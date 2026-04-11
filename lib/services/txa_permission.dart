@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
 import 'txa_language.dart';
 
@@ -37,10 +38,12 @@ class TxaPermission {
     // 1. Notification (Simple dialog/box)
     await Permission.notification.request();
 
-    // 2. Storage Management (Might open settings if API >= 30, otherwise dialog)
-    // On Android 11+ this opens the "Manage All Files" screen correctly.
-    // For earlier versions, it acts as a storage request.
-    await Permission.manageExternalStorage.request();
+    // 2. Storage Management (Android Only)
+    if (Platform.isAndroid) {
+      // On Android 11+ this opens the "Manage All Files" screen correctly.
+      // For earlier versions, it acts as a storage request.
+      await Permission.manageExternalStorage.request();
+    }
   }
 
   // Request all (Legacy compatibility for SplashScreen)

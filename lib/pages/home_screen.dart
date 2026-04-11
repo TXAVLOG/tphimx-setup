@@ -26,6 +26,8 @@ import '../widgets/txa_download_dialog.dart';
 import '../widgets/txa_error_widget.dart';
 import '../utils/txa_logger.dart';
 import '../utils/txa_format.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:flutter/foundation.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -104,6 +106,19 @@ class _HomeScreenState extends State<HomeScreen> {
             final String rawUrl = appData?['download_url'] ?? appData?['apk_url'] ?? '';
             Navigator.pop(context); // Close modal
             
+            // --- PLATFORM SENSITIVE UPDATE ---
+            if (defaultTargetPlatform == TargetPlatform.iOS) {
+              final uri = Uri.parse(rawUrl);
+              if (await canLaunchUrl(uri)) {
+                await launchUrl(uri, mode: LaunchMode.externalApplication);
+              } else {
+                if (!mounted) return;
+                TxaToast.show(context, TxaLanguage.t('error_opening_link'), isError: true);
+              }
+              return;
+            }
+
+            // --- ANDROID FLOW (Existing) ---
             TxaToast.show(context, TxaLanguage.t('loading_progress'));
             
             // Resolve direct link (Handles Mediafire!)
@@ -112,7 +127,6 @@ class _HomeScreenState extends State<HomeScreen> {
                if (!mounted) return;
 
                // --- PERMISSION CHECKS ---
-               // 1. Storage Permission
                if (!await TxaPermission.checkAllRequired()) {
                   if (!mounted) return;
                   TxaToast.show(context, TxaLanguage.t('permissions_required'), isError: true);
@@ -121,7 +135,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   if (!await TxaPermission.checkAllRequired()) return;
                }
 
-               // 2. Install Permission
                if (!await TxaPermission.requestInstall()) {
                   if (!mounted) return;
                   TxaToast.show(context, TxaLanguage.t('permissions_required'), isError: true);

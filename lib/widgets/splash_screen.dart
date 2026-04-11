@@ -11,6 +11,7 @@ import '../services/txa_permission.dart';
 import '../services/txa_settings.dart';
 import '../theme/txa_theme.dart';
 import '../utils/txa_toast.dart';
+import 'package:flutter/services.dart';
 
 class SplashScreen extends StatefulWidget {
   final VoidCallback onFinish;
@@ -23,6 +24,7 @@ class SplashScreen extends StatefulWidget {
 class _SplashScreenState extends State<SplashScreen> {
   double _progress = 0.0;
   String _status = '';
+  String? _fatalError;
   bool _isIosLocked = false;
   late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
@@ -70,47 +72,55 @@ class _SplashScreenState extends State<SplashScreen> {
   }
 
   Future<void> _startInit() async {
-    // 1. Initial Permission Request
-    setState(() {
-      _status = 'Kiểm tra quyền truy cập...';
-      _progress = 0.2;
-    });
-    await TxaPermission.requestInitial();
-
-    // 2. Initialize Language
-    setState(() {
-      _status = 'Khởi tạo ngôn ngữ...';
-      _progress = 0.4;
-    });
-    await TxaLanguage.init();
-
-    // 2.5 iOS UDID Check (Locked state)
-    if (Platform.isIOS && TxaSettings.udid.isEmpty) {
+    try {
+      // 1. Initial Permission Request
       setState(() {
-        _isIosLocked = true;
-        _progress = 0.5;
-        _status = 'Bạn chưa có quyền truy cập ứng dụng này.';
+        _status = 'Kiểm tra quyền truy cập...';
+        _progress = 0.2;
       });
-      return; // Stop initialization until unlocked via deep link
-    }
-    
-    // 3. Check Network
-    setState(() {
-      _status = TxaLanguage.t('connecting');
-      _progress = 0.7;
-    });
-    final hasNet = await TxaNetwork().checkConnection();
-    if (!hasNet) {
-      _showError(TxaLanguage.t('network_error'));
-      return;
-    }
+      await TxaPermission.requestInitial();
 
-    // Success final progress update
-    setState(() {
-      _progress = 1.0;
-      _status = TxaLanguage.t('success');
-    });
-    Future.delayed(const Duration(seconds: 1), widget.onFinish);
+      // 2. Initialize Language
+      setState(() {
+        _status = 'Khởi tạo ngôn ngữ...';
+        _progress = 0.4;
+      });
+      await TxaLanguage.init();
+
+      // 2.5 iOS UDID Check (Locked state)
+      if (Platform.isIOS && TxaSettings.udid.isEmpty) {
+        setState(() {
+          _isIosLocked = true;
+          _progress = 0.5;
+          _status = 'Bạn chưa có quyền truy cập ứng dụng này.';
+        });
+        return; // Stop initialization until unlocked via deep link
+      }
+      
+      // 3. Check Network
+      setState(() {
+        _status = TxaLanguage.t('connecting');
+        _progress = 0.7;
+      });
+      final hasNet = await TxaNetwork().checkConnection();
+      if (!hasNet) {
+        _showError(TxaLanguage.t('network_error'));
+        return;
+      }
+
+      // Success final progress update
+      setState(() {
+        _progress = 1.0;
+        _status = TxaLanguage.t('success');
+      });
+      Future.delayed(const Duration(seconds: 1), widget.onFinish);
+    } catch (e, stack) {
+      debugPrint('[SplashError] $e\n$stack');
+      setState(() {
+        _fatalError = e.toString();
+        _status = 'Khởi tạo thất bại';
+      });
+    }
   }
 
   Future<void> _handleGetUDID() async {
@@ -153,6 +163,10 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_fatalError != null) {
+      return _buildErrorView();
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       body: Center(
@@ -211,6 +225,74 @@ class _SplashScreenState extends State<SplashScreen> {
                  style: TextStyle(color: Colors.white30, fontSize: 11),
                ),
             ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildErrorView() {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F0F0F),
+      body: Padding(
+        padding: const EdgeInsets.all(32.0),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+            const SizedBox(height: 24),
+            const Text(
+              'Oops! Đã có lỗi xảy ra',
+              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.white.withValues(alpha: 0.05),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.white10),
+              ),
+              child: SelectableText(
+                _fatalError ?? 'Lỗi không xác định',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white70, fontSize: 13, fontFamily: 'monospace'),
+              ),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                ElevatedButton.icon(
+                  onPressed: () {
+                    Clipboard.setData(ClipboardData(text: _fatalError ?? 'NaN'));
+                    TxaToast.show(context, 'Đã copy mã lỗi!');
+                  },
+                  icon: const Icon(Icons.copy_rounded, size: 18),
+                  label: const Text('Copy Lỗi'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white12,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                ElevatedButton.icon(
+                  onPressed: () {
+                    setState(() {
+                      _fatalError = null;
+                      _progress = 0;
+                    });
+                    _startInit();
+                  },
+                  icon: const Icon(Icons.refresh_rounded, size: 18),
+                  label: const Text('Thử lại'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: TxaTheme.accent,
+                    foregroundColor: Colors.white,
+                  ),
+                ),
+              ],
+            ),
           ],
         ),
       ),

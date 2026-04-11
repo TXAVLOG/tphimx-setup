@@ -2,7 +2,10 @@ import 'dart:io';
 import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:open_file/open_file.dart';
 import '../utils/txa_format.dart';
+import '../utils/txa_logger.dart';
+import 'txa_language.dart';
 
 class TxaDownload {
   final Dio _dio = Dio();
@@ -26,7 +29,16 @@ class TxaDownload {
 
   void _initNotifications() async {
     const android = AndroidInitializationSettings('@mipmap/ic_launcher');
-    await _notifications.initialize(settings: const InitializationSettings(android: android));
+    await _notifications.initialize(
+      settings: const InitializationSettings(android: android),
+      onDidReceiveNotificationResponse: (details) async {
+        final String? payload = details.payload;
+        if (payload != null && payload.isNotEmpty) {
+           TxaLogger.log("Opening file from notification: $payload");
+           await OpenFile.open(payload);
+        }
+      },
+    );
   }
 
   /// Start direct file download
@@ -88,7 +100,9 @@ class TxaDownload {
       );
 
       if (showNotification) {
-        await _completeNotification(filename, 'Tải xong 🚀');
+        final String title = TxaLanguage.t('download_finished');
+        final String body = TxaLanguage.t('click_to_install');
+        await _completeNotification(filename, '$title $body', payload: savePath);
       }
 
       isDownloading = false;
@@ -169,7 +183,7 @@ class TxaDownload {
     );
   }
 
-  Future<void> _completeNotification(String title, String body) async {
+  Future<void> _completeNotification(String title, String body, {String? payload}) async {
     final android = const AndroidNotificationDetails(
       'txa_download',
       'TPhimX Tải về',
@@ -181,6 +195,7 @@ class TxaDownload {
       id: 1,
       title: title,
       body: body,
+      payload: payload,
       notificationDetails: NotificationDetails(android: android),
     );
   }

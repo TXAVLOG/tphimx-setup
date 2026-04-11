@@ -161,6 +161,9 @@ class TxaLanguage {
       'server_switch_hint': 'Chọn server để xem ở nguồn khác',
       'server_ep_unavailable_title': 'Tập phim không khả dụng',
       'server_ep_unavailable_msg': 'Tập %ep chưa có trên server %server. Tự động chuyển về server mặc định.',
+      'download_finished': 'Tải xong 🚀',
+      'click_to_install': '(Bấm để cài đặt)',
+      'error_opening_link': 'Không thể mở trình cài đặt hoặc liên kết',
     },
     'en': {
       'app_name': 'TPhimX Premium',
@@ -318,6 +321,9 @@ class TxaLanguage {
       'server_switch_hint': 'Switch server to watch from another source',
       'server_ep_unavailable_title': 'Episode Unavailable',
       'server_ep_unavailable_msg': 'Episode %ep is not available on %server. Auto-switching to default server.',
+      'download_finished': 'Download finished 🚀',
+      'click_to_install': '(Click to install)',
+      'error_opening_link': 'Could not open installer or link',
     }
   };
 

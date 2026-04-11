@@ -25,14 +25,24 @@ class TxaFormat {
   }
 
   /// Format size (bytes to human readable)
-  static Map<String, dynamic> formatSize(int bytes, {int decimals = 2}) {
-    if (bytes <= 0) return {'value': 0.0, 'unit': 'B', 'display': '0 B'};
+  static Map<String, dynamic> formatSize(int bytes, {int decimals = 2, bool padInteger = true}) {
+    if (bytes <= 0) return {'value': 0.0, 'unit': 'B', 'display': '00.00 B'};
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     final double value = bytes.toDouble();
-    final double base = 1024.0;
+    const double base = 1024.0;
     final int i = (math.log(value.abs()) / math.log(base)).floor().clamp(0, units.length - 1);
     final double unitValue = value / math.pow(base, i);
-    final String display = '${unitValue.toStringAsFixed(decimals)} ${units[i]}';
+    
+    // Format with decimals
+    String formatted = unitValue.toStringAsFixed(decimals); // e.g. "1.45"
+    if (padInteger) {
+      List<String> parts = formatted.split('.');
+      String integerPart = parts[0].padLeft(2, '0');
+      String decimalPart = parts.length > 1 ? parts[1] : '';
+      formatted = decimalPart.isNotEmpty ? "$integerPart.$decimalPart" : integerPart;
+    }
+
+    final String display = '$formatted ${units[i]}';
     return {'value': unitValue, 'unit': units[i], 'display': display};
   }
 
@@ -42,7 +52,7 @@ class TxaFormat {
     return {
       'value': sizeInfo['value'],
       'unit': '${sizeInfo['unit']}/s',
-      'display': '${sizeInfo['value']} ${sizeInfo['unit']}/s',
+      'display': '${sizeInfo['display']}/s',
     };
   }
 
