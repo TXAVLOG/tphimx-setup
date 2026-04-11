@@ -1,6 +1,6 @@
 workflows:
   main-workflow:
-    name: TPhimX iOS Release Pipeline
+    name: "🚀 [TPhimX] iOS Premium Auto-Build & Release"
     instance_type: mac_mini_m1
     max_build_duration: 60
     environment:
