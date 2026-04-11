@@ -1,6 +1,6 @@
 workflows:
   main-workflow:
-    name: "🚀 [TPhimX] iOS Premium Auto-Build & Release"
+    name: "📦 [TPhimX] iOS Premium Automation (Final)"
     instance_type: mac_mini_m1
     max_build_duration: 60
     environment:
@@ -22,8 +22,11 @@ workflows:
       - name: Get version from pubspec.yaml
         script: |
           VERSION=$(grep "^version: " pubspec.yaml | sed 's/version: //' | tr -d '\r')
+          # Sanitize tag: replace '+' with '_' as GitHub API/URLs can fail with '+'
+          TAG="v${VERSION//+/_}"
           echo "VERSION=$VERSION" >> $CM_ENV
-          echo "Current project version: $VERSION"
+          echo "TAG=$TAG" >> $CM_ENV
+          echo "Current version: $VERSION | Sanity Tag: $TAG"
       - name: Build & Manual Package iOS IPA
         script: |
           echo "Building iOS for version $VERSION..."
@@ -37,13 +40,11 @@ workflows:
           cd ../../..
       - name: Create GitHub Release & Upload IPA
         script: |
-          TAG="v$VERSION"
-          # Get git changelog directly
+          # Use sanitized TAG
           CHANGELOG=$(git log -10 --pretty=format:"- %s")
 
           echo "Creating release $TAG on GitHub..."
 
-          # Fix Python booleans (must be False instead of false)
           JSON_DATA=$(python3 -c "import json, sys; print(json.dumps({'tag_name': sys.argv[1], 'name': 'TPhimX Release ' + sys.argv[1], 'body': sys.argv[2], 'draft': False, 'prerelease': False}))" "$TAG" "$CHANGELOG")
 
           RESPONSE=$(curl -s -X POST \
@@ -55,19 +56,19 @@ workflows:
           UPLOAD_URL=$(echo $RESPONSE | jq -r .upload_url | sed 's/{?name,label}//')
 
           if [ "$UPLOAD_URL" == "null" ] || [ -z "$UPLOAD_URL" ]; then
-            echo "Release entry failed or already exists. Fetching upload URL for tag $TAG..."
+            echo "Direct creation failed or already exists. Attempting to fetch existing release for tag $TAG..."
             UPLOAD_URL=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
               https://api.github.com/repos/$CM_REPO_OWNER/$CM_REPO_NAME/releases/tags/$TAG \
               | jq -r .upload_url | sed 's/{?name,label}//')
           fi
 
           if [ "$UPLOAD_URL" == "null" ] || [ -z "$UPLOAD_URL" ]; then
-            echo "Failed to resolve UPLOAD_URL. Final response from GitHub:"
+            echo "CRITICAL: Could not resolve UPLOAD_URL for tag $TAG. GitHub Response:"
             echo $RESPONSE
             exit 1
           fi
 
-          echo "Uploading IPA..."
+          echo "Uploading IPA to $TAG..."
           IPA_FILE=$(find build/ios/ipa -name "*.ipa" | head -n 1)
           if [ -n "$IPA_FILE" ]; then
             FILE_NAME=$(basename "$IPA_FILE")
@@ -76,7 +77,7 @@ workflows:
               -H "Content-Type: application/octet-stream" \
               --data-binary "@$IPA_FILE" \
               "$UPLOAD_URL?name=$FILE_NAME"
-            echo "IPA $FILE_NAME uploaded successfully."
+            echo "IPA $FILE_NAME uploaded successfully to release $TAG."
           else
             echo "Error: IPA file not found."
             exit 1
