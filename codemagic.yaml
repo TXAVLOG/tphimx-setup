@@ -1,0 +1,35 @@
+workflows:
+  main-workflow:
+    name: TPhimX Build Pipeline
+    instance_type: mac_mini_m1
+    max_build_duration: 60
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: master
+          include: true
+    scripts:
+      - name: Get dependencies
+        script: | 
+          flutter pub get
+      - name: Build Android APK
+        script: | 
+          flutter build apk --release --no-shrink
+      - name: Build iOS IPA
+        script: | 
+          # Lưu ý: Nếu chưa có Distribution Certificate thì dùng --no-codesign để lấy file IPA trần
+          flutter build ipa --release --no-codesign
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk
+      - build/ios/ipa/*.ipa
+    publishing:
+      github:
+        release: true
+        artifact_patterns:
+          - "*.apk"
+          - "*.ipa"
