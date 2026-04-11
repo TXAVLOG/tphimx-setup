@@ -7,6 +7,7 @@ import '../services/txa_settings.dart';
 import '../services/txa_language.dart';
 import '../theme/txa_theme.dart';
 import '../utils/txa_toast.dart';
+import '../widgets/txa_modal.dart';
 
 class TxaPlayer extends StatefulWidget {
   final dynamic movie;
@@ -58,6 +59,16 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
   
   bool _showControls = true;
   Timer? _controlsTimer;
+
+  // Aspect ratio options
+  static const List<Map<String, dynamic>> _aspectRatios = [
+    {'label': '16:9', 'value': 16 / 9, 'fit': BoxFit.contain},
+    {'label': '4:3', 'value': 4 / 3, 'fit': BoxFit.contain},
+    {'label': '21:9', 'value': 21 / 9, 'fit': BoxFit.contain},
+    {'label': 'Fill', 'value': null, 'fit': BoxFit.cover},
+    {'label': 'Fit', 'value': null, 'fit': BoxFit.fitWidth},
+  ];
+  int _currentRatioIndex = 0;
 
   @override
   void initState() {
@@ -147,14 +158,16 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
         if (_showControls) _startControlsTimer();
       });
       
-      // If hiding controls, also hide drawer
+      // If hiding controls, also hide drawers
       if (!_showControls) {
          _showEpisodeDrawer = false;
+         _showServerDrawer = false;
       }
     }
   }
 
   bool _showEpisodeDrawer = false;
+  bool _showServerDrawer = false;
 
 
   Future<void> _initializePlayer() async {
@@ -343,6 +356,73 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
     }
   }
 
+  // --- SERVER SWITCHING ---
+  void _switchServer(int newServerIndex) {
+    if (newServerIndex == _currentServerIndex) return;
+    
+    final newServerData = widget.servers[newServerIndex]['server_data'] as List;
+    final oldServerData = widget.servers[_currentServerIndex]['server_data'] as List;
+    
+    // Check if current episode exists in new server
+    if (_currentEpisodeIndex >= newServerData.length) {
+      // Episode doesn't exist on this server — show modal & auto-revert
+      final serverName = widget.servers[newServerIndex]['server_name'] ?? 'Server';
+      final epName = oldServerData[_currentEpisodeIndex]['name'].toString();
+      
+      TxaModal.show(
+        context,
+        title: TxaLanguage.t('server_ep_unavailable_title'),
+        content: Text(
+          TxaLanguage.t('server_ep_unavailable_msg')
+            .replaceAll('%ep', epName)
+            .replaceAll('%server', serverName),
+          style: const TextStyle(color: TxaTheme.textSecondary, fontSize: 14, height: 1.5),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(TxaLanguage.t('ok'), style: const TextStyle(color: TxaTheme.accent, fontWeight: FontWeight.bold)),
+          ),
+        ],
+        barrierDismissible: true,
+      );
+      
+      // Auto-revert to first server
+      setState(() {
+        _currentServerIndex = 0;
+        _showServerDrawer = false;
+      });
+      return;
+    }
+    
+    // Switch server and reload
+    setState(() {
+      _currentServerIndex = newServerIndex;
+      _showServerDrawer = false;
+    });
+    _loadMarkers();
+    _initializePlayer();
+  }
+
+  // --- ASPECT RATIO ---
+  void _cycleAspectRatio() {
+    if (_betterPlayerController == null || _isEmbed) {
+      TxaToast.show(context, TxaLanguage.t('feature_dev'));
+      return;
+    }
+    setState(() {
+      _currentRatioIndex = (_currentRatioIndex + 1) % _aspectRatios.length;
+      final ratio = _aspectRatios[_currentRatioIndex];
+      _betterPlayerController!.setOverriddenAspectRatio(
+        ratio['value'] as double? ?? MediaQuery.of(context).size.aspectRatio,
+      );
+      _betterPlayerController!.setOverriddenFit(ratio['fit'] as BoxFit);
+      _overlayIcon = Icons.aspect_ratio_rounded;
+      _overlayLabel = "${TxaLanguage.t('player_ratio')}: ${ratio['label']}";
+    });
+    _showOverlayFeedback();
+  }
+
   // --- GESTURE LOGIC ---
   void _handleVerticalDrag(DragUpdateDetails details, double width) {
     if (_isLocked) return;
@@ -410,6 +490,8 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
   @override
   void dispose() {
     _betterPlayerController?.dispose();
+    _controlsTimer?.cancel();
+    _overlayTimer?.cancel();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -481,6 +563,9 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
             if (_showEpisodeDrawer && _isInitialized && !_error) 
               _buildEpisodeSelectionOverlay(),
 
+            // 4.6 SERVER DRAWER
+            if (_showServerDrawer && _isInitialized && !_error)
+              _buildServerSelectionOverlay(),
 
             // 5. SKIP BUTTONS
             if (_showSkipIntro) _buildSkipOverlay(TxaLanguage.t('skip_intro'), () {
@@ -496,6 +581,7 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
   Widget _buildControlOverlay() {
     final serverData = widget.servers[_currentServerIndex]['server_data'] as List;
     final ep = serverData[_currentEpisodeIndex];
+    final serverName = widget.servers[_currentServerIndex]['server_name'] ?? 'Server';
     
     return Stack(
       children: [
@@ -536,14 +622,28 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
                   const Spacer(),
                   Expanded(
                     flex: 12,
-                    child: Text(
-                      "(${TxaLanguage.t('app_name')} - ${widget.movie['name']} ${TxaLanguage.t('episode')} ${ep['name']})", 
-                      textAlign: TextAlign.center,
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, overflow: TextOverflow.ellipsis),
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          "${widget.movie['name']} - ${TxaLanguage.t('episode')} ${ep['name']}", 
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13, overflow: TextOverflow.ellipsis),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          serverName,
+                          textAlign: TextAlign.center,
+                          style: TextStyle(color: TxaTheme.accent.withValues(alpha: 0.8), fontSize: 11, fontWeight: FontWeight.w500),
+                        ),
+                      ],
                     ),
                   ),
                   const Spacer(),
-                  _HeaderIcon(icon: Icons.cast_connected_rounded, onTap: () {}),
+                  _HeaderIcon(
+                    icon: Icons.cast_connected_rounded, 
+                    onTap: () => TxaToast.show(context, TxaLanguage.t('feature_dev')),
+                  ),
                   _HeaderIcon(icon: Icons.settings_outlined, onTap: _showFullSettings),
                 ],
               ),
@@ -597,11 +697,34 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        _BottomBarItem(icon: Icons.aspect_ratio_rounded, label: TxaLanguage.t('player_ratio'), onTap: _showAudioSettings),
-                        const SizedBox(width: 40),
-                        _BottomBarItem(icon: Icons.mic_none_rounded, label: TxaLanguage.t('player_audio_track'), onTap: _showAudioSettings),
-                        const SizedBox(width: 40),
-                        _BottomBarItem(icon: Icons.playlist_play_rounded, label: TxaLanguage.t('player_episodes'), onTap: () => setState(() => _showEpisodeDrawer = true)),
+                        // RATIO BUTTON — cycles aspect ratios
+                        _BottomBarItem(
+                          icon: Icons.aspect_ratio_rounded, 
+                          label: '${TxaLanguage.t('player_ratio')} (${_aspectRatios[_currentRatioIndex]['label']})', 
+                          onTap: _cycleAspectRatio,
+                        ),
+                        const SizedBox(width: 32),
+                        // SERVER BUTTON — opens server selection panel
+                        _BottomBarItem(
+                          icon: Icons.dns_rounded, 
+                          label: widget.servers[_currentServerIndex]['server_name'] ?? TxaLanguage.t('select_server'), 
+                          onTap: () => setState(() { _showServerDrawer = true; _showEpisodeDrawer = false; }),
+                          isActive: true,
+                        ),
+                        const SizedBox(width: 32),
+                        // SUBTITLE BUTTON — coming soon
+                        _BottomBarItem(
+                          icon: Icons.subtitles_rounded, 
+                          label: TxaLanguage.t('player_subtitle'), 
+                          onTap: () => TxaToast.show(context, TxaLanguage.t('feature_dev')),
+                        ),
+                        const SizedBox(width: 32),
+                        // EPISODE LIST BUTTON
+                        _BottomBarItem(
+                          icon: Icons.playlist_play_rounded, 
+                          label: TxaLanguage.t('player_episodes'), 
+                          onTap: () => setState(() { _showEpisodeDrawer = true; _showServerDrawer = false; }),
+                        ),
                       ],
                     ),
                   ],
@@ -674,19 +797,6 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
           ],
         );
       },
-    );
-  }
-
-  void _showAudioSettings() {
-    showModalBottomSheet(
-      context: context, backgroundColor: Colors.transparent,
-      builder: (ctx) => _PremiumSettingsSheet(
-        title: TxaLanguage.t('player_audio'),
-        children: [
-          _SheetItem(label: 'Server: ${widget.servers[_currentServerIndex]['server_name']}', icon: Icons.storage_rounded, onTap: () {}),
-          _SheetItem(label: 'Phụ đề: Auto', icon: Icons.subtitles_rounded, onTap: () {}),
-        ],
-      ),
     );
   }
 
@@ -778,10 +888,10 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
     );
   }
 
-  // Removed _showEpisodeList as it is now handled inline
-
+  // --- EPISODE SELECTION RIGHT PANEL ---
   Widget _buildEpisodeSelectionOverlay() {
     final serverData = widget.servers[_currentServerIndex]['server_data'] as List;
+    final currentEpName = serverData[_currentEpisodeIndex]['name'].toString();
     
     return GestureDetector(
       onTap: () => setState(() => _showEpisodeDrawer = false),
@@ -804,12 +914,48 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
                   children: [
                     Padding(
                       padding: const EdgeInsets.all(20),
-                      child: Row(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          const Icon(Icons.sort_rounded, color: Colors.white70),
-                          const SizedBox(width: 10),
-                          Text(TxaLanguage.t('series_parts'), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                          const Icon(Icons.arrow_drop_down_rounded, color: Colors.white70),
+                          Row(
+                            children: [
+                              const Icon(Icons.playlist_play_rounded, color: TxaTheme.accent),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(TxaLanguage.t('player_episodes'), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 22),
+                                onPressed: () => setState(() => _showEpisodeDrawer = false),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          // Current episode indicator
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: TxaTheme.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: TxaTheme.accent.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.play_circle_filled_rounded, color: TxaTheme.accent, size: 16),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    "${TxaLanguage.t('watching')}: ${TxaLanguage.t('episode')} $currentEpName",
+                                    style: const TextStyle(color: TxaTheme.accent, fontSize: 12, fontWeight: FontWeight.bold),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
                         ],
                       ),
                     ),
@@ -824,30 +970,52 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
                           final displayName = isClean ? epNameRaw : "${TxaLanguage.t('episode')} $epNameRaw";
 
                           return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
+                            padding: const EdgeInsets.only(bottom: 8),
                             child: InkWell(
                               onTap: () { 
                                 setState(() { _currentEpisodeIndex = i; _showEpisodeDrawer = false; }); 
+                                _loadMarkers();
                                 _initializePlayer(); 
                               },
-                              child: Container(
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
                                 padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
                                 decoration: BoxDecoration(
-                                  color: isCur ? TxaTheme.accent : Colors.white12, 
+                                  color: isCur ? TxaTheme.accent : Colors.white.withValues(alpha: 0.06), 
                                   borderRadius: BorderRadius.circular(8),
+                                  border: isCur ? null : Border.all(color: Colors.white.withValues(alpha: 0.06)),
                                 ),
                                 child: Row(
                                   children: [
-                                    Icon(Icons.play_arrow_rounded, color: isCur ? Colors.white : Colors.white70),
-                                    const SizedBox(width: 12),
-                                    Text(
-                                      displayName, 
-                                      style: TextStyle(
-                                        color: isCur ? Colors.white : Colors.white, 
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 15
-                                      )
+                                    Icon(
+                                      isCur ? Icons.play_circle_filled_rounded : Icons.play_arrow_rounded, 
+                                      color: isCur ? Colors.white : Colors.white54,
+                                      size: isCur ? 24 : 20,
                                     ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Text(
+                                        displayName, 
+                                        style: TextStyle(
+                                          color: Colors.white, 
+                                          fontWeight: isCur ? FontWeight.bold : FontWeight.w500,
+                                          fontSize: isCur ? 15 : 14,
+                                        ),
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ),
+                                    if (isCur)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          TxaLanguage.t('watching'),
+                                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
                                   ],
                                 ),
                               ),
@@ -866,7 +1034,157 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
     );
   }
 
-  // Removed _buildEpisodeSelectionOverlayLegacy
+  // --- SERVER SELECTION RIGHT PANEL ---
+  Widget _buildServerSelectionOverlay() {
+    return GestureDetector(
+      onTap: () => setState(() => _showServerDrawer = false),
+      child: Container(
+        color: Colors.black26,
+        child: Align(
+          alignment: Alignment.centerRight,
+          child: GestureDetector(
+            onTap: () {}, // Prevent tap through
+            child: Container(
+              width: MediaQuery.of(context).size.width * 0.4,
+              height: double.infinity,
+              decoration: const BoxDecoration(
+                color: Color(0xFF1A1F2E),
+                boxShadow: [BoxShadow(color: Colors.black54, blurRadius: 20)],
+              ),
+              child: SafeArea(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.dns_rounded, color: TxaTheme.accent),
+                              const SizedBox(width: 10),
+                              Expanded(
+                                child: Text(TxaLanguage.t('select_server'), style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 22),
+                                onPressed: () => setState(() => _showServerDrawer = false),
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 8),
+                          // Current server + episode info
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: TxaTheme.accent.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(color: TxaTheme.accent.withValues(alpha: 0.3)),
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.check_circle_rounded, color: TxaTheme.accent, size: 16),
+                                const SizedBox(width: 6),
+                                Flexible(
+                                  child: Text(
+                                    widget.servers[_currentServerIndex]['server_name'] ?? 'Server',
+                                    style: const TextStyle(color: TxaTheme.accent, fontSize: 12, fontWeight: FontWeight.bold),
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            TxaLanguage.t('server_switch_hint'),
+                            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(
+                      child: ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        itemCount: widget.servers.length,
+                        itemBuilder: (ctx, i) {
+                          final isCur = i == _currentServerIndex;
+                          final serverName = widget.servers[i]['server_name'] ?? 'Server ${i + 1}';
+                          final epCount = (widget.servers[i]['server_data'] as List?)?.length ?? 0;
+
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: InkWell(
+                              onTap: () => _switchServer(i),
+                              child: AnimatedContainer(
+                                duration: const Duration(milliseconds: 200),
+                                padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 16),
+                                decoration: BoxDecoration(
+                                  color: isCur ? TxaTheme.accent : Colors.white.withValues(alpha: 0.06),
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: isCur ? null : Border.all(color: Colors.white.withValues(alpha: 0.06)),
+                                ),
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      isCur ? Icons.check_circle_rounded : Icons.dns_outlined,
+                                      color: isCur ? Colors.white : Colors.white54,
+                                      size: 22,
+                                    ),
+                                    const SizedBox(width: 12),
+                                    Expanded(
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            serverName,
+                                            style: TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: isCur ? FontWeight.bold : FontWeight.w500,
+                                              fontSize: 14,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            '$epCount ${TxaLanguage.t('episode').toLowerCase()}',
+                                            style: TextStyle(color: Colors.white.withValues(alpha: 0.4), fontSize: 11),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                    if (isCur)
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                                        decoration: BoxDecoration(
+                                          color: Colors.white.withValues(alpha: 0.2),
+                                          borderRadius: BorderRadius.circular(4),
+                                        ),
+                                        child: Text(
+                                          TxaLanguage.t('current_label'),
+                                          style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
   Widget _buildSkipOverlay(String label, VoidCallback onTap, Alignment align) {
     return Positioned(
@@ -912,7 +1230,8 @@ class _BottomBarItem extends StatelessWidget {
   final IconData icon;
   final String label;
   final VoidCallback onTap;
-  const _BottomBarItem({required this.icon, required this.label, required this.onTap});
+  final bool isActive;
+  const _BottomBarItem({required this.icon, required this.label, required this.onTap, this.isActive = false});
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -920,9 +1239,16 @@ class _BottomBarItem extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: Colors.white, size: 24),
+          Icon(icon, color: isActive ? TxaTheme.accent : Colors.white, size: 24),
           const SizedBox(height: 4),
-          Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+          Text(
+            label, 
+            style: TextStyle(
+              color: isActive ? TxaTheme.accent : Colors.white70, 
+              fontSize: 10, 
+              fontWeight: isActive ? FontWeight.bold : FontWeight.normal,
+            ),
+          ),
         ],
       ),
     );
@@ -938,30 +1264,6 @@ class _HeaderIcon extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return IconButton(icon: Icon(icon, color: color, size: size), onPressed: onTap);
-  }
-}
-
-class _PremiumSettingsSheet extends StatelessWidget {
-  final String title;
-  final List<Widget> children;
-  const _PremiumSettingsSheet({required this.title, required this.children});
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(color: TxaTheme.primaryBg.withValues(alpha: 0.95), borderRadius: const BorderRadius.vertical(top: Radius.circular(24))),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(width: 32, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(2))),
-          const SizedBox(height: 16),
-          Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-          const SizedBox(height: 24),
-          ...children,
-          const SizedBox(height: 24),
-        ],
-      ),
-    );
   }
 }
 
@@ -1027,21 +1329,6 @@ class _SwitchRow extends StatelessWidget {
       value: value,
       activeThumbColor: TxaTheme.accent,
       onChanged: onChanged,
-    );
-  }
-}
-
-class _SheetItem extends StatelessWidget {
-  final String label;
-  final IconData icon;
-  final VoidCallback onTap;
-  const _SheetItem({required this.label, required this.icon, required this.onTap});
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      leading: Icon(icon, color: TxaTheme.textSecondary),
-      title: Text(label, style: const TextStyle(color: Colors.white)),
-      onTap: onTap,
     );
   }
 }

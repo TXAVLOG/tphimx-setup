@@ -1,11 +1,12 @@
 import 'package:dio/dio.dart';
+import '../services/txa_settings.dart';
 import '../utils/txa_logger.dart';
 
 class TxaApi {
   static const String baseUrl = 'https://film.nrotxa.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '2.4.7';
+  static const String apiVersion = '2.4.8';
   
   // Community Links
   static const String facebookFanpage = 'https://www.facebook.com/profile.php?id=61573302085316';
@@ -23,6 +24,7 @@ class TxaApi {
       'Accept': 'application/json',
       'X-TXA-API-KEY': apiKey,
       'X-TXC-Client': 'TPhimX-App',
+      'X-TXA-UDID': TxaSettings.udid,
     },
   ));
 

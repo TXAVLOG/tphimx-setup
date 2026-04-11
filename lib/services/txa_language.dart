@@ -156,6 +156,11 @@ class TxaLanguage {
       'player_ratio': 'Tỷ lệ',
       'player_audio_track': 'Âm thanh',
       'player_seek_hint_short': 'Chạm đúp',
+      'player_subtitle': 'Phụ đề',
+      'current_label': 'Hiện tại',
+      'server_switch_hint': 'Chọn server để xem ở nguồn khác',
+      'server_ep_unavailable_title': 'Tập phim không khả dụng',
+      'server_ep_unavailable_msg': 'Tập %ep chưa có trên server %server. Tự động chuyển về server mặc định.',
     },
     'en': {
       'app_name': 'TPhimX Premium',
@@ -308,6 +313,11 @@ class TxaLanguage {
       'player_ratio': 'Ratio',
       'player_audio_track': 'Audio',
       'player_seek_hint_short': 'Double Tap',
+      'player_subtitle': 'Subtitle',
+      'current_label': 'Current',
+      'server_switch_hint': 'Switch server to watch from another source',
+      'server_ep_unavailable_title': 'Episode Unavailable',
+      'server_ep_unavailable_msg': 'Episode %ep is not available on %server. Auto-switching to default server.',
     }
   };
 

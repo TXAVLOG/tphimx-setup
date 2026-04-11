@@ -54,10 +54,20 @@ class _AccountScreenState extends State<AccountScreen> {
     if (uri.scheme == 'tphimx' && uri.host == 'udid') {
       final String? m = uri.queryParameters['m'];
       if (m != null && m.isNotEmpty) {
-        setState(() {
-          TxaSettings.udid = m;
-        });
-        TxaToast.show(context, 'Tự động nhận diện UDID thành công!');
+        // Basic UDID validation (usually 40 characters for older devices or 25 for newer, or UUID format)
+        // We'll accept it if it looks like a valid UDID/UUID
+        final bool isValid = RegExp(r'^[a-fA-F0-9\-]{20,45}$').hasMatch(m);
+        
+        if (isValid) {
+          setState(() {
+            TxaSettings.udid = m;
+          });
+          TxaToast.show(context, '✅ Tự động nhận diện UDID thành công!');
+        } else {
+          TxaToast.show(context, '❌ Mã UDID không hợp lệ: $m', isError: true);
+        }
+      } else {
+         TxaToast.show(context, '⚠️ Không tìm thấy mã UDID trong liên kết', isError: true);
       }
     }
   }
@@ -88,6 +98,7 @@ class _AccountScreenState extends State<AccountScreen> {
       }
     }
   }
+
 
   Future<void> _handleGetUDID(BuildContext context) async {
     if (Platform.isIOS) {
@@ -153,6 +164,7 @@ class _AccountScreenState extends State<AccountScreen> {
       ),
     );
   }
+
 
   @override
   Widget build(BuildContext context) {
@@ -497,10 +509,35 @@ class _AccountScreenState extends State<AccountScreen> {
                     ),
                     if (TxaSettings.udid.isNotEmpty)
                       Padding(
-                        padding: const EdgeInsets.only(top: 12),
-                        child: Text(
-                          'Mã máy: ${TxaSettings.udid}',
-                          style: const TextStyle(color: TxaTheme.textMuted, fontSize: 11, fontStyle: FontStyle.italic),
+                        padding: const EdgeInsets.only(top: 16),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: Colors.black26,
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.white10),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.fingerprint_rounded, color: TxaTheme.accent, size: 18),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  TxaSettings.udid,
+                                  style: const TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'monospace'),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.copy_rounded, color: TxaTheme.accent, size: 18),
+                                onPressed: () {
+                                  Clipboard.setData(ClipboardData(text: TxaSettings.udid));
+                                  TxaToast.show(context, 'Đã sao chép UDID');
+                                },
+                                padding: EdgeInsets.zero,
+                                constraints: const BoxConstraints(),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                   ],
