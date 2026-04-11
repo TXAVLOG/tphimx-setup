@@ -27,10 +27,8 @@ workflows:
       - name: Build & Manual Package iOS IPA
         script: |
           echo "Building iOS for version $VERSION..."
-          # Build iOS without codesigning (creates Runner.app)
           flutter build ios --release --no-codesign
           
-          # Manually package .app into .ipa
           echo "Packaging .app into .ipa..."
           mkdir -p build/ios/ipa/Payload
           cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
@@ -40,12 +38,13 @@ workflows:
       - name: Create GitHub Release & Upload IPA
         script: |
           TAG="v$VERSION"
+          # Get git changelog directly
           CHANGELOG=$(git log -10 --pretty=format:"- %s")
 
           echo "Creating release $TAG on GitHub..."
 
-          # Use Python to safely escape JSON for the GitHub API (more reliable on macOS)
-          JSON_DATA=$(python3 -c "import json, sys; print(json.dumps({'tag_name': sys.argv[1], 'name': 'TPhimX Release ' + sys.argv[1], 'body': sys.argv[2], 'draft': false, 'prerelease': false}))" "$TAG" "$CHANGELOG")
+          # Fix Python booleans (must be False instead of false)
+          JSON_DATA=$(python3 -c "import json, sys; print(json.dumps({'tag_name': sys.argv[1], 'name': 'TPhimX Release ' + sys.argv[1], 'body': sys.argv[2], 'draft': False, 'prerelease': False}))" "$TAG" "$CHANGELOG")
 
           RESPONSE=$(curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
@@ -56,17 +55,23 @@ workflows:
           UPLOAD_URL=$(echo $RESPONSE | jq -r .upload_url | sed 's/{?name,label}//')
 
           if [ "$UPLOAD_URL" == "null" ] || [ -z "$UPLOAD_URL" ]; then
-            echo "Release already exists or error. Fetching existing upload URL..."
+            echo "Release entry failed or already exists. Fetching upload URL for tag $TAG..."
             UPLOAD_URL=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
               https://api.github.com/repos/$CM_REPO_OWNER/$CM_REPO_NAME/releases/tags/$TAG \
               | jq -r .upload_url | sed 's/{?name,label}//')
+          fi
+
+          if [ "$UPLOAD_URL" == "null" ] || [ -z "$UPLOAD_URL" ]; then
+            echo "Failed to resolve UPLOAD_URL. Final response from GitHub:"
+            echo $RESPONSE
+            exit 1
           fi
 
           echo "Uploading IPA..."
           IPA_FILE=$(find build/ios/ipa -name "*.ipa" | head -n 1)
           if [ -n "$IPA_FILE" ]; then
             FILE_NAME=$(basename "$IPA_FILE")
-            curl -X POST \
+            curl -L -X POST \
               -H "Authorization: token $GITHUB_TOKEN" \
               -H "Content-Type: application/octet-stream" \
               --data-binary "@$IPA_FILE" \
