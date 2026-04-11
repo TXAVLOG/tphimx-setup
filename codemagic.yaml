@@ -1,6 +1,6 @@
 workflows:
   main-workflow:
-    name: TPhimX Auto Release Pipeline
+    name: TPhimX iOS Release Pipeline
     instance_type: mac_mini_m1
     max_build_duration: 60
     environment:
@@ -23,21 +23,18 @@ workflows:
         script: |
           VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | tr -d '\r')
           echo "VERSION=$VERSION" >> $CM_ENV
-      - name: Build Android APK
-        script: |
-          flutter build apk --release --no-shrink
       - name: Build iOS IPA
         script: |
           flutter build ipa --release --no-codesign
-      - name: Create GitHub Release & Upload
+      - name: Create GitHub Release & Upload IPA
         script: |
           TAG="v$VERSION"
-          RELEASE_NAME="TPhimX Release $TAG"
+          RELEASE_NAME="TPhimX iOS Release $TAG"
           CHANGELOG=$(git log -10 --pretty=format:"- %s")
 
           echo "Creating release $TAG on GitHub..."
 
-          # Tạo Release và lấy Upload URL bằng jq
+          # Tạo Release
           RESPONSE=$(curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
@@ -55,18 +52,13 @@ workflows:
 
           UPLOAD_URL=$(echo $RESPONSE | jq -r .upload_url | sed 's/{?name,label}//')
 
-          if [ "$UPLOAD_URL" == "null" ]; then
-            echo "Error: Could not create release. Response was:"
-            echo $RESPONSE
-            exit 1
+          # Nếu tag đã tồn tại, lấy upload_url của release cũ để tránh lỗi
+          if [ "$UPLOAD_URL" == "null" ] || [ -z "$UPLOAD_URL" ]; then
+            echo "Release already exists or error occurred. Fetching existing release upload URL..."
+            UPLOAD_URL=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
+              https://api.github.com/repos/$CM_REPO_OWNER/$CM_REPO_NAME/releases/tags/$TAG \
+              | jq -r .upload_url | sed 's/{?name,label}//')
           fi
-
-          echo "Uploading APK..."
-          curl -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Content-Type: application/vnd.android.package-archive" \
-            --data-binary @build/app/outputs/flutter-apk/app-release.apk \
-            "$UPLOAD_URL?name=TPhimX-v$VERSION.apk"
 
           echo "Uploading IPA..."
           IPA_PATH=$(find build/ios/ipa -name "*.ipa" | head -n 1)
@@ -75,11 +67,11 @@ workflows:
               -H "Authorization: token $GITHUB_TOKEN" \
               -H "Content-Type: application/octet-stream" \
               --data-binary @$IPA_PATH \
-              "$UPLOAD_URL?name=TPhimX-v$VERSION.ipa"
+              "$UPLOAD_URL?name=TPhimX-Premium-v$VERSION.ipa"
+            echo "IPA Uploaded successfully."
           else
-            echo "No IPA found to upload."
+            echo "Error: No IPA found."
+            exit 1
           fi
-
     artifacts:
-      - build/app/outputs/flutter-apk/*.apk
       - build/ios/ipa/*.ipa
