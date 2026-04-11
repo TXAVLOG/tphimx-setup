@@ -1,9 +1,11 @@
 workflows:
   main-workflow:
-    name: TPhimX Build Pipeline
+    name: TPhimX Auto Release Pipeline
     instance_type: mac_mini_m1
     max_build_duration: 60
     environment:
+      groups:
+        - txa
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -15,21 +17,69 @@ workflows:
           include: true
     scripts:
       - name: Get dependencies
-        script: | 
+        script: |
           flutter pub get
+      - name: Get version from pubspec.yaml
+        script: |
+          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | tr -d '\r')
+          echo "VERSION=$VERSION" >> $CM_ENV
       - name: Build Android APK
-        script: | 
+        script: |
           flutter build apk --release --no-shrink
       - name: Build iOS IPA
-        script: | 
-          # Lưu ý: Nếu chưa có Distribution Certificate thì dùng --no-codesign để lấy file IPA trần
+        script: |
           flutter build ipa --release --no-codesign
+      - name: Create GitHub Release & Upload
+        script: |
+          TAG="v$VERSION"
+          RELEASE_NAME="TPhimX Release $TAG"
+          CHANGELOG=$(git log -10 --pretty=format:"- %s")
+
+          echo "Creating release $TAG on GitHub..."
+
+          # Tạo Release và lấy Upload URL bằng jq
+          RESPONSE=$(curl -s -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Accept: application/vnd.github.v3+json" \
+            https://api.github.com/repos/$CM_REPO_OWNER/$CM_REPO_NAME/releases \
+            -d @- <<EOF
+          {
+            "tag_name": "$TAG",
+            "name": "$RELEASE_NAME",
+            "body": "$(echo "$CHANGELOG" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')",
+            "draft": false,
+            "prerelease": false
+          }
+          EOF
+          )
+
+          UPLOAD_URL=$(echo $RESPONSE | jq -r .upload_url | sed 's/{?name,label}//')
+
+          if [ "$UPLOAD_URL" == "null" ]; then
+            echo "Error: Could not create release. Response was:"
+            echo $RESPONSE
+            exit 1
+          fi
+
+          echo "Uploading APK..."
+          curl -X POST \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary @build/app/outputs/flutter-apk/app-release.apk \
+            "$UPLOAD_URL?name=TPhimX-v$VERSION.apk"
+
+          echo "Uploading IPA..."
+          IPA_PATH=$(find build/ios/ipa -name "*.ipa" | head -n 1)
+          if [ -n "$IPA_PATH" ]; then
+            curl -X POST \
+              -H "Authorization: token $GITHUB_TOKEN" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary @$IPA_PATH \
+              "$UPLOAD_URL?name=TPhimX-v$VERSION.ipa"
+          else
+            echo "No IPA found to upload."
+          fi
+
     artifacts:
       - build/app/outputs/flutter-apk/*.apk
       - build/ios/ipa/*.ipa
-    publishing:
-      github:
-        release: true
-        artifact_patterns:
-          - "*.apk"
-          - "*.ipa"
