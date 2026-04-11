@@ -7,9 +7,60 @@ import '../services/txa_api.dart';
 import '../utils/txa_toast.dart';
 import 'legal_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'dart:io';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:flutter/services.dart';
+import 'package:app_links/app_links.dart';
+import 'dart:async';
 
-class AccountScreen extends StatelessWidget {
+class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
+
+  @override
+  State<AccountScreen> createState() => _AccountScreenState();
+}
+
+class _AccountScreenState extends State<AccountScreen> {
+  late AppLinks _appLinks;
+  StreamSubscription<Uri>? _linkSubscription;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinks();
+  }
+
+  @override
+  void dispose() {
+    _linkSubscription?.cancel();
+    super.dispose();
+  }
+
+  void _initDeepLinks() {
+    _appLinks = AppLinks();
+    
+    // Listen for incoming links while the app is open
+    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
+      _handleIncomingUri(uri);
+    });
+
+    // Check if the app was opened by a link
+    _appLinks.getInitialLink().then((uri) {
+      if (uri != null) _handleIncomingUri(uri);
+    });
+  }
+
+  void _handleIncomingUri(Uri uri) {
+    if (uri.scheme == 'tphimx' && uri.host == 'udid') {
+      final String? m = uri.queryParameters['m'];
+      if (m != null && m.isNotEmpty) {
+        setState(() {
+          TxaSettings.udid = m;
+        });
+        TxaToast.show(context, 'Tự động nhận diện UDID thành công!');
+      }
+    }
+  }
 
   void _handleDev(BuildContext context, String label) {
     TxaToast.show(
@@ -36,6 +87,71 @@ class AccountScreen extends StatelessWidget {
         );
       }
     }
+  }
+
+  Future<void> _handleGetUDID(BuildContext context) async {
+    if (Platform.isIOS) {
+      String deviceName = "iPhone";
+      try {
+        final deviceInfo = DeviceInfoPlugin();
+        final iosInfo = await deviceInfo.iosInfo;
+        deviceName = iosInfo.name;
+      } catch (e) {
+        deviceName = "iOS Device";
+      }
+
+      final String url = "https://asset.nrotxa.online/uuid?device_name=${Uri.encodeComponent(deviceName)}";
+      await _launchUrl(context, url);
+    }
+  }
+
+  void _showUdidInputDialog(BuildContext context) {
+    final controller = TextEditingController(text: TxaSettings.udid);
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: TxaTheme.cardBg,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: const Text('Cập nhật UDID', style: TextStyle(color: Colors.white, fontSize: 18)),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('Dán mã UDID bạn vừa lấy được từ trình duyệt vào đây:',
+                style: TextStyle(color: Colors.white70, fontSize: 13)),
+            const SizedBox(height: 16),
+            TextField(
+              controller: controller,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                filled: true,
+                fillColor: TxaTheme.glassBg,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                hintText: 'Nhập UDID...',
+                hintStyle: const TextStyle(color: Colors.white30),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Hủy', style: TextStyle(color: Colors.white54)),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              setState(() {
+                TxaSettings.udid = controller.text.trim();
+              });
+              Navigator.pop(ctx);
+              TxaToast.show(context, 'Đã lưu UDID!');
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: TxaTheme.accent),
+            child: const Text('Lưu lại'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -300,6 +416,98 @@ class AccountScreen extends StatelessWidget {
             ),
           ),
           
+          if (Platform.isIOS)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+              child: Container(
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [TxaTheme.accent.withValues(alpha: 0.1), Colors.transparent],
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                  ),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: TxaTheme.accent.withValues(alpha: 0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        const Icon(Icons.apple_rounded, color: TxaTheme.accent, size: 22),
+                        const SizedBox(width: 8),
+                        const Text(
+                          'iOS Premium Service',
+                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        ),
+                        const Spacer(),
+                        if (TxaSettings.udid.isNotEmpty)
+                          GestureDetector(
+                            onTap: () {
+                              Clipboard.setData(ClipboardData(text: TxaSettings.udid));
+                              TxaToast.show(context, 'Đã sao chép UDID');
+                            },
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.green.withValues(alpha: 0.2),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: const Text('ĐÃ ĐĂNG KÝ', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 12),
+                    const Text(
+                      'Cần đăng ký UDID thiết bị để có thể cài đặt và cập nhật bản IPA Premium chính thức.',
+                      style: TextStyle(color: TxaTheme.textMuted, fontSize: 12),
+                    ),
+                    const SizedBox(height: 16),
+                    Row(
+                      children: [
+                        Expanded(
+                          child: OutlinedButton.icon(
+                            onPressed: () => _handleGetUDID(context),
+                            icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                            label: const Text('Lấy UDID'),
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: TxaTheme.accent,
+                              side: const BorderSide(color: TxaTheme.accent),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: ElevatedButton.icon(
+                            onPressed: () => _showUdidInputDialog(context),
+                            icon: const Icon(Icons.edit_note_rounded, size: 18),
+                            label: const Text('Nhập UDID'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: TxaTheme.glassBg,
+                              foregroundColor: Colors.white,
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              elevation: 0,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                    if (TxaSettings.udid.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 12),
+                        child: Text(
+                          'Mã máy: ${TxaSettings.udid}',
+                          style: const TextStyle(color: TxaTheme.textMuted, fontSize: 11, fontStyle: FontStyle.italic),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ),
+
           // Version info
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 20),

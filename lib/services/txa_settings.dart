@@ -28,4 +28,8 @@ class TxaSettings {
 
   static double get brightness => _prefs.getDouble('player_brightness') ?? 0.5;
   static set brightness(double v) => _prefs.setDouble('player_brightness', v);
+
+  // --- iOS Specific ---
+  static String get udid => _prefs.getString('ios_device_udid') ?? '';
+  static set udid(String v) => _prefs.setString('ios_device_udid', v);
 }

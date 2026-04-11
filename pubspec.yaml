@@ -55,6 +55,8 @@ dependencies:
   open_file: ^3.3.0
   better_player_plus: ^1.1.5
   webview_flutter: ^4.10.0
+  device_info_plus: ^12.4.0
+  app_links: ^7.0.0
 
 dev_dependencies:
   flutter_test:
