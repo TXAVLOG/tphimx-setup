@@ -1,0 +1,159 @@
+import 'package:dio/dio.dart';
+import '../utils/txa_logger.dart';
+
+class TxaApi {
+  static const String baseUrl = 'https://film.nrotxa.online';
+  static const String apiPrefix = '/api/app';
+  static const String apiKey = 'tphimx-mobile-2026-secure';
+  static const String apiVersion = '2.4.7';
+  
+  // Community Links
+  static const String facebookFanpage = 'https://www.facebook.com/profile.php?id=61573302085316';
+  static const String facebookGroup = 'https://www.facebook.com/groups/1819522938713878';
+  static const String telegramChannel = 'https://t.me/tphimx';
+  static const String telegramGroup = 'https://t.me/+uptNAkShrJFjMjc1';
+
+
+  final Dio _dio = Dio(BaseOptions(
+    baseUrl: baseUrl,
+    connectTimeout: const Duration(seconds: 15),
+    receiveTimeout: const Duration(seconds: 15),
+    headers: {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json',
+      'X-TXA-API-KEY': apiKey,
+      'X-TXC-Client': 'TPhimX-App',
+    },
+  ));
+
+  // Endpoints
+  static const String home = '$apiPrefix/home';
+  static String movieDetail(String slug) => '$apiPrefix/movie/$slug';
+  static const String search = '$apiPrefix/search';
+  static String category(String slug) => '$apiPrefix/category/$slug';
+  static String type(String type) => '$apiPrefix/type/$type';
+  static const String schedule = '$apiPrefix/schedule';
+  static const String filters = '$apiPrefix/filters';
+  static const String watchHistory = '$apiPrefix/watch-history';
+  static const String report = '$apiPrefix/report';
+  static const String checkUpdate = '$apiPrefix/check-update';
+  static const String notifications = '$apiPrefix/notifications';
+  static const String readNotification = '$apiPrefix/notifications/read';
+  static const String clientError = '$apiPrefix/client-error';
+  static const String changelog = '$apiPrefix/changelog';
+  static const String hotSearch = '$apiPrefix/hot-search';
+  static const String searchClick = '$apiPrefix/search-click';
+
+  // Auth
+  static const String authLogin = '/api/auth/login';
+  static const String authRegister = '/api/auth/register';
+  static const String authMe = '/api/auth/me';
+
+  void setToken(String token) {
+    _dio.options.headers['Authorization'] = 'Bearer $token';
+  }
+
+  Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) async {
+    try {
+      return await _dio.get(path, queryParameters: queryParameters);
+    } on DioException catch (e) {
+      TxaLogger.log('API GET Error [$path]: ${e.type} | Code: ${e.response?.statusCode} | Body: ${e.response?.data}', isError: true);
+      rethrow;
+    }
+  }
+
+  Future<Response> post(String path, {dynamic data}) async {
+    try {
+      return await _dio.post(path, data: data);
+    } on DioException catch (e) {
+      TxaLogger.log('API POST Error [$path]: ${e.type} | Code: ${e.response?.statusCode}', isError: true);
+      rethrow;
+    }
+  }
+
+  // ============ Implementation methods ============
+
+  /// Lấy dữ liệu trang chủ (featured, latest, hot, anime, series, single, categories)
+  Future<Map<String, dynamic>> getHome() async {
+    final response = await get(home);
+    return response.data;
+  }
+
+  /// Lấy chi tiết phim
+  Future<Map<String, dynamic>> getMovie(String slug) async {
+    final response = await get(movieDetail(slug));
+    return response.data;
+  }
+
+  /// Tìm kiếm phim
+  Future<Map<String, dynamic>> searchMovies(String query, {int page = 1, String? categorySlug, String? region, String? year, String? movieType}) async {
+    final params = <String, dynamic>{'q': query, 'page': page};
+    if (categorySlug != null) params['category'] = categorySlug;
+    if (region != null) params['region'] = region;
+    if (year != null) params['year'] = year;
+    if (movieType != null) params['type'] = movieType;
+    final response = await get(search, queryParameters: params);
+    return response.data;
+  }
+
+  /// Lấy phim theo thể loại
+  Future<Map<String, dynamic>> getCategory(String slug, {int page = 1}) async {
+    final response = await get(category(slug), queryParameters: {'page': page});
+    return response.data;
+  }
+
+  /// Lấy phim theo loại (series/single)
+  Future<Map<String, dynamic>> getType(String movieType, {int page = 1}) async {
+    final response = await get(type(movieType), queryParameters: {'page': page});
+    return response.data;
+  }
+
+  /// Lấy lịch chiếu
+  Future<Map<String, dynamic>> getSchedule() async {
+    final response = await get(schedule);
+    return response.data;
+  }
+
+  /// Lấy bộ lọc (thể loại, quốc gia, năm)
+  Future<Map<String, dynamic>> getFilters() async {
+    final response = await get(filters);
+    return response.data;
+  }
+
+  /// Lấy hot search (phim được tìm nhiều nhất)
+  Future<Map<String, dynamic>> getHotSearch({int limit = 10}) async {
+    final response = await get(hotSearch, queryParameters: {'limit': limit});
+    return response.data;
+  }
+
+  /// Kiểm tra cập nhật
+  Future<Map<String, dynamic>> getCheckUpdate() async {
+    final response = await get(checkUpdate);
+    return response.data;
+  }
+
+  /// Track search click
+  Future<Map<String, dynamic>> trackSearchClick(int movieId, String keyword) async {
+    final response = await post(searchClick, data: {
+      'movie_id': movieId,
+      'keyword': keyword,
+      'platform': 'app',
+    });
+    return response.data;
+  }
+
+  /// Ghi log lỗi từ client về server
+  Future<void> logError(String type, String message, {Map<String, dynamic>? extra}) async {
+    try {
+      await post(clientError, data: {
+        'type': type,
+        'message': message,
+        'extra': extra,
+        'device_info': 'TPhimX-App-V6',
+        'timestamp': DateTime.now().toIso8601String(),
+      });
+    } catch (_) {
+      // Ignore logger errors to avoid infinite loops
+    }
+  }
+}
