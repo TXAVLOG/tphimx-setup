@@ -22,7 +22,7 @@ workflows:
       - name: Get version from pubspec.yaml
         script: |
           VERSION=$(grep "^version: " pubspec.yaml | sed 's/version: //' | tr -d '\r')
-          # Sanitize tag: replace '+' with '_' as GitHub API/URLs can fail with '+'
+          # Sanitize tag for GitHub
           TAG="v${VERSION//+/_}"
           echo "VERSION=$VERSION" >> $CM_ENV
           echo "TAG=$TAG" >> $CM_ENV
@@ -38,49 +38,33 @@ workflows:
           cd build/ios/ipa
           zip -r "TPhimX-Premium-v$VERSION.ipa" Payload
           cd ../../..
-      - name: Create GitHub Release & Upload IPA
+      - name: Create GitHub Release & Upload IPA (via GH CLI)
         script: |
-          # Use sanitized TAG
+          # Use GitHub CLI for robust release management
+          export GITHUB_TOKEN=$GITHUB_TOKEN
+          
+          echo "Creating or Updating Release $TAG on GitHub..."
+          
           CHANGELOG=$(git log -10 --pretty=format:"- %s")
-
-          echo "Creating release $TAG on GitHub..."
-
-          JSON_DATA=$(python3 -c "import json, sys; print(json.dumps({'tag_name': sys.argv[1], 'name': 'TPhimX Release ' + sys.argv[1], 'body': sys.argv[2], 'draft': False, 'prerelease': False}))" "$TAG" "$CHANGELOG")
-
-          RESPONSE=$(curl -s -X POST \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Accept: application/vnd.github.v3+json" \
-            https://api.github.com/repos/$CM_REPO_OWNER/$CM_REPO_NAME/releases \
-            -d "$JSON_DATA")
-
-          UPLOAD_URL=$(echo $RESPONSE | jq -r .upload_url | sed 's/{?name,label}//')
-
-          if [ "$UPLOAD_URL" == "null" ] || [ -z "$UPLOAD_URL" ]; then
-            echo "Direct creation failed or already exists. Attempting to fetch existing release for tag $TAG..."
-            UPLOAD_URL=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
-              https://api.github.com/repos/$CM_REPO_OWNER/$CM_REPO_NAME/releases/tags/$TAG \
-              | jq -r .upload_url | sed 's/{?name,label}//')
-          fi
-
-          if [ "$UPLOAD_URL" == "null" ] || [ -z "$UPLOAD_URL" ]; then
-            echo "CRITICAL: Could not resolve UPLOAD_URL for tag $TAG. GitHub Response:"
-            echo $RESPONSE
-            exit 1
-          fi
-
-          echo "Uploading IPA to $TAG..."
           IPA_FILE=$(find build/ios/ipa -name "*.ipa" | head -n 1)
-          if [ -n "$IPA_FILE" ]; then
-            FILE_NAME=$(basename "$IPA_FILE")
-            curl -L -X POST \
-              -H "Authorization: token $GITHUB_TOKEN" \
-              -H "Content-Type: application/octet-stream" \
-              --data-binary "@$IPA_FILE" \
-              "$UPLOAD_URL?name=$FILE_NAME"
-            echo "IPA $FILE_NAME uploaded successfully to release $TAG."
-          else
+
+          if [ -z "$IPA_FILE" ]; then
             echo "Error: IPA file not found."
             exit 1
           fi
+
+          # Try creating the release first, then upload the asset
+          # If release exists, it'll just fail creation and we move to upload
+          gh release create "$TAG" \
+            --repo "$CM_REPO_OWNER/$CM_REPO_NAME" \
+            --title "TPhimX Release $TAG" \
+            --notes "$CHANGELOG" || echo "Release $TAG already exists, proceeding to upload."
+
+          echo "Uploading $IPA_FILE..."
+          gh release upload "$TAG" "$IPA_FILE" \
+            --repo "$CM_REPO_OWNER/$CM_REPO_NAME" \
+            --clobber
+          
+          echo "Release and Upload completed successfully."
     artifacts:
       - build/ios/ipa/*.ipa
