@@ -21,56 +21,59 @@ workflows:
           flutter pub get
       - name: Get version from pubspec.yaml
         script: |
-          VERSION=$(grep '^version:' pubspec.yaml | awk '{print $2}' | tr -d '\r')
+          VERSION=$(grep "^version: " pubspec.yaml | sed 's/version: //' | tr -d '\r')
           echo "VERSION=$VERSION" >> $CM_ENV
-      - name: Build iOS IPA
+          echo "Current project version: $VERSION"
+      - name: Build & Manual Package iOS IPA
         script: |
-          flutter build ipa --release --no-codesign
+          echo "Building iOS for version $VERSION..."
+          # Build iOS without codesigning (creates Runner.app)
+          flutter build ios --release --no-codesign
+          
+          # Manually package .app into .ipa
+          echo "Packaging .app into .ipa..."
+          mkdir -p build/ios/ipa/Payload
+          cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
+          cd build/ios/ipa
+          zip -r "TPhimX-Premium-v$VERSION.ipa" Payload
+          cd ../../..
       - name: Create GitHub Release & Upload IPA
         script: |
           TAG="v$VERSION"
-          RELEASE_NAME="TPhimX iOS Release $TAG"
           CHANGELOG=$(git log -10 --pretty=format:"- %s")
 
           echo "Creating release $TAG on GitHub..."
 
-          # Tạo Release
+          # Use Python to safely escape JSON for the GitHub API (more reliable on macOS)
+          JSON_DATA=$(python3 -c "import json, sys; print(json.dumps({'tag_name': sys.argv[1], 'name': 'TPhimX Release ' + sys.argv[1], 'body': sys.argv[2], 'draft': false, 'prerelease': false}))" "$TAG" "$CHANGELOG")
+
           RESPONSE=$(curl -s -X POST \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Accept: application/vnd.github.v3+json" \
             https://api.github.com/repos/$CM_REPO_OWNER/$CM_REPO_NAME/releases \
-            -d @- <<EOF
-          {
-            "tag_name": "$TAG",
-            "name": "$RELEASE_NAME",
-            "body": "$(echo "$CHANGELOG" | sed 's/"/\\"/g' | sed ':a;N;$!ba;s/\n/\\n/g')",
-            "draft": false,
-            "prerelease": false
-          }
-          EOF
-          )
+            -d "$JSON_DATA")
 
           UPLOAD_URL=$(echo $RESPONSE | jq -r .upload_url | sed 's/{?name,label}//')
 
-          # Nếu tag đã tồn tại, lấy upload_url của release cũ để tránh lỗi
           if [ "$UPLOAD_URL" == "null" ] || [ -z "$UPLOAD_URL" ]; then
-            echo "Release already exists or error occurred. Fetching existing release upload URL..."
+            echo "Release already exists or error. Fetching existing upload URL..."
             UPLOAD_URL=$(curl -s -H "Authorization: token $GITHUB_TOKEN" \
               https://api.github.com/repos/$CM_REPO_OWNER/$CM_REPO_NAME/releases/tags/$TAG \
               | jq -r .upload_url | sed 's/{?name,label}//')
           fi
 
           echo "Uploading IPA..."
-          IPA_PATH=$(find build/ios/ipa -name "*.ipa" | head -n 1)
-          if [ -n "$IPA_PATH" ]; then
+          IPA_FILE=$(find build/ios/ipa -name "*.ipa" | head -n 1)
+          if [ -n "$IPA_FILE" ]; then
+            FILE_NAME=$(basename "$IPA_FILE")
             curl -X POST \
               -H "Authorization: token $GITHUB_TOKEN" \
               -H "Content-Type: application/octet-stream" \
-              --data-binary @$IPA_PATH \
-              "$UPLOAD_URL?name=TPhimX-Premium-v$VERSION.ipa"
-            echo "IPA Uploaded successfully."
+              --data-binary "@$IPA_FILE" \
+              "$UPLOAD_URL?name=$FILE_NAME"
+            echo "IPA $FILE_NAME uploaded successfully."
           else
-            echo "Error: No IPA found."
+            echo "Error: IPA file not found."
             exit 1
           fi
     artifacts:
