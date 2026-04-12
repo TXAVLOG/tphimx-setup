@@ -96,7 +96,7 @@ class _SplashScreenState extends State<SplashScreen> {
         });
         return; // Stop initialization until unlocked via deep link
       }
-      
+
       // 3. Check Network
       setState(() {
         _status = TxaLanguage.t('connecting');
@@ -133,9 +133,12 @@ class _SplashScreenState extends State<SplashScreen> {
       deviceName = "iOS Device";
     }
 
-    final String url = "https://asset.nrotxa.online/uuid?device_name=${Uri.encodeComponent(deviceName)}";
+    final String url =
+        "https://asset.nrotxa.online/uuid?device_name=${Uri.encodeComponent(deviceName)}";
     final Uri uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
+      if (!context.mounted) return;
+      // ignore: use_build_context_synchronously
       TxaToast.show(context, 'Không thể mở trình duyệt', isError: true);
     }
   }
@@ -146,8 +149,14 @@ class _SplashScreenState extends State<SplashScreen> {
       barrierDismissible: false,
       builder: (ctx) => AlertDialog(
         backgroundColor: TxaTheme.cardBg,
-        title: Text(TxaLanguage.t('error'), style: const TextStyle(color: Colors.white)),
-        content: Text(msg, style: const TextStyle(color: TxaTheme.textSecondary)),
+        title: Text(
+          TxaLanguage.t('error'),
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          msg,
+          style: const TextStyle(color: TxaTheme.textSecondary),
+        ),
         actions: [
           TextButton(
             onPressed: () {
@@ -155,7 +164,7 @@ class _SplashScreenState extends State<SplashScreen> {
               _startInit();
             },
             child: Text(TxaLanguage.t('retry')),
-          )
+          ),
         ],
       ),
     );
@@ -178,14 +187,19 @@ class _SplashScreenState extends State<SplashScreen> {
             Container(
               width: 240,
               height: 6,
-              decoration: BoxDecoration(color: Colors.white10, borderRadius: BorderRadius.circular(3)),
+              decoration: BoxDecoration(
+                color: Colors.white10,
+                borderRadius: BorderRadius.circular(3),
+              ),
               child: Stack(
                 children: [
                   AnimatedContainer(
                     duration: const Duration(milliseconds: 500),
                     width: 240 * _progress,
                     decoration: BoxDecoration(
-                      gradient: const LinearGradient(colors: [TxaTheme.accent, Color(0xFF818CF8)]),
+                      gradient: const LinearGradient(
+                        colors: [TxaTheme.accent, Color(0xFF818CF8)],
+                      ),
                       borderRadius: BorderRadius.circular(3),
                     ),
                   ),
@@ -195,7 +209,11 @@ class _SplashScreenState extends State<SplashScreen> {
             const SizedBox(height: 16),
             Text(
               '${(_progress * 100).toInt()}%',
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
             ),
             const SizedBox(height: 8),
             Padding(
@@ -207,23 +225,31 @@ class _SplashScreenState extends State<SplashScreen> {
               ),
             ),
             if (_isIosLocked) ...[
-               const SizedBox(height: 32),
-               ElevatedButton.icon(
-                 onPressed: _handleGetUDID,
-                 icon: const Icon(Icons.apple_rounded),
-                 label: const Text('Lấy quyền truy cập ứng dụng', style: TextStyle(fontWeight: FontWeight.bold)),
-                 style: ElevatedButton.styleFrom(
-                   backgroundColor: TxaTheme.accent,
-                   foregroundColor: Colors.white,
-                   padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 14),
-                   shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(30)),
-                 ),
-               ),
-               const SizedBox(height: 16),
-               const Text(
-                 'Lưu ý: Bạn cần cài đặt Profile xác minh sau khi mở Safari.',
-                 style: TextStyle(color: Colors.white30, fontSize: 11),
-               ),
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: _handleGetUDID,
+                icon: const Icon(Icons.apple_rounded),
+                label: const Text(
+                  'Lấy quyền truy cập ứng dụng',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: TxaTheme.accent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(30),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Lưu ý: Bạn cần cài đặt Profile xác minh sau khi mở Safari.',
+                style: TextStyle(color: Colors.white30, fontSize: 11),
+              ),
             ],
           ],
         ),
@@ -239,11 +265,19 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, color: Colors.redAccent, size: 64),
+            const Icon(
+              Icons.error_outline_rounded,
+              color: Colors.redAccent,
+              size: 64,
+            ),
             const SizedBox(height: 24),
             const Text(
               'Oops! Đã có lỗi xảy ra',
-              style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
             ),
             const SizedBox(height: 16),
             Container(
@@ -256,7 +290,11 @@ class _SplashScreenState extends State<SplashScreen> {
               child: SelectableText(
                 _fatalError ?? 'Lỗi không xác định',
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: Colors.white70, fontSize: 13, fontFamily: 'monospace'),
+                style: const TextStyle(
+                  color: Colors.white70,
+                  fontSize: 13,
+                  fontFamily: 'monospace',
+                ),
               ),
             ),
             const SizedBox(height: 24),
@@ -265,7 +303,9 @@ class _SplashScreenState extends State<SplashScreen> {
               children: [
                 ElevatedButton.icon(
                   onPressed: () {
-                    Clipboard.setData(ClipboardData(text: _fatalError ?? 'NaN'));
+                    Clipboard.setData(
+                      ClipboardData(text: _fatalError ?? 'NaN'),
+                    );
                     TxaToast.show(context, 'Đã copy mã lỗi!');
                   },
                   icon: const Icon(Icons.copy_rounded, size: 18),

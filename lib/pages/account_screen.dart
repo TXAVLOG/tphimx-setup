@@ -46,7 +46,7 @@ class _AccountScreenState extends State<AccountScreen> {
 
     // Check if the app was opened by a link
     _appLinks.getInitialLink().then((uri) {
-      if (uri != null) _handleIncomingUri(uri);
+      if (uri != null && mounted) _handleIncomingUri(uri);
     });
   }
 
@@ -62,12 +62,12 @@ class _AccountScreenState extends State<AccountScreen> {
           setState(() {
             TxaSettings.udid = m;
           });
-          TxaToast.show(context, '✅ Tự động nhận diện UDID thành công!');
+          if (mounted) TxaToast.show(context, '✅ Tự động nhận diện UDID thành công!');
         } else {
-          TxaToast.show(context, '❌ Mã UDID không hợp lệ: $m', isError: true);
+          if (mounted) TxaToast.show(context, '❌ Mã UDID không hợp lệ: $m', isError: true);
         }
       } else {
-         TxaToast.show(context, '⚠️ Không tìm thấy mã UDID trong liên kết', isError: true);
+         if (mounted) TxaToast.show(context, '⚠️ Không tìm thấy mã UDID trong liên kết', isError: true);
       }
     }
   }
@@ -91,11 +91,10 @@ class _AccountScreenState extends State<AccountScreen> {
   Future<void> _launchUrl(BuildContext context, String urlStr) async {
     final Uri url = Uri.parse(urlStr);
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(TxaLanguage.t('not_open_link'))),
-        );
-      }
+      if (!context.mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(TxaLanguage.t('not_open_link'))),
+      );
     }
   }
 
@@ -112,8 +111,16 @@ class _AccountScreenState extends State<AccountScreen> {
       }
 
       final String url = "https://asset.nrotxa.online/uuid?device_name=${Uri.encodeComponent(deviceName)}";
+      if (!context.mounted) return;
       await _launchUrl(context, url);
     }
+  }
+
+  void _handleDeleteUdid() {
+    setState(() {
+      TxaSettings.udid = '';
+    });
+    TxaToast.show(context, TxaLanguage.t('udid_deleted'));
   }
 
   void _showUdidInputDialog(BuildContext context) {
@@ -122,24 +129,37 @@ class _AccountScreenState extends State<AccountScreen> {
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: TxaTheme.cardBg,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        title: const Text('Cập nhật UDID', style: TextStyle(color: Colors.white, fontSize: 18)),
+        surfaceTintColor: Colors.transparent,
+        contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
+        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(24),
+          side: const BorderSide(color: Colors.white10),
+        ),
+        title: Row(
+          children: [
+            const Icon(Icons.fingerprint_rounded, color: TxaTheme.accent, size: 20),
+            const SizedBox(width: 8),
+            Text(
+              TxaSettings.udid.isEmpty ? TxaLanguage.t('udid_register_title') : TxaLanguage.t('udid_update_title'),
+              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
         content: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('Dán mã UDID bạn vừa lấy được từ trình duyệt vào đây:',
-                style: TextStyle(color: Colors.white70, fontSize: 13)),
-            const SizedBox(height: 16),
             TextField(
               controller: controller,
-              style: const TextStyle(color: Colors.white),
+              autofocus: true,
+              style: const TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'monospace'),
               decoration: InputDecoration(
                 filled: true,
-                fillColor: TxaTheme.glassBg,
+                fillColor: Colors.black26,
+                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                hintText: 'Nhập UDID...',
-                hintStyle: const TextStyle(color: Colors.white30),
+                hintText: TxaLanguage.t('udid_hint'),
+                hintStyle: const TextStyle(color: Colors.white30, fontSize: 13),
               ),
             ),
           ],
@@ -147,18 +167,27 @@ class _AccountScreenState extends State<AccountScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: const Text('Hủy', style: TextStyle(color: Colors.white54)),
+            child: Text(TxaLanguage.t('cancel'), style: const TextStyle(color: Colors.white38, fontSize: 13)),
           ),
           ElevatedButton(
             onPressed: () {
-              setState(() {
-                TxaSettings.udid = controller.text.trim();
-              });
-              Navigator.pop(ctx);
-              TxaToast.show(context, 'Đã lưu UDID!');
+              final val = controller.text.trim();
+              if (val.isNotEmpty) {
+                setState(() {
+                  TxaSettings.udid = val;
+                });
+                Navigator.pop(ctx);
+                TxaToast.show(context, '✅ ${TxaLanguage.t('udid_save')} ${TxaLanguage.t('success')}!');
+              }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: TxaTheme.accent),
-            child: const Text('Lưu lại'),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: TxaTheme.accent,
+              foregroundColor: Colors.white,
+              elevation: 0,
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+            ),
+            child: Text(TxaLanguage.t('udid_save'), style: const TextStyle(fontWeight: FontWeight.bold)),
           ),
         ],
       ),
@@ -346,7 +375,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 const SizedBox(width: 12),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _handleDev(context, 'Đăng ký'),
+                    onPressed: () => _handleDev(context, TxaLanguage.t('register')),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: TxaTheme.cardBg,
                       foregroundColor: TxaTheme.textPrimary,
@@ -449,16 +478,16 @@ class _AccountScreenState extends State<AccountScreen> {
                       children: [
                         const Icon(Icons.apple_rounded, color: TxaTheme.accent, size: 22),
                         const SizedBox(width: 8),
-                        const Text(
-                          'iOS Premium Service',
-                          style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                        Text(
+                          TxaLanguage.t('ios_service_title'),
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                         ),
                         const Spacer(),
                         if (TxaSettings.udid.isNotEmpty)
                           GestureDetector(
                             onTap: () {
                               Clipboard.setData(ClipboardData(text: TxaSettings.udid));
-                              TxaToast.show(context, 'Đã sao chép UDID');
+                              TxaToast.show(context, TxaLanguage.t('udid_copied'));
                             },
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
@@ -466,37 +495,69 @@ class _AccountScreenState extends State<AccountScreen> {
                                 color: Colors.green.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(8),
                               ),
-                              child: const Text('ĐÃ ĐĂNG KÝ', style: TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold)),
+                              child: Text(
+                                TxaLanguage.t('udid_registered_badge'),
+                                style: const TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold),
+                              ),
                             ),
                           ),
                       ],
                     ),
                     const SizedBox(height: 12),
-                    const Text(
-                      'Cần đăng ký UDID thiết bị để có thể cài đặt và cập nhật bản IPA Premium chính thức.',
-                      style: TextStyle(color: TxaTheme.textMuted, fontSize: 12),
+                    Text(
+                      TxaSettings.udid.isNotEmpty
+                          ? TxaLanguage.t('ios_ready_desc')
+                          : TxaLanguage.t('ios_premium_desc'),
+                      style: const TextStyle(color: TxaTheme.textMuted, fontSize: 11, height: 1.4),
                     ),
                     const SizedBox(height: 16),
+                    if (TxaSettings.udid.isNotEmpty)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 12),
+                        child: ElevatedButton.icon(
+                          onPressed: () => _launchUrl(context, 'https://asset.nrotxa.online/install'),
+                          icon: const Icon(Icons.auto_awesome_rounded, size: 18),
+                          label: Text(TxaLanguage.t('udid_install_btn')),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: Colors.green.withValues(alpha: 0.8),
+                            foregroundColor: Colors.white,
+                            minimumSize: const Size(double.infinity, 44),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                            elevation: 0,
+                          ),
+                        ),
+                      ),
                     Row(
                       children: [
                         Expanded(
-                          child: OutlinedButton.icon(
-                            onPressed: () => _handleGetUDID(context),
-                            icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                            label: const Text('Lấy UDID'),
-                            style: OutlinedButton.styleFrom(
-                              foregroundColor: TxaTheme.accent,
-                              side: const BorderSide(color: TxaTheme.accent),
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                            ),
-                          ),
+                          child: TxaSettings.udid.isNotEmpty
+                              ? OutlinedButton.icon(
+                                  onPressed: _handleDeleteUdid,
+                                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
+                                  label: Text(TxaLanguage.t('udid_delete_btn')),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: Colors.redAccent,
+                                    side: const BorderSide(color: Colors.redAccent, width: 0.5),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                )
+                              : OutlinedButton.icon(
+                                  onPressed: () => _handleGetUDID(context),
+                                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
+                                  label: Text(TxaLanguage.t('udid_get_btn')),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: TxaTheme.accent,
+                                    side: const BorderSide(color: TxaTheme.accent),
+                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                                  ),
+                                ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: ElevatedButton.icon(
                             onPressed: () => _showUdidInputDialog(context),
-                            icon: const Icon(Icons.edit_note_rounded, size: 18),
-                            label: const Text('Nhập UDID'),
+                            icon: Icon(TxaSettings.udid.isNotEmpty ? Icons.sync_rounded : Icons.edit_note_rounded, size: 18),
+                            label: Text(TxaSettings.udid.isNotEmpty ? TxaLanguage.t('udid_update_btn') : TxaLanguage.t('udid_input_btn')),
                             style: ElevatedButton.styleFrom(
                               backgroundColor: TxaTheme.glassBg,
                               foregroundColor: Colors.white,
@@ -531,7 +592,7 @@ class _AccountScreenState extends State<AccountScreen> {
                                 icon: const Icon(Icons.copy_rounded, color: TxaTheme.accent, size: 18),
                                 onPressed: () {
                                   Clipboard.setData(ClipboardData(text: TxaSettings.udid));
-                                  TxaToast.show(context, 'Đã sao chép UDID');
+                                  TxaToast.show(context, TxaLanguage.t('udid_copied'));
                                 },
                                 padding: EdgeInsets.zero,
                                 constraints: const BoxConstraints(),
@@ -552,8 +613,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '2.4.9';
-                  final buildNumber = snapshot.data?.buildNumber ?? '249';
+                  final version = snapshot.data?.version ?? '2.5.0';
+                  final buildNumber = snapshot.data?.buildNumber ?? '250';
                   return Text(
                     TxaLanguage.t('current_version').replaceAll('%version', '$version (Build $buildNumber)'),
                     style: const TextStyle(
