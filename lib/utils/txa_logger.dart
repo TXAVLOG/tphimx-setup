@@ -6,18 +6,24 @@ import 'package:flutter/foundation.dart';
 
 class TxaLogger {
   static Future<String> get _logPath async {
-    // Check for "Manage All Files" permission (Android 11+)
-    final status = await Permission.manageExternalStorage.status;
+    // manageExternalStorage is Android-only; on other platforms (iOS) we always use the sandbox
+    bool isAndroid11Plus = false;
+    if (Platform.isAndroid) {
+      final status = await Permission.manageExternalStorage.status;
+      if (status.isGranted) {
+        isAndroid11Plus = true;
+      }
+    }
     
-    if (status.isGranted) {
-      // Premium path for granted "All Files" permission
+    if (isAndroid11Plus) {
+      // Premium path for granted "All Files" permission (Android Only)
       final dir = Directory('/storage/emulated/0/TPHIMX/Logs');
       if (!await dir.exists()) {
         await dir.create(recursive: true);
       }
       return dir.path;
     } else {
-      // Default sandbox path
+      // Default sandbox path (iOS and non-authorized Android)
       final dir = await getApplicationDocumentsDirectory();
       final logDir = Directory('${dir.path}/Logs');
       if (!await logDir.exists()) {

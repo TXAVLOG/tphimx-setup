@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -318,75 +319,77 @@ class _HomeScreenState extends State<HomeScreen> {
                 ],
               ),
             ),
-            const Divider(color: Colors.white10),
-            Padding(
-              padding: const EdgeInsets.all(24.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    TxaLanguage.t('check_permissions'),
-                    style: const TextStyle(color: Colors.white70, fontSize: 14),
-                  ),
-                  const SizedBox(height: 16),
-                  FutureBuilder<Map<String, PermissionStatus>>(
-                    future: TxaPermission.getAllStatus(),
-                    builder: (context, snapshot) {
-                      final statuses = snapshot.data ?? {};
-                      return Column(
-                        children: TxaPermission.permissions.map((p) {
-                          final status = statuses[p['id']] ?? PermissionStatus.denied;
-                          final isGranted = status.isGranted;
-                          return Padding(
-                            padding: const EdgeInsets.only(bottom: 12),
-                            child: Row(
-                              children: [
-                                Icon(
-                                  isGranted ? Icons.check_circle_outline : Icons.error_outline,
-                                  color: isGranted ? Colors.greenAccent : Colors.redAccent,
-                                  size: 16,
-                                ),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Text(
-                                    p['label'],
-                                    style: TextStyle(
-                                      color: isGranted ? Colors.white70 : TxaTheme.textMuted,
-                                      fontSize: 12,
+            if (Platform.isAndroid) ...[
+              const Divider(color: Colors.white10),
+              Padding(
+                padding: const EdgeInsets.all(24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      TxaLanguage.t('check_permissions'),
+                      style: const TextStyle(color: Colors.white70, fontSize: 14),
+                    ),
+                    const SizedBox(height: 16),
+                    FutureBuilder<Map<String, PermissionStatus>>(
+                      future: TxaPermission.getAllStatus(),
+                      builder: (context, snapshot) {
+                        final statuses = snapshot.data ?? {};
+                        return Column(
+                          children: TxaPermission.permissions.map((p) {
+                            final status = statuses[p['id']] ?? PermissionStatus.denied;
+                            final isGranted = status.isGranted;
+                            return Padding(
+                              padding: const EdgeInsets.only(bottom: 12),
+                              child: Row(
+                                children: [
+                                  Icon(
+                                    isGranted ? Icons.check_circle_outline : Icons.error_outline,
+                                    color: isGranted ? Colors.greenAccent : Colors.redAccent,
+                                    size: 16,
+                                  ),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Text(
+                                      p['label'],
+                                      style: TextStyle(
+                                        color: isGranted ? Colors.white70 : TxaTheme.textMuted,
+                                        fontSize: 12,
+                                      ),
                                     ),
                                   ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
-                      );
-                    },
-                  ),
-                  const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: ElevatedButton.icon(
-                      onPressed: () async {
-                        await TxaPermission.openSettings();
-                        setState(() {}); // Refresh statuses when they come back
+                                ],
+                              ),
+                            );
+                          }).toList(),
+                        );
                       },
-                      icon: const Icon(Icons.settings_rounded, size: 14),
-                      label: Text(TxaLanguage.t('go_to_settings'), style: const TextStyle(fontSize: 12)),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: TxaTheme.glassBg,
-                        foregroundColor: Colors.white,
-                        elevation: 0,
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          side: const BorderSide(color: TxaTheme.glassBorder),
+                    ),
+                    const SizedBox(height: 8),
+                    SizedBox(
+                      width: double.infinity,
+                      child: ElevatedButton.icon(
+                        onPressed: () async {
+                          await TxaPermission.openSettings();
+                          setState(() {}); // Refresh statuses when they come back
+                        },
+                        icon: const Icon(Icons.settings_rounded, size: 14),
+                        label: Text(TxaLanguage.t('go_to_settings'), style: const TextStyle(fontSize: 12)),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: TxaTheme.glassBg,
+                          foregroundColor: Colors.white,
+                          elevation: 0,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(8),
+                            side: const BorderSide(color: TxaTheme.glassBorder),
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
+            ],
             const Spacer(),
             Padding(
               padding: const EdgeInsets.all(24.0),

@@ -4,23 +4,30 @@ import 'txa_language.dart';
 
 class TxaPermission {
   // Define permissions used for general UI display
-  static List<Map<String, dynamic>> get permissions => [
-    {
-      'id': 'notifications',
-      'label': TxaLanguage.t('permission_notif_label'),
-      'desc': TxaLanguage.t('permission_notif_desc'),
-      'permission': Permission.notification,
-    },
-    {
-      'id': 'storage',
-      'label': TxaLanguage.t('permission_storage_label'),
-      'desc': TxaLanguage.t('permission_storage_desc'),
-      'permission': Permission.manageExternalStorage,
-    },
-  ];
+  static List<Map<String, dynamic>> get permissions {
+    final List<Map<String, dynamic>> perms = [
+      {
+        'id': 'notifications',
+        'label': TxaLanguage.t('permission_notif_label'),
+        'desc': TxaLanguage.t('permission_notif_desc'),
+        'permission': Permission.notification,
+      },
+    ];
+    // manageExternalStorage is Android-only — crashes on iOS
+    if (Platform.isAndroid) {
+      perms.add({
+        'id': 'storage',
+        'label': TxaLanguage.t('permission_storage_label'),
+        'desc': TxaLanguage.t('permission_storage_desc'),
+        'permission': Permission.manageExternalStorage,
+      });
+    }
+    return perms;
+  }
 
   static Future<bool> checkAllRequired() async {
-    // We only require "Manage All Files" to function for core features (logs, updates, downloads)
+    // Storage permission is Android-only; on iOS we skip this check
+    if (!Platform.isAndroid) return true;
     final statuses = await getAllStatus();
     final storageStatus = statuses['storage'] ?? PermissionStatus.denied;
     return storageStatus.isGranted;
