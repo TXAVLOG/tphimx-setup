@@ -29,6 +29,8 @@ import '../utils/txa_logger.dart';
 import '../utils/txa_format.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:crypto/crypto.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -57,15 +59,16 @@ class _HomeScreenState extends State<HomeScreen> {
       final api = Provider.of<TxaApi>(context, listen: false);
       final updateData = await api.getCheckUpdate();
       
-      // The API returns { status: true, data: { current_version: "2.4.0", latest_version: "2.4.0", ... } }
       final Map<String, dynamic>? appData = updateData['data'];
       final String latestVersion = appData?['latest_version'] ?? appData?['current_version'] ?? '';
+      final String minVersion = appData?['min_version'] ?? '';
+      final bool forceUpdate = appData?['force_update'] == true;
       
       // Get current version from PackageInfo
       final packageInfo = await PackageInfo.fromPlatform();
       final String currentVersion = packageInfo.version;
       
-      debugPrint('[TxaUpdate] API Latest: $latestVersion, App Current: $currentVersion');
+      debugPrint('[TxaUpdate] API Latest: $latestVersion, App Current: $currentVersion, Min: $minVersion');
       
       bool isNewer(String latest, String current) {
         List<int> latestParts = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
@@ -77,11 +80,16 @@ class _HomeScreenState extends State<HomeScreen> {
         return latestParts.length > currentParts.length;
       }
 
+      // Check if current version is below min_version (force update regardless)
+      final bool belowMinVersion = minVersion.isNotEmpty && isNewer(minVersion, currentVersion);
+      final bool shouldForce = forceUpdate || belowMinVersion;
+
       if (latestVersion.isNotEmpty && isNewer(latestVersion, currentVersion)) {
         if (!mounted) return;
         
         final String rawDate = appData?['release_date'] ?? '';
         final int rawSize = int.tryParse(appData?['size']?.toString() ?? '0') ?? 0;
+        final String? sha256 = appData?['sha256'];
         
         String? formattedDate;
         if (rawDate.isNotEmpty) {
@@ -102,7 +110,7 @@ class _HomeScreenState extends State<HomeScreen> {
           changelog: appData?['changelog'] ?? '',
           releaseDate: formattedDate,
           fileSize: formattedSize,
-          forceUpdate: appData?['force_update'] == true,
+          forceUpdate: shouldForce,
           onUpdate: () async {
             final String rawUrl = appData?['download_url'] ?? appData?['apk_url'] ?? '';
             Navigator.pop(context); // Close modal
@@ -119,47 +127,8 @@ class _HomeScreenState extends State<HomeScreen> {
               return;
             }
 
-            // --- ANDROID FLOW (Existing) ---
-            TxaToast.show(context, TxaLanguage.t('loading_progress'));
-            
-            // Resolve direct link (Handles Mediafire!)
-            final resolved = await TxaUrlResolve.resolve(rawUrl);
-            if (resolved['success']) {
-               if (!mounted) return;
-
-               // --- PERMISSION CHECKS ---
-               if (!await TxaPermission.checkAllRequired()) {
-                  if (!mounted) return;
-                  TxaToast.show(context, TxaLanguage.t('permissions_required'), isError: true);
-                  await TxaPermission.requestInitial();
-                  if (!mounted) return;
-                  if (!await TxaPermission.checkAllRequired()) return;
-               }
-
-               if (!await TxaPermission.requestInstall()) {
-                  if (!mounted) return;
-                  TxaToast.show(context, TxaLanguage.t('permissions_required'), isError: true);
-                  return;
-               }
-               
-               if (!mounted) return;
-               TxaDownloadDialog.show(
-                 context, 
-                 resolved['url'], 
-                 'TPHIMX_$latestVersion.apk',
-                 onFinished: (path) async {
-                    TxaLogger.log('Download finished, opening: $path');
-                    final result = await OpenFile.open(path);
-                    if (!mounted) return;
-                    if (result.type != ResultType.done) {
-                       TxaToast.show(context, "Error: ${result.message}", isError: true);
-                    }
-                 },
-               );
-            } else {
-               if (!mounted) return;
-               TxaToast.show(context, TxaLanguage.t('resolver_error').replaceAll('%error', resolved['error'] ?? 'Unknown'), isError: true);
-            }
+            // --- ANDROID FLOW ---
+            await _handleAndroidUpdate(rawUrl, latestVersion, rawSize, sha256);
           }
         );
       } else if (manual) {
@@ -171,6 +140,107 @@ class _HomeScreenState extends State<HomeScreen> {
       debugPrint('Check update error: $e');
     }
   }
+
+  /// Handles the full Android update flow:
+  /// 1. Check permissions (storage + install unknown apps)
+  /// 2. Check if APK already cached & valid → install directly
+  /// 3. Otherwise download then install
+  Future<void> _handleAndroidUpdate(String rawUrl, String version, int expectedSize, String? sha256) async {
+    // --- STEP 1: STORAGE PERMISSION ---
+    if (!await TxaPermission.checkAllRequired()) {
+      if (!mounted) return;
+      TxaToast.show(context, TxaLanguage.t('permissions_required'), isError: true);
+      await TxaPermission.requestInitial();
+      if (!mounted) return;
+      if (!await TxaPermission.checkAllRequired()) return;
+    }
+
+    // --- STEP 2: INSTALL UNKNOWN APPS PERMISSION ---
+    // Request and then ALWAYS continue to install/download after granting
+    if (!await TxaPermission.requestInstall()) {
+      if (!mounted) return;
+      TxaToast.show(context, TxaLanguage.t('permissions_required'), isError: true);
+      return; // User explicitly denied — stop
+    }
+
+    if (!mounted) return;
+
+    // --- STEP 3: CHECK CACHED APK ---
+    final String filename = 'TPHIMX_$version.apk';
+    final dir = await getExternalStorageDirectory();
+    final String savePath = '${dir?.path}/$filename';
+    final File cachedFile = File(savePath);
+
+    if (cachedFile.existsSync()) {
+      final int localSize = cachedFile.lengthSync();
+      bool isValid = false;
+
+      if (expectedSize > 0 && localSize == expectedSize) {
+        // Size matches — check SHA256 if provided by server
+        if (sha256 != null && sha256.isNotEmpty) {
+          if (!mounted) return;
+          TxaToast.show(context, TxaLanguage.t('verifying_file'));
+          final bytes = await cachedFile.readAsBytes();
+          final localHash = _sha256Hex(bytes);
+          isValid = localHash == sha256.toLowerCase();
+          debugPrint('[TxaUpdate] SHA256 check: local=$localHash, server=$sha256, match=$isValid');
+        } else {
+          // No SHA256 from server — size match is good enough
+          isValid = true;
+        }
+      }
+
+      if (isValid) {
+        // File is already downloaded and valid → install directly!
+        debugPrint('[TxaUpdate] Cached APK valid ($localSize bytes), opening installer directly');
+        if (!mounted) return;
+        TxaToast.show(context, TxaLanguage.t('installing_cached'));
+        final result = await OpenFile.open(savePath);
+        if (!mounted) return;
+        if (result.type != ResultType.done) {
+          TxaToast.show(context, "Error: ${result.message}", isError: true);
+        }
+        return;
+      } else {
+        // File corrupted or size mismatch → delete and re-download
+        debugPrint('[TxaUpdate] Cached APK invalid (local=$localSize, expected=$expectedSize), deleting...');
+        try { cachedFile.deleteSync(); } catch (_) {}
+      }
+    }
+
+    // --- STEP 4: DOWNLOAD ---
+    if (!mounted) return;
+    TxaToast.show(context, TxaLanguage.t('loading_progress'));
+    
+    // Resolve direct link (Handles Mediafire!)
+    final resolved = await TxaUrlResolve.resolve(rawUrl);
+    if (resolved['success']) {
+       if (!mounted) return;
+       TxaDownloadDialog.show(
+         context, 
+         resolved['url'], 
+         filename,
+         onFinished: (path) async {
+            TxaLogger.log('Download finished, opening installer: $path');
+            final result = await OpenFile.open(path);
+            if (!mounted) return;
+            if (result.type != ResultType.done) {
+               TxaToast.show(context, "Error: ${result.message}", isError: true);
+            }
+         },
+       );
+    } else {
+       if (!mounted) return;
+       TxaToast.show(context, TxaLanguage.t('resolver_error').replaceAll('%error', resolved['error'] ?? 'Unknown'), isError: true);
+    }
+  }
+
+  /// Simple SHA256 hex digest
+  String _sha256Hex(List<int> bytes) {
+    final digest = sha256.convert(bytes);
+    return digest.toString();
+  }
+
 
   @override
   Widget build(BuildContext context) {
