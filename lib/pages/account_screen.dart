@@ -7,11 +7,6 @@ import '../services/txa_api.dart';
 import '../utils/txa_toast.dart';
 import 'legal_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'dart:io';
-import 'package:device_info_plus/device_info_plus.dart';
-import 'package:flutter/services.dart';
-import 'package:app_links/app_links.dart';
-import 'dart:async';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -21,56 +16,6 @@ class AccountScreen extends StatefulWidget {
 }
 
 class _AccountScreenState extends State<AccountScreen> {
-  late AppLinks _appLinks;
-  StreamSubscription<Uri>? _linkSubscription;
-
-  @override
-  void initState() {
-    super.initState();
-    _initDeepLinks();
-  }
-
-  @override
-  void dispose() {
-    _linkSubscription?.cancel();
-    super.dispose();
-  }
-
-  void _initDeepLinks() {
-    _appLinks = AppLinks();
-    
-    // Listen for incoming links while the app is open
-    _linkSubscription = _appLinks.uriLinkStream.listen((uri) {
-      _handleIncomingUri(uri);
-    });
-
-    // Check if the app was opened by a link
-    _appLinks.getInitialLink().then((uri) {
-      if (uri != null && mounted) _handleIncomingUri(uri);
-    });
-  }
-
-  void _handleIncomingUri(Uri uri) {
-    if (uri.scheme == 'tphimx' && uri.host == 'udid') {
-      final String? m = uri.queryParameters['m'];
-      if (m != null && m.isNotEmpty) {
-        // Basic UDID validation (usually 40 characters for older devices or 25 for newer, or UUID format)
-        // We'll accept it if it looks like a valid UDID/UUID
-        final bool isValid = RegExp(r'^[a-fA-F0-9\-]{20,45}$').hasMatch(m);
-        
-        if (isValid) {
-          setState(() {
-            TxaSettings.udid = m;
-          });
-          if (mounted) TxaToast.show(context, '✅ Tự động nhận diện UDID thành công!');
-        } else {
-          if (mounted) TxaToast.show(context, '❌ Mã UDID không hợp lệ: $m', isError: true);
-        }
-      } else {
-         if (mounted) TxaToast.show(context, '⚠️ Không tìm thấy mã UDID trong liên kết', isError: true);
-      }
-    }
-  }
 
   void _handleDev(BuildContext context, String label) {
     TxaToast.show(
@@ -99,100 +44,6 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
 
-  Future<void> _handleGetUDID(BuildContext context) async {
-    if (Platform.isIOS) {
-      String deviceName = "iPhone";
-      try {
-        final deviceInfo = DeviceInfoPlugin();
-        final iosInfo = await deviceInfo.iosInfo;
-        deviceName = iosInfo.name;
-      } catch (e) {
-        deviceName = "iOS Device";
-      }
-
-      final String url = "https://asset.nrotxa.online/uuid?device_name=${Uri.encodeComponent(deviceName)}";
-      if (!context.mounted) return;
-      await _launchUrl(context, url);
-    }
-  }
-
-  void _handleDeleteUdid() {
-    setState(() {
-      TxaSettings.udid = '';
-    });
-    TxaToast.show(context, TxaLanguage.t('udid_deleted'));
-  }
-
-  void _showUdidInputDialog(BuildContext context) {
-    final controller = TextEditingController(text: TxaSettings.udid);
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: TxaTheme.cardBg,
-        surfaceTintColor: Colors.transparent,
-        contentPadding: const EdgeInsets.fromLTRB(20, 20, 20, 10),
-        titlePadding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
-          side: const BorderSide(color: Colors.white10),
-        ),
-        title: Row(
-          children: [
-            const Icon(Icons.fingerprint_rounded, color: TxaTheme.accent, size: 20),
-            const SizedBox(width: 8),
-            Text(
-              TxaSettings.udid.isEmpty ? TxaLanguage.t('udid_register_title') : TxaLanguage.t('udid_update_title'),
-              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-            ),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            TextField(
-              controller: controller,
-              autofocus: true,
-              style: const TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'monospace'),
-              decoration: InputDecoration(
-                filled: true,
-                fillColor: Colors.black26,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                hintText: TxaLanguage.t('udid_hint'),
-                hintStyle: const TextStyle(color: Colors.white30, fontSize: 13),
-              ),
-            ),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(TxaLanguage.t('cancel'), style: const TextStyle(color: Colors.white38, fontSize: 13)),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              final val = controller.text.trim();
-              if (val.isNotEmpty) {
-                setState(() {
-                  TxaSettings.udid = val;
-                });
-                Navigator.pop(ctx);
-                TxaToast.show(context, '✅ ${TxaLanguage.t('udid_save')} ${TxaLanguage.t('success')}!');
-              }
-            },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: TxaTheme.accent,
-              foregroundColor: Colors.white,
-              elevation: 0,
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-            ),
-            child: Text(TxaLanguage.t('udid_save'), style: const TextStyle(fontWeight: FontWeight.bold)),
-          ),
-        ],
-      ),
-    );
-  }
 
 
   @override
@@ -299,21 +150,21 @@ class _AccountScreenState extends State<AccountScreen> {
         children: [
           // Header
           Padding(
-            padding: const EdgeInsets.fromLTRB(16, 8, 16, 20),
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 Row(
                   children: [
-                    Image.asset('assets/logo.png', height: 36),
-                    const SizedBox(width: 10),
+                    Image.asset('assets/logo.png', height: 32),
+                    const SizedBox(width: 8),
                     RichText(
                       text: const TextSpan(
                         children: [
                           TextSpan(
                             text: 'T',
                             style: TextStyle(
-                              fontSize: 24,
+                              fontSize: 22,
                               fontWeight: FontWeight.w900,
                               color: TxaTheme.textPrimary,
                             ),
@@ -321,7 +172,7 @@ class _AccountScreenState extends State<AccountScreen> {
                           TextSpan(
                             text: 'Phim',
                             style: TextStyle(
-                              fontSize: 24,
+                              fontSize: 22,
                               fontWeight: FontWeight.w900,
                               color: TxaTheme.accent,
                             ),
@@ -329,7 +180,7 @@ class _AccountScreenState extends State<AccountScreen> {
                           TextSpan(
                             text: 'X',
                             style: TextStyle(
-                              fontSize: 24,
+                              fontSize: 22,
                               fontWeight: FontWeight.w900,
                               color: TxaTheme.textPrimary,
                             ),
@@ -337,12 +188,51 @@ class _AccountScreenState extends State<AccountScreen> {
                         ],
                       ),
                     ),
+                    const SizedBox(width: 8),
+                    // Status badge: Đã đăng ký / Chưa đăng ký
+                    Builder(builder: (_) {
+                      final isRegistered = TxaSettings.udid.isNotEmpty;
+                      return Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: isRegistered
+                              ? Colors.green.withValues(alpha: 0.15)
+                              : Colors.orange.withValues(alpha: 0.15),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(
+                            color: isRegistered
+                                ? Colors.green.withValues(alpha: 0.5)
+                                : Colors.orange.withValues(alpha: 0.5),
+                            width: 0.5,
+                          ),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(
+                              isRegistered ? Icons.verified_rounded : Icons.info_outline_rounded,
+                              color: isRegistered ? Colors.green : Colors.orange,
+                              size: 10,
+                            ),
+                            const SizedBox(width: 2),
+                            Text(
+                              isRegistered ? TxaLanguage.t('status_registered') : TxaLanguage.t('status_not_registered'),
+                              style: TextStyle(
+                                color: isRegistered ? Colors.green : Colors.orange,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }),
                   ],
                 ),
                 Text(
                   TxaLanguage.t('account_title'),
                   style: const TextStyle(
-                    fontSize: 18,
+                    fontSize: 16,
                     fontWeight: FontWeight.bold,
                     color: TxaTheme.textSecondary,
                   ),
@@ -351,7 +241,7 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ),
 
-          // Auth Buttons
+          // Auth Buttons - Compact
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),
             child: Row(
@@ -359,86 +249,86 @@ class _AccountScreenState extends State<AccountScreen> {
                 Expanded(
                   child: ElevatedButton.icon(
                     onPressed: () => _handleDev(context, TxaLanguage.t('login')),
-                    icon: const Icon(Icons.person_outline_rounded, size: 20),
-                    label: Text(TxaLanguage.t('login')),
+                    icon: const Icon(Icons.person_outline_rounded, size: 18),
+                    label: Text(TxaLanguage.t('login'), style: const TextStyle(fontSize: 13)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: TxaTheme.accent,
                       foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       elevation: 0,
                     ),
                   ),
                 ),
-                const SizedBox(width: 12),
+                const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton(
                     onPressed: () => _handleDev(context, TxaLanguage.t('register')),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: TxaTheme.cardBg,
                       foregroundColor: TxaTheme.textPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      padding: const EdgeInsets.symmetric(vertical: 10),
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
+                        borderRadius: BorderRadius.circular(10),
                         side: const BorderSide(color: TxaTheme.glassBorder),
                       ),
                       elevation: 0,
                     ),
-                    child: Text(TxaLanguage.t('register')),
+                    child: Text(TxaLanguage.t('register'), style: const TextStyle(fontSize: 13)),
                   ),
                 ),
               ],
             ),
           ),
 
-          const SizedBox(height: 30),
+          const SizedBox(height: 16),
 
-          // Menu Items
+          // Menu Items - Compact Grid Layout
           Expanded(
             child: ListView.builder(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
               itemCount: menuItems.length,
               itemBuilder: (context, index) {
                 final item = menuItems[index];
                 return Padding(
-                  padding: const EdgeInsets.only(bottom: 12),
+                  padding: const EdgeInsets.only(bottom: 6),
                   child: InkWell(
                     onTap: item['action'] as VoidCallback,
-                    borderRadius: BorderRadius.circular(16),
+                    borderRadius: BorderRadius.circular(12),
                     child: Container(
                       padding: const EdgeInsets.symmetric(
-                        horizontal: 16,
-                        vertical: 16,
+                        horizontal: 12,
+                        vertical: 10,
                       ),
                       decoration: BoxDecoration(
                         color: TxaTheme.cardBg,
-                        borderRadius: BorderRadius.circular(16),
+                        borderRadius: BorderRadius.circular(12),
                         border: Border.all(color: TxaTheme.glassBorder),
                       ),
                       child: Row(
                         children: [
                           Container(
-                            padding: const EdgeInsets.all(10),
+                            padding: const EdgeInsets.all(8),
                             decoration: BoxDecoration(
                               color: TxaTheme.glassBg,
-                              borderRadius: BorderRadius.circular(12),
+                              borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(
                               item['icon'] as IconData,
                               color: TxaTheme.textPrimary,
-                              size: 20,
+                              size: 18,
                             ),
                           ),
-                          const SizedBox(width: 16),
+                          const SizedBox(width: 12),
                           Expanded(
                             child: Text(
                               item['label'] as String,
                               style: const TextStyle(
                                 color: TxaTheme.textPrimary,
-                                fontSize: 15,
+                                fontSize: 14,
                                 fontWeight: FontWeight.w500,
                               ),
                             ),
@@ -446,7 +336,7 @@ class _AccountScreenState extends State<AccountScreen> {
                           const Icon(
                             Icons.chevron_right_rounded,
                             color: TxaTheme.textMuted,
-                            size: 20,
+                            size: 18,
                           ),
                         ],
                       ),
@@ -457,158 +347,9 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ),
           
-          if (Platform.isIOS)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
-              child: Container(
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [TxaTheme.accent.withValues(alpha: 0.1), Colors.transparent],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: TxaTheme.accent.withValues(alpha: 0.3)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        const Icon(Icons.apple_rounded, color: TxaTheme.accent, size: 22),
-                        const SizedBox(width: 8),
-                        Text(
-                          TxaLanguage.t('ios_service_title'),
-                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
-                        ),
-                        const Spacer(),
-                        if (TxaSettings.udid.isNotEmpty)
-                          GestureDetector(
-                            onTap: () {
-                              Clipboard.setData(ClipboardData(text: TxaSettings.udid));
-                              TxaToast.show(context, TxaLanguage.t('udid_copied'));
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withValues(alpha: 0.2),
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Text(
-                                TxaLanguage.t('udid_registered_badge'),
-                                style: const TextStyle(color: Colors.green, fontSize: 10, fontWeight: FontWeight.bold),
-                              ),
-                            ),
-                          ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    Text(
-                      TxaSettings.udid.isNotEmpty
-                          ? TxaLanguage.t('ios_ready_desc')
-                          : TxaLanguage.t('ios_premium_desc'),
-                      style: const TextStyle(color: TxaTheme.textMuted, fontSize: 11, height: 1.4),
-                    ),
-                    const SizedBox(height: 16),
-                    if (TxaSettings.udid.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(bottom: 12),
-                        child: ElevatedButton.icon(
-                          onPressed: () => _launchUrl(context, 'https://asset.nrotxa.online/install'),
-                          icon: const Icon(Icons.auto_awesome_rounded, size: 18),
-                          label: Text(TxaLanguage.t('udid_install_btn')),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.green.withValues(alpha: 0.8),
-                            foregroundColor: Colors.white,
-                            minimumSize: const Size(double.infinity, 44),
-                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TxaSettings.udid.isNotEmpty
-                              ? OutlinedButton.icon(
-                                  onPressed: _handleDeleteUdid,
-                                  icon: const Icon(Icons.delete_outline_rounded, size: 18),
-                                  label: Text(TxaLanguage.t('udid_delete_btn')),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: Colors.redAccent,
-                                    side: const BorderSide(color: Colors.redAccent, width: 0.5),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                )
-                              : OutlinedButton.icon(
-                                  onPressed: () => _handleGetUDID(context),
-                                  icon: const Icon(Icons.qr_code_scanner_rounded, size: 18),
-                                  label: Text(TxaLanguage.t('udid_get_btn')),
-                                  style: OutlinedButton.styleFrom(
-                                    foregroundColor: TxaTheme.accent,
-                                    side: const BorderSide(color: TxaTheme.accent),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                                  ),
-                                ),
-                        ),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: ElevatedButton.icon(
-                            onPressed: () => _showUdidInputDialog(context),
-                            icon: Icon(TxaSettings.udid.isNotEmpty ? Icons.sync_rounded : Icons.edit_note_rounded, size: 18),
-                            label: Text(TxaSettings.udid.isNotEmpty ? TxaLanguage.t('udid_update_btn') : TxaLanguage.t('udid_input_btn')),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: TxaTheme.glassBg,
-                              foregroundColor: Colors.white,
-                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-                              elevation: 0,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (TxaSettings.udid.isNotEmpty)
-                      Padding(
-                        padding: const EdgeInsets.only(top: 16),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: Colors.black26,
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(color: Colors.white10),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(Icons.fingerprint_rounded, color: TxaTheme.accent, size: 18),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  TxaSettings.udid,
-                                  style: const TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'monospace'),
-                                ),
-                              ),
-                              IconButton(
-                                icon: const Icon(Icons.copy_rounded, color: TxaTheme.accent, size: 18),
-                                onPressed: () {
-                                  Clipboard.setData(ClipboardData(text: TxaSettings.udid));
-                                  TxaToast.show(context, TxaLanguage.t('udid_copied'));
-                                },
-                                padding: EdgeInsets.zero,
-                                constraints: const BoxConstraints(),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-              ),
-            ),
-
-          // Version info
+          // Version info - Compact
           Padding(
-            padding: const EdgeInsets.symmetric(vertical: 20),
+            padding: const EdgeInsets.symmetric(vertical: 12),
             child: Center(
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
@@ -619,7 +360,7 @@ class _AccountScreenState extends State<AccountScreen> {
                     TxaLanguage.t('current_version').replaceAll('%version', '$version (Build $buildNumber)'),
                     style: const TextStyle(
                       color: TxaTheme.textMuted,
-                      fontSize: 12,
+                      fontSize: 11,
                       fontWeight: FontWeight.w400,
                     ),
                   );

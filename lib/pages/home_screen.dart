@@ -11,6 +11,7 @@ import '../widgets/txa_nav.dart';
 import '../pages/search_screen.dart';
 import '../pages/schedule_screen.dart';
 import '../pages/account_screen.dart';
+import '../pages/premium_screen.dart';
 import '../pages/category_list_screen.dart';
 import '../pages/movie_detail_screen.dart';
 import '../widgets/txa_dropdown.dart';
@@ -494,6 +495,8 @@ class _HomeScreenState extends State<HomeScreen> {
         return ScheduleScreen(key: ValueKey('schedule_$langKey'));
       case 3:
         return AccountScreen(key: ValueKey('account_$langKey'));
+      case 4:
+        return PremiumScreen(key: ValueKey('premium_$langKey'));
       default:
         return _HomeTab(key: ValueKey('home_$langKey'));
     }

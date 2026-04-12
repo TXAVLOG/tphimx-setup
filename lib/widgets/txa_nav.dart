@@ -1,4 +1,5 @@
 import 'dart:ui';
+import 'dart:io';
 import 'package:flutter/material.dart';
 import '../theme/txa_theme.dart';
 import '../services/txa_language.dart';
@@ -68,6 +69,13 @@ class TxaNav extends StatelessWidget {
                       isActive: currentIndex == 3,
                       onTap: () => onTap(3),
                     ),
+                    if (Platform.isIOS)
+                      _NavItem(
+                        icon: Icons.workspace_premium_rounded,
+                        label: TxaLanguage.t('premium_tab'),
+                        isActive: currentIndex == 4,
+                        onTap: () => onTap(4),
+                      ),
                   ],
                 ),
               ),

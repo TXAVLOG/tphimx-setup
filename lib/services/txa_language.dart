@@ -182,6 +182,15 @@ class TxaLanguage {
       'ios_service_title': 'iOS Premium Service',
       'ios_premium_desc': 'Cần đăng ký UDID thiết bị để có thể cài đặt và cập nhật bản IPA Premium chính thức.',
       'ios_ready_desc': 'Thiết bị của bạn đã được đăng ký UDID. Bạn có thể cài đặt phiên bản Premium IPA chính thức ngay bây giờ.',
+      'premium_tab': 'Premium',
+      'share_logs': 'Chia sẻ nhật ký',
+      'share_logs_desc': 'Gửi file log qua AirDrop, tin nhắn hoặc lưu vào Files',
+      'no_logs_found': 'Không tìm thấy file nhật ký',
+      'share_logs_subject': 'TPhimX Log Files',
+      'udid_auto_detected': '✅ Tự động nhận diện UDID thành công!',
+      'udid_invalid': '❌ Mã UDID không hợp lệ: %m',
+      'status_registered': 'Đã đăng ký',
+      'status_not_registered': 'Chưa đăng ký',
     },
     'en': {
       'app_name': 'TPhimX Premium',
@@ -360,6 +369,15 @@ class TxaLanguage {
       'ios_service_title': 'iOS Premium Service',
       'ios_premium_desc': 'Need to register device UDID to install and update the official Premium IPA.',
       'ios_ready_desc': 'Your device is registered. You can install the official Premium IPA now.',
+      'premium_tab': 'Premium',
+      'share_logs': 'Share Logs',
+      'share_logs_desc': 'Send log files via AirDrop, messages or save to Files',
+      'no_logs_found': 'No log files found',
+      'share_logs_subject': 'TPhimX Log Files',
+      'udid_auto_detected': '✅ UDID auto-detected successfully!',
+      'udid_invalid': '❌ Invalid UDID code: %m',
+      'status_registered': 'Registered',
+      'status_not_registered': 'Not Registered',
     }
   };
 

@@ -178,9 +178,10 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
       _isEmbed = false;
     });
 
+    // Force landscapeLeft for consistent rotation on both iOS and Android
+    // landscapeLeft = 90° counter-clockwise (top on left side)
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
