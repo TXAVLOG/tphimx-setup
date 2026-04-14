@@ -1,11 +1,13 @@
 workflows:
-  main-workflow:
-    name: "📦 [TPhimX] iOS Premium Automation (Final)"
+  premium-release-workflow:
+    name: "🚀 [TPhimX] Premium Multi-Platform Auto-Release"
     instance_type: mac_mini_m1
     max_build_duration: 60
     environment:
       groups:
         - txa
+      vars:
+        PACKAGE_NAME: "TPHIMX"
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -16,55 +18,69 @@ workflows:
         - pattern: master
           include: true
     scripts:
-      - name: Get dependencies
+      - name: 🛠 Clean & Get Dependencies
         script: |
+          flutter clean
           flutter pub get
-      - name: Get version from pubspec.yaml
+      - name: 🏷 Prepare Version & Git Tag
         script: |
           VERSION=$(grep "^version: " pubspec.yaml | sed 's/version: //' | tr -d '\r')
-          # Sanitize tag for GitHub
           TAG="v${VERSION//+/_}"
           echo "VERSION=$VERSION" >> $CM_ENV
           echo "TAG=$TAG" >> $CM_ENV
-          echo "Current version: $VERSION | Sanity Tag: $TAG"
-      - name: Build & Manual Package iOS IPA
+          echo "Current version identified: $VERSION (Tag: $TAG)"
+      - name: 🤖 Build Android APK (Release)
         script: |
-          echo "Building iOS for version $VERSION..."
+          echo "Building Android APK for v$VERSION..."
+          flutter build apk --release --build-name=$VERSION --build-number=$(echo $VERSION | cut -d'+' -f2)
+      - name: 🍎 Build & Package iOS IPA (No-CodeSign)
+        script: |
+          echo "Building iOS for v$VERSION..."
           flutter build ios --release --no-codesign
           
-          echo "Packaging .app into .ipa..."
+          echo "Packaging .app into .ipa (Enterprise/Ad-hoc Style)..."
           mkdir -p build/ios/ipa/Payload
           cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
           cd build/ios/ipa
-          zip -r "TPhimX-Premium-v$VERSION.ipa" Payload
+          # Use PACKAGE_NAME from env
+          zip -r "$PACKAGE_NAME-v$VERSION.ipa" Payload
           cd ../../..
-      - name: Create GitHub Release & Upload IPA (via GH CLI)
+      - name: 🚀 Create GitHub Tags & Release
         script: |
           # Use GitHub CLI for robust release management
           export GITHUB_TOKEN=$GITHUB_TOKEN
           
-          echo "Creating or Updating Release $TAG on GitHub..."
+          # Git Tagging
+          echo "Tagging current commit with $TAG..."
+          git tag "$TAG" || echo "Tag already exists"
+          git push origin "$TAG" || echo "Tag already pushed"
+
+          echo "Generating changelog..."
+          CHANGELOG=$(git log -1 --pretty=format:"%s%n%nFull changes:%n- %b")
           
-          CHANGELOG=$(git log -10 --pretty=format:"- %s")
-          IPA_FILE=$(find build/ios/ipa -name "*.ipa" | head -n 1)
+          # Find Build Artifacts
+          APK_FILE=$(find build/app/outputs/flutter-apk -name "*release.apk" | head -n 1)
+          # Use our specific IPA name format
+          IPA_FILE=$(find build/ios/ipa -name "$PACKAGE_NAME-v$VERSION.ipa" | head -n 1)
 
-          if [ -z "$IPA_FILE" ]; then
-            echo "Error: IPA file not found."
-            exit 1
-          fi
-
-          # Try creating the release first, then upload the asset
-          # If release exists, it'll just fail creation and we move to upload
+          echo "Creating Release $TAG on GitHub..."
           gh release create "$TAG" \
             --repo "$CM_REPO_OWNER/$CM_REPO_NAME" \
-            --title "TPhimX Release $TAG" \
-            --notes "$CHANGELOG" || echo "Release $TAG already exists, proceeding to upload."
+            --title "TPhimX Premium v$VERSION" \
+            --notes "$CHANGELOG" || echo "Release $TAG already exists."
 
-          echo "Uploading $IPA_FILE..."
-          gh release upload "$TAG" "$IPA_FILE" \
-            --repo "$CM_REPO_OWNER/$CM_REPO_NAME" \
-            --clobber
+          # Upload Assets
+          if [ -f "$APK_FILE" ]; then 
+            echo "Uploading APK: $APK_FILE"
+            gh release upload "$TAG" "$APK_FILE" --repo "$CM_REPO_OWNER/$CM_REPO_NAME" --clobber
+          fi
           
-          echo "Release and Upload completed successfully."
+          if [ -f "$IPA_FILE" ]; then 
+            echo "Uploading IPA: $IPA_FILE"
+            gh release upload "$TAG" "$IPA_FILE" --repo "$CM_REPO_OWNER/$CM_REPO_NAME" --clobber
+          fi
+          
+          echo "✅ Multi-platform Release and Upload completed successfully."
     artifacts:
+      - build/app/outputs/flutter-apk/*-release.apk
       - build/ios/ipa/*.ipa
