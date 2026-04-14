@@ -8,6 +8,7 @@ workflows:
         - txa
       vars:
         PACKAGE_NAME: "TPHIMX-Premium"
+        REPO_ID: "TXAVLOG/tphimx-setup"
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -46,10 +47,12 @@ workflows:
           # Use GitHub CLI for robust release management
           export GITHUB_TOKEN=$GITHUB_TOKEN
           
-          # Git Tagging
+          # Git Tagging with Token Auth
           echo "Tagging current commit with $TAG..."
           git tag "$TAG" || echo "Tag already exists"
-          git push origin "$TAG" || echo "Tag already pushed"
+          
+          echo "Pushing tag to remote..."
+          git push https://x-access-token:$GITHUB_TOKEN@github.com/$REPO_ID.git "$TAG" || echo "Tag already pushed"
 
           echo "Generating changelog..."
           CHANGELOG=$(git log -1 --pretty=format:"%s%n%nFull changes:%n- %b")
@@ -57,20 +60,24 @@ workflows:
           # Find Build Artifacts (iOS Only)
           IPA_FILE=$(find build/ios/ipa -name "$PACKAGE_NAME-v$VERSION.ipa" | head -n 1)
 
-          echo "Creating Release $TAG on GitHub..."
-          gh release create "$TAG" \
-            --repo "$CM_REPO_OWNER/$CM_REPO_NAME" \
-            --title "TPhimX Premium iOS v$VERSION" \
-            --notes "$CHANGELOG" || echo "Release $TAG already exists."
-
-          # Upload IPA Asset
-          if [ -f "$IPA_FILE" ]; then 
-            echo "Uploading IPA: $IPA_FILE"
-            gh release upload "$TAG" "$IPA_FILE" --repo "$CM_REPO_OWNER/$CM_REPO_NAME" --clobber
-          else
-            echo "Error: IPA file not found for upload."
+          # Validation
+          if [ ! -f "$IPA_FILE" ]; then
+            echo "❌ Error: IPA file $IPA_FILE NOT FOUND for upload."
             exit 1
           fi
+
+          echo "Creating Release $TAG on GitHub (as Latest)..."
+          gh release create "$TAG" \
+            --repo "$REPO_ID" \
+            --title "TPhimX Premium iOS v$VERSION" \
+            --notes "$CHANGELOG" \
+            --latest || echo "Release $TAG already exists."
+
+          # Upload IPA Asset
+          echo "Uploading IPA: $IPA_FILE"
+          gh release upload "$TAG" "$IPA_FILE" \
+            --repo "$REPO_ID" \
+            --clobber
           
           echo "✅ iOS Release and Upload completed successfully."
     artifacts:
