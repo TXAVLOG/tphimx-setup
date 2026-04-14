@@ -25,8 +25,8 @@ class TxaFormat {
   }
 
   /// Format size (bytes to human readable)
-  static Map<String, dynamic> formatSize(int bytes, {int decimals = 2, bool padInteger = true}) {
-    if (bytes <= 0) return {'value': 0.0, 'unit': 'B', 'display': '00.00 B'};
+  static Map<String, dynamic> formatSize(int bytes, {int decimals = 2, bool padInteger = false}) {
+    if (bytes <= 0) return {'value': 0.0, 'unit': 'B', 'display': '0.00 B'};
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     final double value = bytes.toDouble();
     const double base = 1024.0;

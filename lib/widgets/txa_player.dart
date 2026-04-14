@@ -3,9 +3,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:screen_brightness/screen_brightness.dart';
+import 'package:volume_controller/volume_controller.dart';
 import '../services/txa_settings.dart';
 import '../services/txa_language.dart';
+import '../services/txa_mini_player_provider.dart';
+import '../utils/txa_format.dart';
 import '../theme/txa_theme.dart';
+import 'package:provider/provider.dart';
 import '../utils/txa_toast.dart';
 import '../widgets/txa_modal.dart';
 
@@ -14,6 +19,7 @@ class TxaPlayer extends StatefulWidget {
   final List<dynamic> servers;
   final int? initialServerIndex;
   final String? initialEpisodeId;
+  final BetterPlayerController? existingController;
 
   const TxaPlayer({
     super.key,
@@ -21,13 +27,14 @@ class TxaPlayer extends StatefulWidget {
     required this.servers,
     this.initialServerIndex,
     this.initialEpisodeId,
+    this.existingController,
   });
 
   @override
   State<TxaPlayer> createState() => _TxaPlayerState();
 }
 
-class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
+class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin, WidgetsBindingObserver {
   BetterPlayerController? _betterPlayerController;
   bool _error = false;
   bool _isInitialized = false;
@@ -60,6 +67,15 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
   bool _showControls = true;
   Timer? _controlsTimer;
 
+  // --- NEW SEEK ACCUMULATION ---
+  int _seekAccumulator = 0;
+  Timer? _seekDebounce;
+
+  // --- NEW AUTO NEXT OVERLAY ---
+  bool _showAutoNextCountdownOverlay = false;
+  int _autoNextRemaining = 5;
+  Timer? _autoNextTimer;
+
   // Aspect ratio options
   static const List<Map<String, dynamic>> _aspectRatios = [
     {'label': '16:9', 'value': 16 / 9, 'fit': BoxFit.contain},
@@ -90,8 +106,58 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
       }
     }
 
-    _initializePlayer();
+    if (widget.existingController != null) {
+       _betterPlayerController = widget.existingController;
+       _isInitialized = true;
+       _setupControllerListeners();
+    } else {
+       _initializePlayer();
+    }
     _startControlsTimer();
+    _initSystemMirrors();
+    WidgetsBinding.instance.addObserver(this);
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+       if (TxaSettings.autoPiP && _isInitialized && !_error && !_isLocked) {
+          final isPlaying = _betterPlayerController?.videoPlayerController?.value.isPlaying ?? false;
+          if (isPlaying) {
+             _betterPlayerController?.enablePictureInPicture(_betterPlayerController!.betterPlayerGlobalKey!);
+          }
+       }
+    } else if (state == AppLifecycleState.resumed) {
+       // Returning from background — check if we were in PiP
+       _checkPiPReturn();
+    }
+  }
+
+  void _checkPiPReturn() {
+    // If we return and find ourselves in PiP or about to exit it, 
+    // we can transition to MiniPlayer if the user isn't on the player screen anymore.
+    // However, since TxaPlayer is technically still on top, we might just stay full screen.
+  }
+
+  void _initSystemMirrors() {
+    try {
+      ScreenBrightness().setApplicationScreenBrightness(_brightness);
+      VolumeController.instance.setVolume(_volume);
+      
+      // Listen to system volume changes to intercept hardware button presses
+      VolumeController.instance.addListener((v) {
+        if (!mounted || _isLocked) return;
+        if ((v - _volume).abs() > 0.01) {
+          // Changed via hardware buttons — revert and notify
+          VolumeController.instance.setVolume(_volume);
+          _overlayIcon = Icons.phonelink_lock_rounded;
+          _overlayLabel = TxaLanguage.t('player_system_control_blocked');
+          _showOverlayFeedback();
+        }
+      });
+    } catch (e) {
+      debugPrint("System mirror init error: $e");
+    }
   }
 
   void _loadMarkers() {
@@ -169,6 +235,9 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
   bool _showEpisodeDrawer = false;
   bool _showServerDrawer = false;
 
+  void _setupControllerListeners() {
+    _betterPlayerController?.addEventsListener(_onPlayerEvent);
+  }
 
   Future<void> _initializePlayer() async {
     setState(() {
@@ -322,12 +391,15 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
 
       if (_outroStart > 0 && ct >= _outroStart && ct <= (dur)) {
          if (!_showSkipOutro) setState(() => _showSkipOutro = true);
-         if (TxaSettings.autoNextEpisode && !_autoNextTriggered && dur - ct < 10) {
-            _autoNextTriggered = true;
-            _showAutoNextCountdown();
+         if (TxaSettings.autoNextEpisode && !_autoNextTriggered && !_showAutoNextCountdownOverlay) {
+            _startAutoNextCountdown();
          }
       } else {
          if (_showSkipOutro) setState(() => _showSkipOutro = false);
+         // Reset if seeking out
+         if (_showAutoNextCountdownOverlay && ct < _outroStart) {
+            _cancelAutoNextCountdown();
+         }
       }
     } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
        _handlePlayerError();
@@ -340,11 +412,48 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
      _initializePlayer();
   }
 
-  void _showAutoNextCountdown() {
-     TxaToast.show(context, TxaLanguage.t('prep_next_ep'));
-     Future.delayed(const Duration(seconds: 5), () {
-        if (mounted && _autoNextTriggered) _playNext();
+  void _startAutoNextCountdown() {
+     if (!mounted || _autoNextTriggered) return;
+     
+     setState(() {
+        _showAutoNextCountdownOverlay = true;
+        _autoNextRemaining = 5;
      });
+
+     _autoNextTimer?.cancel();
+     _autoNextTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+        if (!mounted) {
+           timer.cancel();
+           return;
+        }
+        setState(() {
+           if (_autoNextRemaining > 1) {
+              _autoNextRemaining--;
+           } else {
+              timer.cancel();
+              _showAutoNextCountdownOverlay = false;
+              _autoNextTriggered = true;
+              _playNext();
+           }
+        });
+     });
+  }
+
+  void _cancelAutoNextCountdown() {
+     _autoNextTimer?.cancel();
+     setState(() {
+        _showAutoNextCountdownOverlay = false;
+        _autoNextRemaining = 5;
+     });
+     // Prevent re-triggering for this session unless autoNextTriggered is reset
+     _autoNextTriggered = true; 
+  }
+
+  void _playPrevious() {
+    if (_currentEpisodeIndex > 0) {
+       setState(() { _currentEpisodeIndex--; });
+       _initializePlayer();
+    }
   }
 
   void _playNext() {
@@ -436,6 +545,7 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
         _overlayLabel = TxaLanguage.t('player_brightness');
         _overlayValue = _brightness;
         TxaSettings.brightness = _brightness;
+        ScreenBrightness().setApplicationScreenBrightness(_brightness);
       });
     } else {
       // Right side: Volume
@@ -446,6 +556,7 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
         _overlayValue = _volume;
         _betterPlayerController?.setVolume(_volume);
         TxaSettings.volume = _volume;
+        VolumeController.instance.setVolume(_volume);
       });
     }
     _showOverlayFeedback();
@@ -460,17 +571,38 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
 
   void _onDoubleTap(TapDownDetails details, double width) {
     if (_isLocked || _betterPlayerController == null) return;
-    const seekDuration = 10;
-    if (details.globalPosition.dx < width / 2) {
-      _betterPlayerController!.seekTo(_betterPlayerController!.videoPlayerController!.value.position - const Duration(seconds: seekDuration));
-      _overlayIcon = Icons.fast_rewind_rounded;
-      _overlayLabel = TxaLanguage.t('player_seek_backward').replaceAll('%count', '$seekDuration');
-    } else {
-      _betterPlayerController!.seekTo(_betterPlayerController!.videoPlayerController!.value.position + const Duration(seconds: seekDuration));
-      _overlayIcon = Icons.fast_forward_rounded;
-      _overlayLabel = TxaLanguage.t('player_seek_forward').replaceAll('%count', '$seekDuration');
-    }
-    _showOverlayFeedback();
+    
+    _seekDebounce?.cancel();
+    final isForward = details.globalPosition.dx > width / 2;
+    
+    setState(() {
+      if (isForward) {
+        _seekAccumulator += 10;
+      } else {
+        _seekAccumulator -= 10;
+      }
+
+      final formattedTime = TxaFormat.formatDuration(_seekAccumulator.abs());
+      if (isForward) {
+        _overlayIcon = Icons.fast_forward_rounded;
+        _overlayLabel = "+ $formattedTime";
+      } else {
+        _overlayIcon = Icons.fast_rewind_rounded;
+        _overlayLabel = "- $formattedTime";
+      }
+      _overlayValue = null;
+    });
+
+    _seekDebounce = Timer(const Duration(milliseconds: 700), () {
+      if (!mounted) return;
+      final currentPos = _betterPlayerController!.videoPlayerController!.value.position;
+      _betterPlayerController!.seekTo(currentPos + Duration(seconds: _seekAccumulator));
+      setState(() {
+        _seekAccumulator = 0;
+        _overlayLabel = null;
+        _overlayIcon = null;
+      });
+    });
   }
 
   void _onLongPress(bool start) {
@@ -490,9 +622,19 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
 
   @override
   void dispose() {
-    _betterPlayerController?.dispose();
+    // If we are minimizing to mini player, we MUST NOT dispose the controller here.
+    // But how do we know? We check if the provider is currently holding THIS controller.
+    final miniProvider = Provider.of<TxaMiniPlayerProvider>(context, listen: false);
+    if (miniProvider.controller != _betterPlayerController) {
+       _betterPlayerController?.dispose();
+    }
     _controlsTimer?.cancel();
     _overlayTimer?.cancel();
+    _seekDebounce?.cancel();
+    _autoNextTimer?.cancel();
+    VolumeController.instance.removeListener();
+    ScreenBrightness().resetApplicationScreenBrightness();
+    WidgetsBinding.instance.removeObserver(this);
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -568,12 +710,105 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
             if (_showServerDrawer && _isInitialized && !_error)
               _buildServerSelectionOverlay(),
 
-            // 5. SKIP BUTTONS
+            // 6. AUTO NEXT PREVIEW (PREMIUM)
+            if (_showAutoNextCountdownOverlay && _isInitialized && !_error)
+              _buildAutoNextOverlay(),
+
+            // 7. SKIP BUTTONS
             if (_showSkipIntro) _buildSkipOverlay(TxaLanguage.t('skip_intro'), () {
                _betterPlayerController!.seekTo(Duration(seconds: _introEnd.toInt()));
             }, Alignment.bottomLeft),
             if (_showSkipOutro) _buildSkipOverlay(TxaLanguage.t('skip_outro_next'), _playNext, Alignment.bottomRight),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAutoNextOverlay() {
+    final serverData = widget.servers[_currentServerIndex]['server_data'] as List;
+    final nextEpIndex = _currentEpisodeIndex + 1;
+    final nextEp = nextEpIndex < serverData.length ? serverData[nextEpIndex] : null;
+    
+    if (nextEp == null) return const SizedBox.shrink();
+
+    return Positioned(
+      bottom: 85,
+      right: 30,
+      child: TxaTheme.glassConnector(
+        radius: 20,
+        padding: const EdgeInsets.all(16),
+        child: Container(
+          constraints: const BoxConstraints(maxWidth: 320),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // Thumbnail
+              Stack(
+                children: [
+                   ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      width: 100, height: 60,
+                      color: Colors.black,
+                      child: Image.network(
+                        widget.movie['thumb_url'] ?? '',
+                        fit: BoxFit.cover,
+                        errorBuilder: (c, e, s) => const Icon(Icons.movie_rounded, color: Colors.white24),
+                      ),
+                    ),
+                  ),
+                  Positioned(
+                    top: 2, left: 2,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: TxaTheme.accent,
+                        borderRadius: BorderRadius.circular(6),
+                        boxShadow: [BoxShadow(color: TxaTheme.accent.withValues(alpha: 0.5), blurRadius: 10)],
+                      ),
+                      child: Text(
+                        "${TxaLanguage.t('episode')} ${nextEp['name']}",
+                        style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 16),
+              // Info
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      TxaLanguage.t('prep_next_ep'),
+                      style: const TextStyle(color: TxaTheme.textSecondary, fontSize: 11, fontWeight: FontWeight.bold, letterSpacing: 0.5),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      widget.movie['name'],
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      "${TxaLanguage.t('player_start_in')} 0${_autoNextRemaining}s",
+                      style: const TextStyle(color: TxaTheme.accent, fontSize: 12, fontWeight: FontWeight.w600),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 8),
+              // Action
+              IconButton(
+                onPressed: _cancelAutoNextCountdown,
+                icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 20),
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -611,7 +846,18 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
                 children: [
                    IconButton(
                     icon: const Icon(Icons.arrow_back_ios_new_rounded, color: Colors.white, size: 28), 
-                    onPressed: () => Navigator.pop(context)
+                    onPressed: () {
+                      if (_betterPlayerController != null) {
+                        context.read<TxaMiniPlayerProvider>().switchToMini(
+                          controller: _betterPlayerController!, 
+                          movie: widget.movie, 
+                          servers: widget.servers, 
+                          serverIndex: _currentServerIndex, 
+                          episodeIndex: _currentEpisodeIndex
+                        );
+                      }
+                      Navigator.pop(context);
+                    }
                   ),
                   const SizedBox(width: 8),
                   _HeaderIcon(
@@ -641,6 +887,21 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
                     ),
                   ),
                   const Spacer(),
+                  _HeaderIcon(
+                    icon: Icons.picture_in_picture_alt_rounded,
+                    onTap: () {
+                      if (_betterPlayerController != null) {
+                        context.read<TxaMiniPlayerProvider>().switchToMini(
+                          controller: _betterPlayerController!, 
+                          movie: widget.movie, 
+                          servers: widget.servers, 
+                          serverIndex: _currentServerIndex, 
+                          episodeIndex: _currentEpisodeIndex
+                        );
+                        Navigator.pop(context);
+                      }
+                    },
+                  ),
                   _HeaderIcon(
                     icon: Icons.cast_connected_rounded, 
                     onTap: () => TxaToast.show(context, TxaLanguage.t('feature_dev')),
@@ -698,6 +959,15 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
+                        // PREV EPISODE
+                        if (_currentEpisodeIndex > 0)
+                          _BottomBarItem(
+                            icon: Icons.skip_previous_rounded,
+                            label: TxaLanguage.t('prev_ep'),
+                            onTap: _playPrevious,
+                          ),
+                        if (_currentEpisodeIndex > 0) const SizedBox(width: 32),
+                        
                         // RATIO BUTTON — cycles aspect ratios
                         _BottomBarItem(
                           icon: Icons.aspect_ratio_rounded, 
@@ -720,6 +990,15 @@ class _TxaPlayerState extends State<TxaPlayer> with TickerProviderStateMixin {
                           onTap: () => TxaToast.show(context, TxaLanguage.t('feature_dev')),
                         ),
                         const SizedBox(width: 32),
+                        // NEXT EPISODE
+                        if (_currentEpisodeIndex < serverData.length - 1)
+                          _BottomBarItem(
+                            icon: Icons.skip_next_rounded,
+                            label: TxaLanguage.t('next_ep'),
+                            onTap: _playNext,
+                          ),
+                        if (_currentEpisodeIndex < serverData.length - 1) const SizedBox(width: 32),
+
                         // EPISODE LIST BUTTON
                         _BottomBarItem(
                           icon: Icons.playlist_play_rounded, 

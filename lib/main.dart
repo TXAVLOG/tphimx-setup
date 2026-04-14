@@ -11,8 +11,11 @@ import 'services/txa_network.dart';
 import 'services/txa_settings.dart';
 import 'services/search_provider.dart';
 import 'theme/txa_theme.dart';
-import 'pages/home_screen.dart';
+import 'services/txa_mini_player_provider.dart';
+import 'services/txa_shortcut_service.dart';
+import 'widgets/txa_mini_player.dart';
 import 'utils/txa_logger.dart';
+import 'pages/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -36,6 +39,17 @@ void main() async {
         iOS: initializationSettingsIOS,
       );
       await flutterLocalNotificationsPlugin.initialize(settings: initializationSettings);
+      
+      // Request permissions explicitly for iOS
+      if (Platform.isIOS) {
+        await flutterLocalNotificationsPlugin
+            .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+            ?.requestPermissions(
+              alert: true,
+              badge: true,
+              sound: true,
+            );
+      }
     } catch (e) {
       TxaLogger.log('[Notification] Init failed: $e');
     }
@@ -47,6 +61,7 @@ void main() async {
         Provider<TxaApi>(create: (_) => TxaApi()),
         Provider<TxaNetwork>(create: (_) => TxaNetwork()),
         ChangeNotifierProvider<SearchProvider>(create: (_) => SearchProvider()),
+        ChangeNotifierProvider<TxaMiniPlayerProvider>(create: (_) => TxaMiniPlayerProvider()),
       ],
       child: const TPhimXApp(),
     ),
@@ -65,6 +80,14 @@ class TPhimXApp extends StatelessWidget {
         textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
       ),
       home: const MainEntry(),
+      builder: (context, child) {
+        return Stack(
+          children: [
+            child ?? const SizedBox.shrink(),
+            const TxaMiniPlayer(),
+          ],
+        );
+      },
     );
   }
 }
@@ -77,6 +100,24 @@ class MainEntry extends StatefulWidget {
 }
 
 class _MainEntryState extends State<MainEntry> {
+  @override
+  void initState() {
+    super.initState();
+    TxaShortcutService.init((type) {
+      if (!mounted) return;
+      final miniProvider = context.read<TxaMiniPlayerProvider>();
+      
+      switch (type) {
+        case 'action_player_play_pause':
+          miniProvider.playPause();
+          break;
+        case 'action_player_close':
+          miniProvider.close();
+          break;
+      }
+    });
+  }
+
   bool _showSplash = true;
 
   @override

@@ -7,7 +7,6 @@ import 'package:path_provider/path_provider.dart';
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:app_links/app_links.dart';
 import 'dart:async';
-import 'package:cross_file/cross_file.dart';
 import '../theme/txa_theme.dart';
 import '../services/txa_settings.dart';
 import '../services/txa_language.dart';

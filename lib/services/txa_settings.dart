@@ -26,6 +26,9 @@ class TxaSettings {
   static bool get showClock => _prefs.getBool('player_show_clock') ?? true;
   static set showClock(bool v) => _prefs.setBool('player_show_clock', v);
 
+  static bool get autoPiP => _prefs.getBool('player_auto_pip') ?? true;
+  static set autoPiP(bool v) => _prefs.setBool('player_auto_pip', v);
+
   static double get brightness => _prefs.getDouble('player_brightness') ?? 0.5;
   static set brightness(double v) => _prefs.setDouble('player_brightness', v);
 

@@ -9,6 +9,7 @@ import '../utils/txa_toast.dart';
 import '../widgets/txa_player.dart';
 import '../widgets/txa_error_widget.dart';
 import '../utils/txa_logger.dart';
+import '../services/txa_mini_player_provider.dart';
 
 class MovieDetailScreen extends StatefulWidget {
   final String slug;
@@ -162,6 +163,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> with SingleTicker
                       final m = _data!['movie'];
                       final s = _data!['servers'] as List? ?? [];
                       if (s.isNotEmpty && (s[0]['server_data'] as List).isNotEmpty) {
+                        // CLOSE MINI PLAYER IF ACTIVE TO AVOID CONFLICTS
+                        final miniProvider = context.read<TxaMiniPlayerProvider>();
+                        if (!miniProvider.isClosed) miniProvider.close();
+
                         Navigator.push(context, MaterialPageRoute(builder: (ctx) => TxaPlayer(
                           movie: m,
                           servers: s,
@@ -345,6 +350,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> with SingleTicker
                 return GestureDetector(
                   onTap: () {
                     if (servers.isNotEmpty) {
+                       // CLOSE MINI PLAYER IF ACTIVE
+                       final miniProvider = context.read<TxaMiniPlayerProvider>();
+                       if (!miniProvider.isClosed) miniProvider.close();
+
                        Navigator.push(context, MaterialPageRoute(builder: (ctx) => TxaPlayer(
                         movie: _data!['movie'],
                         servers: servers,
@@ -352,7 +361,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen> with SingleTicker
                         initialEpisodeId: ep['id'].toString(),
                       )));
                     }
-          },
+                  },
                   child: Container(
                     decoration: BoxDecoration(
                       color: TxaTheme.secondaryBg,

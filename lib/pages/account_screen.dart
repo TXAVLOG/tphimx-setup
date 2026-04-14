@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
 import '../theme/txa_theme.dart';
 import '../services/txa_settings.dart';
 import '../services/txa_language.dart';
@@ -354,8 +356,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '2.5.0';
-                  final buildNumber = snapshot.data?.buildNumber ?? '250';
+                  final version = snapshot.data?.version ?? '2.5.1';
+                  final buildNumber = snapshot.data?.buildNumber ?? '251';
                   return Text(
                     TxaLanguage.t('current_version').replaceAll('%version', '$version (Build $buildNumber)'),
                     style: const TextStyle(
@@ -384,6 +386,36 @@ class _PlayerSettingsBottomSheet extends StatefulWidget {
 
 class _PlayerSettingsBottomSheetState
     extends State<_PlayerSettingsBottomSheet> {
+  bool _hasOverlayPermission = true;
+
+  @override
+  void initState() {
+    super.initState();
+    if (Platform.isAndroid) {
+      _checkPermission();
+    }
+  }
+
+  Future<void> _checkPermission() async {
+    final status = await Permission.systemAlertWindow.status;
+    setState(() {
+      _hasOverlayPermission = status.isGranted;
+      // If missing, auto disable
+      if (!_hasOverlayPermission && TxaSettings.autoPiP) {
+        TxaSettings.autoPiP = false;
+      }
+    });
+  }
+
+  Future<void> _requestOverlayPermission() async {
+    final status = await Permission.systemAlertWindow.request();
+    if (status.isGranted) {
+      setState(() => _hasOverlayPermission = true);
+    } else {
+      openAppSettings();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Container(
@@ -451,6 +483,51 @@ class _PlayerSettingsBottomSheetState
             value: TxaSettings.autoNextEpisode,
             onChanged: (v) => setState(() => TxaSettings.autoNextEpisode = v),
           ),
+          
+          const Divider(color: Colors.white10, height: 32),
+          
+          // 3. Auto PiP with Permission Check (Android Only)
+          if (Platform.isAndroid)
+            _hasOverlayPermission 
+              ? _SettingToggle(
+                  label: TxaLanguage.t('auto_pip_label'),
+                  value: TxaSettings.autoPiP,
+                  onChanged: (v) => setState(() => TxaSettings.autoPiP = v),
+                )
+              : Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          TxaLanguage.t('pip_permission_missing'),
+                          style: const TextStyle(color: Colors.white70, fontSize: 13),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: _requestOverlayPermission,
+                        child: Text(
+                          TxaLanguage.t('grant'),
+                          style: const TextStyle(color: TxaTheme.accent, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+          
+          if (Platform.isAndroid) const SizedBox(height: 8),
+          if (Platform.isAndroid)
+             Text(
+              TxaLanguage.t('auto_pip_desc'),
+              style: const TextStyle(color: TxaTheme.textMuted, fontSize: 11),
+            ),
           
           const SizedBox(height: 24),
           ElevatedButton(

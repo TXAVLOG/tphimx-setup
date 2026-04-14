@@ -6,8 +6,10 @@ list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   connectivity_plus
   permission_handler_windows
+  screen_brightness_windows
   share_plus
   url_launcher_windows
+  volume_controller
 )
 
 list(APPEND FLUTTER_FFI_PLUGIN_LIST

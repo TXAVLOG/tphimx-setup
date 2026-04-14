@@ -6,6 +6,7 @@ import 'package:open_file/open_file.dart';
 import '../utils/txa_format.dart';
 import '../utils/txa_logger.dart';
 import 'txa_language.dart';
+import 'txa_shortcut_service.dart';
 
 class TxaDownload {
   final Dio _dio = Dio();
@@ -89,12 +90,25 @@ class TxaDownload {
           }
           
           if (showNotification && total > 0) {
-             // Throttling: Update notification at most once per every 1,5 seconds to avoid flickering
-             if (lastUpdateTime == null || now.difference(lastUpdateTime!).inMilliseconds >= 1500 || received == total) {
-                lastUpdateTime = now;
-                final body = "[${info['formatted']['downloaded']}/${info['formatted']['total']}] • ${info['formatted']['speed']} • ETA: ${info['formatted']['eta']}";
-                _updateNotification(received * 100 ~/ total, filename, body);
-             }
+              if (lastUpdateTime == null || now.difference(lastUpdateTime!).inMilliseconds >= 1500 || received == total) {
+                 lastUpdateTime = now;
+                 final speedFormatted = info['formatted']['speed'];
+                 final body = "🚀 $speedFormatted • ⏳ ETA: ${info['formatted']['eta']}\n📦 ${info['formatted']['downloaded']} / ${info['formatted']['total']}";
+                 _updateNotification(received * 100 ~/ total, filename, body);
+                 
+                 // UPDATE SHORTCUT (Platform Specific)
+                 if (Platform.isIOS) {
+                    final int dotCount = (received ~/ (1024 * 1024)) % 4; // Change dot every 1MB
+                    final String dots = "." * dotCount;
+                    TxaShortcutService.setDownloadStatus("${TxaLanguage.t('downloading')}$dots");
+                 } else {
+                    TxaShortcutService.setDownloadStatus(TxaLanguage.t('downloading_status', replace: {
+                      'p': info['progress'].toInt().toString(),
+                      's': speedFormatted,
+                      'e': info['formatted']['eta'],
+                    }));
+                 }
+              }
           }
         },
       );
@@ -102,7 +116,8 @@ class TxaDownload {
       if (showNotification) {
         final String title = TxaLanguage.t('download_finished');
         final String body = TxaLanguage.t('click_to_install');
-        await _completeNotification(filename, '$title $body', payload: savePath);
+        await _completeNotification(filename, '✅ $title $body', payload: savePath);
+        TxaShortcutService.setDownloadStatus(null); // Clear shortcut
       }
 
       isDownloading = false;
@@ -120,7 +135,8 @@ class TxaDownload {
       }
 
       if (showNotification) {
-        await _completeNotification(filename, errorMsg);
+        await _completeNotification(filename, '❌ $errorMsg');
+        TxaShortcutService.setDownloadStatus(null);
       }
       return null;
     }
@@ -154,7 +170,7 @@ class TxaDownload {
       'formatted': {
         'downloaded': TxaFormat.formatSize(downloadedBytes)['display'],
         'total': TxaFormat.formatSize(totalBytes)['display'],
-        'speed': TxaFormat.formatSpeed(speed, decimals: 1)['display'], // Rounded to 1 decimal
+        'speed': TxaFormat.formatSpeed(speed, decimals: 2)['display'], 
         'eta': TxaFormat.formatTime(etaSeconds),
       }
     };
@@ -175,11 +191,20 @@ class TxaDownload {
         const AndroidNotificationAction('cancel_download', 'Hủy', showsUserInterface: true),
       ],
     );
+
+    // iOS doesn't support progress bars in notifications natively via this plugin
+    const ios = DarwinNotificationDetails(
+      presentAlert: false, // Don't buzz every 1.5s
+      presentBadge: false,
+      presentSound: false,
+      threadIdentifier: 'download_status',
+    );
+
     await _notifications.show(
       id: 1,
       title: title,
       body: body,
-      notificationDetails: NotificationDetails(android: android),
+      notificationDetails: NotificationDetails(android: android, iOS: ios),
     );
   }
 

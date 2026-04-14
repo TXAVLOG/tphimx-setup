@@ -10,11 +10,13 @@ class TxaLanguage {
       'ok': 'Đồng ý',
       'cancel': 'Hủy bỏ',
       'check_update': 'Kiểm tra cập nhật',
-      'downloading': 'Đang tải xuống...',
+      'downloading': 'Đang tải',
+      'downloading_status': 'Đang tải: %p%% • %s% • ETA: %e%',
       'error': 'Lỗi',
       'success': 'Thành công',
       'permissions_required': 'Yêu cầu quyền truy cập',
-      'storage_permission_msg': 'Ứng dụng cần quyền quản lý tệp để lưu nhật ký và tải ứng dụng.',
+      'storage_permission_msg':
+          'Ứng dụng cần quyền quản lý tệp để lưu nhật ký và tải ứng dụng.',
       'grant': 'Cấp quyền',
       'skip': 'Bỏ qua',
       'retry': 'Thử lại',
@@ -45,11 +47,18 @@ class TxaLanguage {
       'trending_categories': 'Bạn đang quan tâm gì?',
       'see_all': 'Xem tất cả',
       'permission_storage_label': 'Quản lý tệp & Bộ nhớ',
-      'permission_storage_desc': 'Bắt buộc để tải xuống phim và lưu nhật ký ứng dụng.',
+      'permission_storage_desc':
+          'Bắt buộc để tải xuống phim và lưu nhật ký ứng dụng.',
       'permission_notif_label': 'Thông báo đẩy',
-      'permission_notif_desc': 'Nhận thông báo khi có tập phim mới hoặc lịch chiếu.',
+      'permission_notif_desc':
+          'Nhận thông báo khi có tập phim mới hoặc lịch chiếu.',
       'permission_install_label': 'Cài đặt ứng dụng',
-      'permission_install_desc': 'Bắt buộc để ứng dụng có thể tự động nâng cấp phiên bản mới.',
+      'permission_install_desc':
+          'Bắt buộc để ứng dụng có thể tự động nâng cấp phiên bản mới.',
+      'permission_overlay_label': 'Hiển thị trên ứng dụng khác',
+      'permission_overlay_desc':
+          'Quyền này cần thiết để chế độ PiP (thu nhỏ) có thể hoạt động khi bạn thoát app.',
+      'pip_permission_missing': 'Thiếu quyền vẽ lên ứng dụng khác để bật PiP.',
       'press_back_again': 'Nhấn lần nữa để thoát ứng dụng',
       'player_settings': 'Cài đặt trình phát',
       'language': 'Ngôn ngữ',
@@ -63,7 +72,8 @@ class TxaLanguage {
       'feature_dev': 'Tính năng đang phát triển',
       'feature_under_dev': 'Tính năng "%label" đang được phát triển',
       'coming_soon': 'Tính năng đang phát triển',
-      'coming_soon_msg': 'Tính năng này sẽ sớm ra mắt trong các bản cập nhật tới. Vui lòng quay lại sau nhé!',
+      'coming_soon_msg':
+          'Tính năng này sẽ sớm ra mắt trong các bản cập nhật tới. Vui lòng quay lại sau nhé!',
       'episodes': 'Tập phim',
       'episode': 'Tập',
       'loading_home': 'Đang tải trang chủ...',
@@ -82,9 +92,12 @@ class TxaLanguage {
       'favorite_list': 'Yêu thích',
       'collapse': 'Thu gọn',
       'show_more': 'Xem thêm',
-      'broadcast_msg': '%prefix sẽ phát sóng vào %time. Các bạn nhớ đón xem nhé 😙',
-      'broadcast_final_msg': 'Đừng bỏ lỡ %prefix (Hồi kết) sẽ phát sóng vào %time 🥹',
-      'broadcast_suffix': 'Phim sẽ phát sóng tập tiếp theo vào %time. Các bạn nhớ đón xem nhé 😙',
+      'broadcast_msg':
+          '%prefix sẽ phát sóng vào %time. Các bạn nhớ đón xem nhé 😙',
+      'broadcast_final_msg':
+          'Đừng bỏ lỡ %prefix (Hồi kết) sẽ phát sóng vào %time 🥹',
+      'broadcast_suffix':
+          'Phim sẽ phát sóng tập tiếp theo vào %time. Các bạn nhớ đón xem nhé 😙',
       'final_ep': 'Tập cuối',
       'final_part': 'Hồi kết',
       'current_version': 'Phiên bản hiện tại: %version',
@@ -147,6 +160,12 @@ class TxaLanguage {
       'player_audio': 'Âm thanh',
       'player_lock': 'Khóa màn hình',
       'player_unlock': 'Mở khóa',
+      'player_play': 'Phát',
+      'player_pause': 'Tạm dừng',
+      'player_close': 'Đóng phim',
+      'auto_pip_label': 'Tự động bật PiP',
+      'auto_pip_desc':
+          'Tự động kích hoạt thu nhỏ màn hình khi thoát app đang xem phim',
       'player_episodes': 'Danh sách tập',
       'player_gesture_hint': 'Vuốt để chỉnh độ sáng/âm lượng',
       'player_fast_forward_2x': 'Đang tua nhanh 2x',
@@ -157,10 +176,16 @@ class TxaLanguage {
       'player_audio_track': 'Âm thanh',
       'player_seek_hint_short': 'Chạm đúp',
       'player_subtitle': 'Phụ đề',
+      'player_system_control_blocked':
+          'App đang điều khiển hệ thống, không thể chỉnh tay',
+      'player_start_in': 'Bắt đầu sau',
+      'prev_ep': 'Tập trước',
+      'next_ep': 'Tập tiếp',
       'current_label': 'Hiện tại',
       'server_switch_hint': 'Chọn server để xem ở nguồn khác',
       'server_ep_unavailable_title': 'Tập phim không khả dụng',
-      'server_ep_unavailable_msg': 'Tập %ep chưa có trên server %server. Tự động chuyển về server mặc định.',
+      'server_ep_unavailable_msg':
+          'Tập %ep chưa có trên server %server. Tự động chuyển về server mặc định.',
       'download_finished': 'Tải xong 🚀',
       'click_to_install': '(Bấm để cài đặt)',
       'verifying_file': 'Đang xác minh bản cập nhật...',
@@ -180,11 +205,14 @@ class TxaLanguage {
       'udid_update_btn': 'Nhập UDID',
       'udid_registered_badge': 'ĐÃ ĐĂNG KÝ',
       'ios_service_title': 'iOS Premium Service',
-      'ios_premium_desc': 'Cần đăng ký UDID thiết bị để có thể cài đặt và cập nhật bản IPA Premium chính thức.',
-      'ios_ready_desc': 'Thiết bị của bạn đã được đăng ký UDID. Bạn có thể cài đặt phiên bản Premium IPA chính thức ngay bây giờ.',
+      'ios_premium_desc':
+          'Cần đăng ký UDID thiết bị để có thể cài đặt và cập nhật bản IPA Premium chính thức.',
+      'ios_ready_desc':
+          'Thiết bị của bạn đã được đăng ký UDID. Bạn có thể cài đặt phiên bản Premium IPA chính thức ngay bây giờ.',
       'premium_tab': 'Premium',
       'share_logs': 'Chia sẻ nhật ký',
-      'share_logs_desc': 'Gửi file log qua AirDrop, tin nhắn hoặc lưu vào Files',
+      'share_logs_desc':
+          'Gửi file log qua AirDrop, tin nhắn hoặc lưu vào Files',
       'no_logs_found': 'Không tìm thấy file nhật ký',
       'share_logs_subject': 'TPhimX Log Files',
       'udid_auto_detected': '✅ Tự động nhận diện UDID thành công!',
@@ -197,11 +225,13 @@ class TxaLanguage {
       'ok': 'OK',
       'cancel': 'Cancel',
       'check_update': 'Check for Updates',
-      'downloading': 'Downloading...',
+      'downloading': 'Downloading',
+      'downloading_status': 'Downloading: %p%% • %s% • ETA: %e%',
       'error': 'Error',
       'success': 'Success',
       'permissions_required': 'Permissions Required',
-      'storage_permission_msg': 'App needs file management permission to save logs and download apps.',
+      'storage_permission_msg':
+          'App needs file management permission to save logs and download apps.',
       'grant': 'Grant',
       'skip': 'Skip',
       'retry': 'Retry',
@@ -232,11 +262,17 @@ class TxaLanguage {
       'trending_categories': 'What are you interested in?',
       'see_all': 'See All',
       'permission_storage_label': 'Storage & File Management',
-      'permission_storage_desc': 'Required to download movies and save app logs.',
+      'permission_storage_desc':
+          'Required to download movies and save app logs.',
       'permission_notif_label': 'Push Notifications',
-      'permission_notif_desc': 'Receive notifications for new episodes or schedules.',
+      'permission_notif_desc':
+          'Receive notifications for new episodes or schedules.',
       'permission_install_label': 'Install Applications',
       'permission_install_desc': 'Required for automatic version upgrades.',
+      'permission_overlay_label': 'Display over other apps',
+      'permission_overlay_desc':
+          'Required for Picture-in-Picture mode to work when leaving the app.',
+      'pip_permission_missing': 'Missing overlay permission for Auto PiP.',
       'press_back_again': 'Press back again to exit',
       'player_settings': 'Player Settings',
       'language': 'Language',
@@ -250,7 +286,8 @@ class TxaLanguage {
       'feature_dev': 'Feature under development',
       'feature_under_dev': 'Feature "%label" is under development',
       'coming_soon': 'Coming Soon',
-      'coming_soon_msg': 'This feature will be available in future updates. Please check back later!',
+      'coming_soon_msg':
+          'This feature will be available in future updates. Please check back later!',
       'episodes': 'Episodes',
       'episode': 'Episode',
       'loading_home': 'Loading homepage...',
@@ -270,7 +307,8 @@ class TxaLanguage {
       'collapse': 'Collapse',
       'show_more': 'Show more',
       'broadcast_msg': '%prefix will broadcast at %time. Don\'t miss it 😙',
-      'broadcast_final_msg': 'Don\'t miss %prefix (Final) broadcasting at %time 🥹',
+      'broadcast_final_msg':
+          'Don\'t miss %prefix (Final) broadcasting at %time 🥹',
       'broadcast_suffix': 'Next episode will broadcast at %time. Stay tuned 😙',
       'final_ep': 'Final Episode',
       'final_part': 'Final',
@@ -334,6 +372,12 @@ class TxaLanguage {
       'player_audio': 'Audio',
       'player_lock': 'Lock Screen',
       'player_unlock': 'Unlock',
+      'player_play': 'Play',
+      'player_pause': 'Pause',
+      'player_close': 'Close Player',
+      'auto_pip_label': 'Auto PiP Mode',
+      'auto_pip_desc':
+          'Automatically trigger Picture-in-Picture when leaving the app',
       'player_episodes': 'Episode List',
       'player_gesture_hint': 'Swipe to adjust brightness/volume',
       'player_fast_forward_2x': 'Fast Forwarding 2x',
@@ -344,10 +388,16 @@ class TxaLanguage {
       'player_audio_track': 'Audio',
       'player_seek_hint_short': 'Double Tap',
       'player_subtitle': 'Subtitle',
+      'player_system_control_blocked':
+          'Controlled by app, manual change disabled',
+      'player_start_in': 'Starts in',
+      'prev_ep': 'Prev Ep',
+      'next_ep': 'Next Ep',
       'current_label': 'Current',
       'server_switch_hint': 'Switch server to watch from another source',
       'server_ep_unavailable_title': 'Episode Unavailable',
-      'server_ep_unavailable_msg': 'Episode %ep is not available on %server. Auto-switching to default server.',
+      'server_ep_unavailable_msg':
+          'Episode %ep is not available on %server. Auto-switching to default server.',
       'download_finished': 'Download finished 🚀',
       'click_to_install': '(Click to install)',
       'verifying_file': 'Verifying update file...',
@@ -367,18 +417,21 @@ class TxaLanguage {
       'udid_update_btn': 'Update',
       'udid_registered_badge': 'REGISTERED',
       'ios_service_title': 'iOS Premium Service',
-      'ios_premium_desc': 'Need to register device UDID to install and update the official Premium IPA.',
-      'ios_ready_desc': 'Your device is registered. You can install the official Premium IPA now.',
+      'ios_premium_desc':
+          'Need to register device UDID to install and update the official Premium IPA.',
+      'ios_ready_desc':
+          'Your device is registered. You can install the official Premium IPA now.',
       'premium_tab': 'Premium',
       'share_logs': 'Share Logs',
-      'share_logs_desc': 'Send log files via AirDrop, messages or save to Files',
+      'share_logs_desc':
+          'Send log files via AirDrop, messages or save to Files',
       'no_logs_found': 'No log files found',
       'share_logs_subject': 'TPhimX Log Files',
       'udid_auto_detected': '✅ UDID auto-detected successfully!',
       'udid_invalid': '❌ Invalid UDID code: %m',
       'status_registered': 'Registered',
       'status_not_registered': 'Not Registered',
-    }
+    },
   };
 
   static String get currentLang => _currentLang;
@@ -411,10 +464,16 @@ class TxaLanguage {
     }
   }
 
-  static String t(String key) {
+  static String t(String key, {Map<String, String>? replace}) {
     if (_dicts[_currentLang]?[key] == null) {
       TxaLogger.log("Missing key '$key' for language '$_currentLang'", isError: true);
     }
-    return _dicts[_currentLang]?[key] ?? _dicts['en']?[key] ?? key;
+    String text = _dicts[_currentLang]?[key] ?? _dicts['en']?[key] ?? key;
+    if (replace != null) {
+      replace.forEach((k, v) {
+        text = text.replaceAll('%$k%', v);
+      });
+    }
+    return text;
   }
 }

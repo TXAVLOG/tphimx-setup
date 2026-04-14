@@ -14,14 +14,20 @@ class TxaPermission {
       },
     ];
     // manageExternalStorage is Android-only — crashes on iOS
-    if (Platform.isAndroid) {
-      perms.add({
-        'id': 'storage',
-        'label': TxaLanguage.t('permission_storage_label'),
-        'desc': TxaLanguage.t('permission_storage_desc'),
-        'permission': Permission.manageExternalStorage,
-      });
-    }
+      if (Platform.isAndroid) {
+        perms.add({
+          'id': 'storage',
+          'label': TxaLanguage.t('permission_storage_label'),
+          'desc': TxaLanguage.t('permission_storage_desc'),
+          'permission': Permission.manageExternalStorage,
+        });
+        perms.add({
+          'id': 'overlay',
+          'label': TxaLanguage.t('permission_overlay_label'),
+          'desc': TxaLanguage.t('permission_overlay_desc'),
+          'permission': Permission.systemAlertWindow,
+        });
+      }
     return perms;
   }
 
