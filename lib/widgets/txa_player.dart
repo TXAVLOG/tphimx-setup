@@ -165,6 +165,8 @@ class _TxaPlayerState extends State<TxaPlayer>
   void _initSystemMirrors() {
     try {
       ScreenBrightness().setApplicationScreenBrightness(_brightness);
+      // Hide system volume HUD during playback to use our custom premium overlay
+      VolumeController.instance.showSystemUI = false;
 
       // Listen to system volume changes
       VolumeController.instance.addListener((v) {
@@ -842,6 +844,7 @@ class _TxaPlayerState extends State<TxaPlayer>
 
     _betterPlayerController?.removeEventsListener(_onPlayerEvent);
     VolumeController.instance.removeListener();
+    VolumeController.instance.showSystemUI = true; // Restore system volume HUD
     ScreenBrightness().resetApplicationScreenBrightness();
     WidgetsBinding.instance.removeObserver(this);
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
@@ -1002,7 +1005,7 @@ class _TxaPlayerState extends State<TxaPlayer>
                   _betterPlayerController!.seekTo(
                     Duration(seconds: _introEnd.toInt()),
                   );
-                }, Alignment.bottomLeft),
+                }, Alignment.bottomRight),
               if (_showSkipOutro)
                 _buildSkipOverlay(
                   TxaLanguage.t('skip_outro_next'),
@@ -1501,14 +1504,41 @@ class _TxaPlayerState extends State<TxaPlayer>
           children: [
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              crossAxisAlignment: CrossAxisAlignment.end,
               children: [
-                Text(
-                  _formatDuration(value.position),
-                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      "${_formatDuration(value.position)} / ${_formatDuration(value.duration)}",
+                      style: TextStyle(
+                        color: TxaTheme.accent.withValues(alpha: 0.9),
+                        fontSize: 13,
+                        fontWeight: FontWeight.w900,
+                        letterSpacing: 0.5,
+                        shadows: const [
+                          Shadow(blurRadius: 4, color: Colors.black),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      TxaLanguage.t('player_position'),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.4),
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
                 ),
                 Text(
                   _formatDuration(value.duration),
-                  style: const TextStyle(color: Colors.white, fontSize: 11),
+                  style: const TextStyle(
+                    color: Colors.white60,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
               ],
             ),
@@ -1530,12 +1560,20 @@ class _TxaPlayerState extends State<TxaPlayer>
                               width:
                                   ((_introEnd - _introStart) / dur) *
                                   (MediaQuery.of(context).size.width - 48),
-                              top: 20,
-                              bottom: 20,
+                              top: 23,
+                              bottom: 23,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.amber.withOpacity(0.4),
-                                  borderRadius: BorderRadius.circular(2),
+                                  color: Colors.amber.withValues(alpha: 0.8),
+                                  borderRadius: BorderRadius.circular(4),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.amber.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -1545,12 +1583,18 @@ class _TxaPlayerState extends State<TxaPlayer>
                                   (_outroStart / dur) *
                                   (MediaQuery.of(context).size.width - 48),
                               right: 0,
-                              top: 20,
-                              bottom: 20,
+                              top: 23,
+                              bottom: 23,
                               child: Container(
                                 decoration: BoxDecoration(
-                                  color: Colors.red.withOpacity(0.4),
-                                  borderRadius: BorderRadius.circular(2),
+                                  color: Colors.red.withValues(alpha: 0.8),
+                                  borderRadius: BorderRadius.circular(4),
+                                  boxShadow: [
+                                    BoxShadow(
+                                      color: Colors.red.withValues(alpha: 0.3),
+                                      blurRadius: 4,
+                                    ),
+                                  ],
                                 ),
                               ),
                             ),
@@ -1685,7 +1729,8 @@ class _TxaPlayerState extends State<TxaPlayer>
                   'HH:mm:ss': 'HH:mm:ss',
                   'HH:mm:ss.SSS': 'HH:mm:ss.SSS',
                   'HH:mm dd/MM': 'HH:mm dd/MM',
-                  'HH:mm dd/MM/yyyy': 'HH:mm dd/MM/yyyy',
+                  'HH:mm:ss dd/MM/yyyy': 'HH:mm:ss dd/MM/yyyy',
+                  'HH:mm:ss.SS dd/MM/yyyy': 'HH:mm:ss.SS dd/MM/yyyy',
                   'hh:mm a': 'hh:mm a',
                   'hh:mm:ss a': 'hh:mm:ss a',
                   'E, HH:mm': 'E, HH:mm',
@@ -2160,19 +2205,32 @@ class _TxaPlayerState extends State<TxaPlayer>
 
   Widget _buildSkipOverlay(String label, VoidCallback onTap, Alignment align) {
     return Positioned(
-      bottom: 100,
-      left: align == Alignment.bottomLeft ? 40 : null,
-      right: align == Alignment.bottomRight ? 40 : null,
+      bottom: 160, // Higher than total time label
+      right: 40, // Both buttons now on the right side
       child: ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
           backgroundColor: TxaTheme.accent,
           foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+          elevation: 8,
+          shadowColor: TxaTheme.accent.withValues(alpha: 0.5),
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(30),
+            side: const BorderSide(color: Colors.white10),
           ),
         ),
-        child: Text(label, style: const TextStyle(fontWeight: FontWeight.bold)),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 13),
+            ),
+            const SizedBox(width: 8),
+            const Icon(Icons.fast_forward_rounded, size: 18),
+          ],
+        ),
       ),
     );
   }

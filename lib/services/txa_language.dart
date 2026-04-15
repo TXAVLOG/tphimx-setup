@@ -191,6 +191,7 @@ class TxaLanguage {
       'server_ep_unavailable_title': 'Tập phim không khả dụng',
       'server_ep_unavailable_msg':
           'Tập %ep chưa có trên server %server. Tự động chuyển về server mặc định.',
+      'player_position': 'Tiến độ phát',
       'download_finished': 'Tải xong 🚀',
       'click_to_install': '(Bấm để cài đặt)',
       'verifying_file': 'Đang xác minh bản cập nhật...',
@@ -408,6 +409,7 @@ class TxaLanguage {
       'server_ep_unavailable_title': 'Episode Unavailable',
       'server_ep_unavailable_msg':
           'Episode %ep is not available on %server. Auto-switching to default server.',
+      'player_position': 'Playback position',
       'download_finished': 'Download finished 🚀',
       'click_to_install': '(Click to install)',
       'verifying_file': 'Verifying update file...',
