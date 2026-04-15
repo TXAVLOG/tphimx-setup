@@ -18,7 +18,6 @@ class AccountScreen extends StatefulWidget {
 }
 
 class _AccountScreenState extends State<AccountScreen> {
-
   void _handleDev(BuildContext context, String label) {
     TxaToast.show(
       context,
@@ -39,14 +38,11 @@ class _AccountScreenState extends State<AccountScreen> {
     final Uri url = Uri.parse(urlStr);
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(TxaLanguage.t('not_open_link'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(TxaLanguage.t('not_open_link'))));
     }
   }
-
-
-
 
   @override
   Widget build(BuildContext context) {
@@ -114,8 +110,12 @@ class _AccountScreenState extends State<AccountScreen> {
               title: TxaLanguage.t('terms_of_service'),
               sections: [
                 LegalSection(
-                  title: TxaLanguage.currentLang == 'vi' ? 'Quy định chung' : 'General Rules',
-                  content: TxaLanguage.currentLang == 'vi' ? 'Chào mừng bạn đến với TPhimX. Khi truy cập và sử dụng dịch vụ, bạn đồng ý tuân thủ các quy định dưới đây.' : 'Welcome to TPhimX. By accessing and using the service, you agree to comply with the regulations below.',
+                  title: TxaLanguage.currentLang == 'vi'
+                      ? 'Quy định chung'
+                      : 'General Rules',
+                  content: TxaLanguage.currentLang == 'vi'
+                      ? 'Chào mừng bạn đến với TPhimX. Khi truy cập và sử dụng dịch vụ, bạn đồng ý tuân thủ các quy định dưới đây.'
+                      : 'Welcome to TPhimX. By accessing and using the service, you agree to comply with the regulations below.',
                   icon: Icons.gavel_rounded,
                 ),
               ],
@@ -134,8 +134,12 @@ class _AccountScreenState extends State<AccountScreen> {
               title: TxaLanguage.t('privacy_policy'),
               sections: [
                 LegalSection(
-                  title: TxaLanguage.currentLang == 'vi' ? 'Thu thập thông tin' : 'Data Collection',
-                  content: TxaLanguage.currentLang == 'vi' ? 'Chúng tôi chỉ thu thập dữ liệu cần thiết để mang lại trải nghiệm tốt nhất cho bạn.' : 'We only collect data necessary to bring the best experience to you.',
+                  title: TxaLanguage.currentLang == 'vi'
+                      ? 'Thu thập thông tin'
+                      : 'Data Collection',
+                  content: TxaLanguage.currentLang == 'vi'
+                      ? 'Chúng tôi chỉ thu thập dữ liệu cần thiết để mang lại trải nghiệm tốt nhất cho bạn.'
+                      : 'We only collect data necessary to bring the best experience to you.',
                   icon: Icons.storage_rounded,
                 ),
               ],
@@ -192,43 +196,56 @@ class _AccountScreenState extends State<AccountScreen> {
                     ),
                     const SizedBox(width: 8),
                     // Status badge: Đã đăng ký / Chưa đăng ký
-                    Builder(builder: (_) {
-                      final isRegistered = TxaSettings.udid.isNotEmpty;
-                      return Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: isRegistered
-                              ? Colors.green.withValues(alpha: 0.15)
-                              : Colors.orange.withValues(alpha: 0.15),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: isRegistered
-                                ? Colors.green.withValues(alpha: 0.5)
-                                : Colors.orange.withValues(alpha: 0.5),
-                            width: 0.5,
+                    Builder(
+                      builder: (_) {
+                        final isRegistered = TxaSettings.udid.isNotEmpty;
+                        return Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
                           ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              isRegistered ? Icons.verified_rounded : Icons.info_outline_rounded,
-                              color: isRegistered ? Colors.green : Colors.orange,
-                              size: 10,
+                          decoration: BoxDecoration(
+                            color: isRegistered
+                                ? Colors.green.withValues(alpha: 0.15)
+                                : Colors.orange.withValues(alpha: 0.15),
+                            borderRadius: BorderRadius.circular(6),
+                            border: Border.all(
+                              color: isRegistered
+                                  ? Colors.green.withValues(alpha: 0.5)
+                                  : Colors.orange.withValues(alpha: 0.5),
+                              width: 0.5,
                             ),
-                            const SizedBox(width: 2),
-                            Text(
-                              isRegistered ? TxaLanguage.t('status_registered') : TxaLanguage.t('status_not_registered'),
-                              style: TextStyle(
-                                color: isRegistered ? Colors.green : Colors.orange,
-                                fontSize: 9,
-                                fontWeight: FontWeight.bold,
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(
+                                isRegistered
+                                    ? Icons.verified_rounded
+                                    : Icons.info_outline_rounded,
+                                color: isRegistered
+                                    ? Colors.green
+                                    : Colors.orange,
+                                size: 10,
                               ),
-                            ),
-                          ],
-                        ),
-                      );
-                    }),
+                              const SizedBox(width: 2),
+                              Text(
+                                isRegistered
+                                    ? TxaLanguage.t('status_registered')
+                                    : TxaLanguage.t('status_not_registered'),
+                                style: TextStyle(
+                                  color: isRegistered
+                                      ? Colors.green
+                                      : Colors.orange,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
                   ],
                 ),
                 Text(
@@ -250,9 +267,13 @@ class _AccountScreenState extends State<AccountScreen> {
               children: [
                 Expanded(
                   child: ElevatedButton.icon(
-                    onPressed: () => _handleDev(context, TxaLanguage.t('login')),
+                    onPressed: () =>
+                        _handleDev(context, TxaLanguage.t('login')),
                     icon: const Icon(Icons.person_outline_rounded, size: 18),
-                    label: Text(TxaLanguage.t('login'), style: const TextStyle(fontSize: 13)),
+                    label: Text(
+                      TxaLanguage.t('login'),
+                      style: const TextStyle(fontSize: 13),
+                    ),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: TxaTheme.accent,
                       foregroundColor: Colors.white,
@@ -267,7 +288,8 @@ class _AccountScreenState extends State<AccountScreen> {
                 const SizedBox(width: 8),
                 Expanded(
                   child: ElevatedButton(
-                    onPressed: () => _handleDev(context, TxaLanguage.t('register')),
+                    onPressed: () =>
+                        _handleDev(context, TxaLanguage.t('register')),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: TxaTheme.cardBg,
                       foregroundColor: TxaTheme.textPrimary,
@@ -278,7 +300,10 @@ class _AccountScreenState extends State<AccountScreen> {
                       ),
                       elevation: 0,
                     ),
-                    child: Text(TxaLanguage.t('register'), style: const TextStyle(fontSize: 13)),
+                    child: Text(
+                      TxaLanguage.t('register'),
+                      style: const TextStyle(fontSize: 13),
+                    ),
                   ),
                 ),
               ],
@@ -348,7 +373,7 @@ class _AccountScreenState extends State<AccountScreen> {
               },
             ),
           ),
-          
+
           // Version info - Compact
           Padding(
             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -356,10 +381,12 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '2.5.1';
-                  final buildNumber = snapshot.data?.buildNumber ?? '251';
+                  final version = snapshot.data?.version ?? '2.6.0';
+                  final buildNumber = snapshot.data?.buildNumber ?? '260';
                   return Text(
-                    TxaLanguage.t('current_version').replaceAll('%version', '$version (Build $buildNumber)'),
+                    TxaLanguage.t(
+                      'current_version',
+                    ).replaceAll('%version', '$version (Build $buildNumber)'),
                     style: const TextStyle(
                       color: TxaTheme.textMuted,
                       fontSize: 11,
@@ -442,7 +469,10 @@ class _PlayerSettingsBottomSheetState
           const SizedBox(height: 24),
           Row(
             children: [
-              const Icon(Icons.settings_suggest_rounded, color: TxaTheme.accent),
+              const Icon(
+                Icons.settings_suggest_rounded,
+                color: TxaTheme.accent,
+              ),
               const SizedBox(width: 12),
               Text(
                 TxaLanguage.t('player_settings'),
@@ -455,7 +485,7 @@ class _PlayerSettingsBottomSheetState
             ],
           ),
           const SizedBox(height: 24),
-          
+
           // 1. Sliders for Volume & Brightness
           _SliderSetting(
             label: TxaLanguage.t('player_brightness'),
@@ -469,7 +499,7 @@ class _PlayerSettingsBottomSheetState
             value: TxaSettings.volume,
             onChanged: (v) => setState(() => TxaSettings.volume = v),
           ),
-          
+
           const Divider(color: Colors.white10, height: 32),
 
           // 2. Toggles
@@ -483,52 +513,67 @@ class _PlayerSettingsBottomSheetState
             value: TxaSettings.autoNextEpisode,
             onChanged: (v) => setState(() => TxaSettings.autoNextEpisode = v),
           ),
-          
+
           const Divider(color: Colors.white10, height: 32),
-          
+
           // 3. Auto PiP with Permission Check (Android Only)
           if (Platform.isAndroid)
-            _hasOverlayPermission 
-              ? _SettingToggle(
-                  label: TxaLanguage.t('auto_pip_label'),
-                  value: TxaSettings.autoPiP,
-                  onChanged: (v) => setState(() => TxaSettings.autoPiP = v),
-                )
-              : Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
-                  ),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 20),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Text(
-                          TxaLanguage.t('pip_permission_missing'),
-                          style: const TextStyle(color: Colors.white70, fontSize: 13),
-                        ),
+            _hasOverlayPermission
+                ? _SettingToggle(
+                    label: TxaLanguage.t('auto_pip_label'),
+                    value: TxaSettings.autoPiP,
+                    onChanged: (v) => setState(() => TxaSettings.autoPiP = v),
+                  )
+                : Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 12,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.red.withValues(alpha: 0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.red.withValues(alpha: 0.3),
                       ),
-                      TextButton(
-                        onPressed: _requestOverlayPermission,
-                        child: Text(
-                          TxaLanguage.t('grant'),
-                          style: const TextStyle(color: TxaTheme.accent, fontWeight: FontWeight.bold),
+                    ),
+                    child: Row(
+                      children: [
+                        const Icon(
+                          Icons.warning_amber_rounded,
+                          color: Colors.orange,
+                          size: 20,
                         ),
-                      ),
-                    ],
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Text(
+                            TxaLanguage.t('pip_permission_missing'),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 13,
+                            ),
+                          ),
+                        ),
+                        TextButton(
+                          onPressed: _requestOverlayPermission,
+                          child: Text(
+                            TxaLanguage.t('grant'),
+                            style: const TextStyle(
+                              color: TxaTheme.accent,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-          
+
           if (Platform.isAndroid) const SizedBox(height: 8),
           if (Platform.isAndroid)
-             Text(
+            Text(
               TxaLanguage.t('auto_pip_desc'),
               style: const TextStyle(color: TxaTheme.textMuted, fontSize: 11),
             ),
-          
+
           const SizedBox(height: 24),
           ElevatedButton(
             onPressed: () => Navigator.pop(context),
@@ -577,9 +622,19 @@ class _SliderSetting extends StatelessWidget {
             children: [
               Icon(icon, color: TxaTheme.textSecondary, size: 18),
               const SizedBox(width: 8),
-              Text(label, style: const TextStyle(color: Colors.white70, fontSize: 13)),
+              Text(
+                label,
+                style: const TextStyle(color: Colors.white70, fontSize: 13),
+              ),
               const Spacer(),
-              Text('${(value * 100).toInt()}%', style: const TextStyle(color: TxaTheme.accent, fontWeight: FontWeight.bold, fontSize: 13)),
+              Text(
+                '${(value * 100).toInt()}%',
+                style: const TextStyle(
+                  color: TxaTheme.accent,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 13,
+                ),
+              ),
             ],
           ),
           SliderTheme(
@@ -591,10 +646,7 @@ class _SliderSetting extends StatelessWidget {
               overlayColor: TxaTheme.accent.withValues(alpha: 0.1),
               thumbShape: const RoundSliderThumbShape(enabledThumbRadius: 6),
             ),
-            child: Slider(
-              value: value,
-              onChanged: onChanged,
-            ),
+            child: Slider(value: value, onChanged: onChanged),
           ),
         ],
       ),
