@@ -1,3 +1,4 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
 import '../services/txa_settings.dart';
 import '../utils/txa_logger.dart';
@@ -6,27 +7,31 @@ class TxaApi {
   static const String baseUrl = 'https://film.nrotxa.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '2.5.1';
-  
+  static const String apiVersion = '5.2.0';
+
   // Community Links
-  static const String facebookFanpage = 'https://www.facebook.com/profile.php?id=61573302085316';
-  static const String facebookGroup = 'https://www.facebook.com/groups/1819522938713878';
+  static const String facebookFanpage =
+      'https://www.facebook.com/profile.php?id=61573302085316';
+  static const String facebookGroup =
+      'https://www.facebook.com/groups/1819522938713878';
   static const String telegramChannel = 'https://t.me/tphimx';
   static const String telegramGroup = 'https://t.me/+uptNAkShrJFjMjc1';
 
-
-  final Dio _dio = Dio(BaseOptions(
-    baseUrl: baseUrl,
-    connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(seconds: 15),
-    headers: {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-      'X-TXA-API-KEY': apiKey,
-      'X-TXC-Client': 'TPhimX-App',
-      'X-TXA-UDID': TxaSettings.udid,
-    },
-  ));
+  final Dio _dio = Dio(
+    BaseOptions(
+      baseUrl: baseUrl,
+      connectTimeout: const Duration(seconds: 15),
+      receiveTimeout: const Duration(seconds: 15),
+      headers: {
+        'X-TXC-Client': 'TPhimX-App',
+        'X-TXC-Platform': Platform.isIOS ? 'iOS' : 'Android',
+        'X-TXA-API-KEY': apiKey,
+        'X-TXA-UDID': TxaSettings.udid,
+        'User-Agent':
+            'TPhimX-App/$apiVersion (${Platform.isIOS ? 'iPhone' : 'Android'})',
+      },
+    ),
+  );
 
   // Endpoints
   static const String home = '$apiPrefix/home';
@@ -55,11 +60,17 @@ class TxaApi {
     _dio.options.headers['Authorization'] = 'Bearer $token';
   }
 
-  Future<Response> get(String path, {Map<String, dynamic>? queryParameters}) async {
+  Future<Response> get(
+    String path, {
+    Map<String, dynamic>? queryParameters,
+  }) async {
     try {
       return await _dio.get(path, queryParameters: queryParameters);
     } on DioException catch (e) {
-      TxaLogger.log('API GET Error [$path]: ${e.type} | Code: ${e.response?.statusCode} | Body: ${e.response?.data}', isError: true);
+      TxaLogger.log(
+        'API GET Error [$path]: ${e.type} | Code: ${e.response?.statusCode} | Body: ${e.response?.data}',
+        isError: true,
+      );
       rethrow;
     }
   }
@@ -68,7 +79,10 @@ class TxaApi {
     try {
       return await _dio.post(path, data: data);
     } on DioException catch (e) {
-      TxaLogger.log('API POST Error [$path]: ${e.type} | Code: ${e.response?.statusCode}', isError: true);
+      TxaLogger.log(
+        'API POST Error [$path]: ${e.type} | Code: ${e.response?.statusCode}',
+        isError: true,
+      );
       rethrow;
     }
   }
@@ -88,7 +102,14 @@ class TxaApi {
   }
 
   /// Tìm kiếm phim
-  Future<Map<String, dynamic>> searchMovies(String query, {int page = 1, String? categorySlug, String? region, String? year, String? movieType}) async {
+  Future<Map<String, dynamic>> searchMovies(
+    String query, {
+    int page = 1,
+    String? categorySlug,
+    String? region,
+    String? year,
+    String? movieType,
+  }) async {
     final params = <String, dynamic>{'q': query, 'page': page};
     if (categorySlug != null) params['category'] = categorySlug;
     if (region != null) params['region'] = region;
@@ -106,7 +127,10 @@ class TxaApi {
 
   /// Lấy phim theo loại (series/single)
   Future<Map<String, dynamic>> getType(String movieType, {int page = 1}) async {
-    final response = await get(type(movieType), queryParameters: {'page': page});
+    final response = await get(
+      type(movieType),
+      queryParameters: {'page': page},
+    );
     return response.data;
   }
 
@@ -135,25 +159,34 @@ class TxaApi {
   }
 
   /// Track search click
-  Future<Map<String, dynamic>> trackSearchClick(int movieId, String keyword) async {
-    final response = await post(searchClick, data: {
-      'movie_id': movieId,
-      'keyword': keyword,
-      'platform': 'app',
-    });
+  Future<Map<String, dynamic>> trackSearchClick(
+    int movieId,
+    String keyword,
+  ) async {
+    final response = await post(
+      searchClick,
+      data: {'movie_id': movieId, 'keyword': keyword, 'platform': 'app'},
+    );
     return response.data;
   }
 
   /// Ghi log lỗi từ client về server
-  Future<void> logError(String type, String message, {Map<String, dynamic>? extra}) async {
+  Future<void> logError(
+    String type,
+    String message, {
+    Map<String, dynamic>? extra,
+  }) async {
     try {
-      await post(clientError, data: {
-        'type': type,
-        'message': message,
-        'extra': extra,
-        'device_info': 'TPhimX-App-V6',
-        'timestamp': DateTime.now().toIso8601String(),
-      });
+      await post(
+        clientError,
+        data: {
+          'type': type,
+          'message': message,
+          'extra': extra,
+          'device_info': 'TPhimX-App-V6',
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+      );
     } catch (_) {
       // Ignore logger errors to avoid infinite loops
     }
