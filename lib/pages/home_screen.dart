@@ -28,6 +28,7 @@ import '../widgets/txa_download_dialog.dart';
 import '../widgets/txa_error_widget.dart';
 import '../utils/txa_logger.dart';
 import '../utils/txa_format.dart';
+import '../widgets/txa_loading.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -160,8 +161,9 @@ class _HomeScreenState extends State<HomeScreen> {
         );
       }
     } catch (e) {
-      if (manual && mounted)
+      if (manual && mounted) {
         TxaToast.show(context, TxaLanguage.t('update_error'), isError: true);
+      }
       debugPrint('Check update error: $e');
     }
   }
@@ -330,12 +332,13 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
 
-            // Page Content (tab bodies)
-            AnimatedSwitcher(
-              duration: const Duration(milliseconds: 300),
-              switchInCurve: Curves.easeOutCubic,
-              switchOutCurve: Curves.easeInCubic,
-              child: _buildTabBody(),
+            Positioned.fill(
+              child: AnimatedSwitcher(
+                duration: const Duration(milliseconds: 300),
+                switchInCurve: Curves.easeOutCubic,
+                switchOutCurve: Curves.easeInCubic,
+                child: _buildTabBody(),
+              ),
             ),
 
             // TxaNav
@@ -648,8 +651,9 @@ class _HomeTabState extends State<_HomeTab> {
 
     String getTitle(String key, String fallbackCode) {
       final val = _data![key];
-      if (val is Map && val['title'] != null)
+      if (val is Map && val['title'] != null) {
         return TxaLanguage.t(val['title']);
+      }
       return TxaLanguage.t(fallbackCode);
     }
 
@@ -745,22 +749,7 @@ class _HomeTabState extends State<_HomeTab> {
     return Stack(
       children: [
         if (_loading)
-          Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const CircularProgressIndicator(color: TxaTheme.accent),
-                const SizedBox(height: 16),
-                Text(
-                  TxaLanguage.t('loading_home'),
-                  style: const TextStyle(
-                    color: TxaTheme.textMuted,
-                    fontSize: 13,
-                  ),
-                ),
-              ],
-            ),
-          )
+          TxaLoading(message: TxaLanguage.t('loading_home'))
         else if (_error != null || _data == null)
           TxaErrorWidget(
             message: TxaLanguage.t('error_loading_data'),

@@ -14,7 +14,10 @@ class TxaMiniPlayer extends StatefulWidget {
 }
 
 class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
-  Offset _offset = const Offset(-20, -100); // Default bottom-right (relative to screen dimensions)
+  Offset _offset = const Offset(
+    -20,
+    -100,
+  ); // Default bottom-right (relative to screen dimensions)
   bool _isDragging = false;
 
   @override
@@ -31,11 +34,14 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
   Widget build(BuildContext context) {
     return Consumer<TxaMiniPlayerProvider>(
       builder: (context, provider, child) {
-        if (provider.isClosed || !provider.isMini) return const SizedBox.shrink();
+        if (provider.isClosed || !provider.isMini)
+          return const SizedBox.shrink();
 
         return AnimatedPositioned(
-          duration: _isDragging ? Duration.zero : const Duration(milliseconds: 300),
-          curve: Curves.easeOutCubic,
+          duration: _isDragging
+              ? Duration.zero
+              : const Duration(milliseconds: 400),
+          curve: Curves.easeOutBack,
           left: _offset.dx,
           top: _offset.dy,
           child: GestureDetector(
@@ -47,52 +53,80 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
             },
             onPanEnd: (details) {
               setState(() => _isDragging = false);
-              // Snap to edges if needed logic could go here
+              final size = MediaQuery.of(context).size;
+              // Snap to nearest side (160 width + 16 margin)
+              double targetX = _offset.dx < size.width / 2
+                  ? 16
+                  : size.width - 176;
+              double targetY = _offset.dy.clamp(60.0, size.height - 160.0);
+              setState(() {
+                _offset = Offset(targetX, targetY);
+              });
             },
             onTap: () => _restoreToFull(context, provider),
-            child: TxaTheme.glassConnector(
-              radius: 20,
-              padding: const EdgeInsets.all(8),
-              child: Container(
-                width: 220,
-                height: 124,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.5),
-                      blurRadius: 20,
-                      spreadRadius: -5,
-                    )
-                  ],
-                ),
+            child: Container(
+              width: 160,
+              height: 90,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.8),
+                    blurRadius: 25,
+                    spreadRadius: -8,
+                  ),
+                ],
+              ),
+              child: TxaTheme.glassConnector(
+                radius: 16,
+                padding: const EdgeInsets.all(3),
                 child: ClipRRect(
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(14),
                   child: Stack(
                     children: [
-                      // Video content
-                      IgnorePointer(
-                        child: BetterPlayer(
-                          controller: provider.controller!,
-                        ),
+                      // Video content or Placeholder
+                      Positioned.fill(
+                        child:
+                            provider.controller != null &&
+                                provider
+                                        .controller!
+                                        .videoPlayerController
+                                        ?.value
+                                        .initialized ==
+                                    true
+                            ? BetterPlayer(controller: provider.controller!)
+                            : Container(
+                                color: TxaTheme.cardBg,
+                                child: const Center(
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: TxaTheme.accent,
+                                  ),
+                                ),
+                              ),
                       ),
-                      
-                      // Overlay Controls (Gradient)
+
+                      // Overlay Controls (Subtle Gradient)
                       Positioned.fill(
                         child: Container(
                           decoration: BoxDecoration(
                             gradient: LinearGradient(
                               begin: Alignment.topCenter,
                               end: Alignment.bottomCenter,
-                              colors: [Colors.black26, Colors.black.withValues(alpha: 0.7)],
+                              colors: [
+                                Colors.black.withValues(alpha: 0.1),
+                                Colors.black.withValues(alpha: 0.8),
+                              ],
                             ),
                           ),
                         ),
                       ),
-                      
-                      // Title & Episode
+
+                      // Status Info (Ultra Compact)
                       Positioned(
-                        top: 8, left: 10, right: 30,
+                        top: 4,
+                        left: 8,
+                        right: 24,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -100,59 +134,83 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                               provider.movie['name'] ?? '',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 9,
+                                fontWeight: FontWeight.bold,
+                                shadows: [
+                                  Shadow(blurRadius: 4, color: Colors.black),
+                                ],
+                              ),
                             ),
                             Text(
                               "${TxaLanguage.t('episode')} ${provider.episodeIndex + 1}",
-                              style: TextStyle(color: TxaTheme.accent.withValues(alpha: 0.9), fontSize: 9, fontWeight: FontWeight.bold),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // CLOSE BUTTON
-                      Positioned(
-                        top: 4, right: 4,
-                        child: IconButton(
-                          icon: const Icon(Icons.close_rounded, color: Colors.white54, size: 18),
-                          padding: EdgeInsets.zero,
-                          constraints: const BoxConstraints(),
-                          onPressed: () => provider.close(),
-                        ),
-                      ),
-
-                      // CENTER ACTIONS
-                      Center(
-                        child: Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _MiniIcon(
-                              icon: Icons.replay_10_rounded,
-                              onTap: () => provider.controller?.seekTo(
-                                provider.controller!.videoPlayerController!.value.position - const Duration(seconds: 10)
+                              style: TextStyle(
+                                color: TxaTheme.accent,
+                                fontSize: 7,
+                                fontWeight: FontWeight.w900,
                               ),
                             ),
-                            const SizedBox(width: 16),
-                            _MiniIcon(
-                              icon: provider.controller!.videoPlayerController!.value.isPlaying 
-                                ? Icons.pause_rounded 
-                                : Icons.play_arrow_rounded,
-                              size: 28,
-                              onTap: () => setState(() => provider.playPause()),
-                            ),
-                            const SizedBox(width: 16),
-                            _MiniIcon(
-                              icon: Icons.fullscreen_rounded,
-                              onTap: () => _restoreToFull(context, provider),
-                            ),
                           ],
                         ),
                       ),
-                      
-                      // PROGRESS BAR (Minimal)
+
+                      // CLOSE BUTTON (Tiny)
                       Positioned(
-                        bottom: 0, left: 0, right: 0,
-                        child: _MiniProgressBar(controller: provider.controller!),
+                        top: 0,
+                        right: 0,
+                        child: Material(
+                          color: Colors.transparent,
+                          child: InkWell(
+                            onTap: () => provider.close(),
+                            borderRadius: BorderRadius.circular(20),
+                            child: const Padding(
+                              padding: EdgeInsets.all(5.0),
+                              child: Icon(
+                                Icons.close_rounded,
+                                color: Colors.white70,
+                                size: 14,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // PLAY/PAUSE (Center)
+                      Center(
+                        child: InkWell(
+                          onTap: () => setState(() => provider.playPause()),
+                          child: Container(
+                            padding: const EdgeInsets.all(8),
+                            decoration: BoxDecoration(
+                              color: Colors.black38,
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.white10),
+                            ),
+                            child: Icon(
+                              provider
+                                          .controller
+                                          ?.videoPlayerController
+                                          ?.value
+                                          .isPlaying ==
+                                      true
+                                  ? Icons.pause_rounded
+                                  : Icons.play_arrow_rounded,
+                              color: Colors.white,
+                              size: 24,
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // PROGRESS LINE (Thinnest)
+                      Positioned(
+                        bottom: 0,
+                        left: 0,
+                        right: 0,
+                        child: _MiniProgressBar(
+                          controller: provider.controller!,
+                        ),
                       ),
                     ],
                   ),
@@ -173,7 +231,7 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
     // We don't want to dispose the controller when leaving this "mini" mode
     // but the full TxaPlayer expects to initialize its own.
     // To solve this, we will pass the existing controller to TxaPlayer.
-    
+
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -186,29 +244,6 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
       ),
     );
     provider.switchToFull();
-  }
-}
-
-class _MiniIcon extends StatelessWidget {
-  final IconData icon;
-  final VoidCallback onTap;
-  final double size;
-  const _MiniIcon({required this.icon, required this.onTap, this.size = 20});
-
-  @override
-  Widget build(BuildContext context) {
-    return InkWell(
-      onTap: onTap,
-      child: Container(
-        padding: const EdgeInsets.all(4),
-        decoration: BoxDecoration(
-          color: Colors.white10,
-          shape: BoxShape.circle,
-          border: Border.all(color: Colors.white10),
-        ),
-        child: Icon(icon, color: Colors.white, size: size),
-      ),
-    );
   }
 }
 
@@ -225,7 +260,7 @@ class _MiniProgressBar extends StatelessWidget {
         final position = value.position.inMilliseconds;
         double progress = 0;
         if (duration > 0) progress = position / duration;
-        
+
         return LinearProgressIndicator(
           value: progress,
           backgroundColor: Colors.white12,

@@ -808,6 +808,14 @@ class _TxaPlayerState extends State<TxaPlayer>
   Future<void> _toggleDND(bool enable) async {
     if (!TxaSettings.autoDND) return;
     try {
+      final bool? hasPermission = await _dndChannel.invokeMethod<bool>(
+        'checkPermission',
+      );
+      if (hasPermission == false && enable) {
+        // Pause playback before opening Android settings to request DND access
+        _betterPlayerController?.pause();
+        TxaToast.show(context, TxaLanguage.t('pip_permission_missing'));
+      }
       await _dndChannel.invokeMethod('setDND', {'enable': enable});
     } catch (e) {
       debugPrint("DND Error: $e");
