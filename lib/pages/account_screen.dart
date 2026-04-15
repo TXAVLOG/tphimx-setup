@@ -381,8 +381,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '2.7.1';
-                  final buildNumber = snapshot.data?.buildNumber ?? '271';
+                  final version = snapshot.data?.version ?? '2.7.2';
+                  final buildNumber = snapshot.data?.buildNumber ?? '272';
                   return Text(
                     TxaLanguage.t(
                       'current_version',

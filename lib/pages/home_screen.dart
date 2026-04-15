@@ -316,6 +316,7 @@ class _HomeScreenState extends State<HomeScreen> {
       },
       child: Scaffold(
         key: _scaffoldKey,
+        backgroundColor: TxaTheme.primaryBg,
         drawer: _buildDrawer(),
         body: Stack(
           children: [
@@ -746,300 +747,304 @@ class _HomeTabState extends State<_HomeTab> {
             ),
           ];
 
-    return Stack(
-      children: [
-        if (_loading)
-          TxaLoading(message: TxaLanguage.t('loading_home'))
-        else if (_error != null || _data == null)
-          TxaErrorWidget(
-            message: TxaLanguage.t('error_loading_data'),
-            technicalDetails: _error,
-            onRetry: _loadHome,
-          )
-        else
-          RefreshIndicator(
-            onRefresh: _loadHome,
-            color: TxaTheme.accent,
-            child: CustomScrollView(
-              physics: const BouncingScrollPhysics(
-                parent: AlwaysScrollableScrollPhysics(),
-              ),
-              slivers: [
-                // Hero Slider
-                SliverToBoxAdapter(
-                  child: featured.isNotEmpty
-                      ? _HeroSlider(movies: featured.take(10).toList())
-                      : const SizedBox(height: 100),
+    return Container(
+      color: TxaTheme.primaryBg,
+      child: Stack(
+        children: [
+          if (_loading)
+            TxaLoading(message: TxaLanguage.t('loading_home'))
+          else if (_error != null || _data == null)
+            TxaErrorWidget(
+              message: TxaLanguage.t('error_loading_data'),
+              technicalDetails: _error,
+              onRetry: _loadHome,
+            )
+          else
+            RefreshIndicator(
+              onRefresh: _loadHome,
+              color: TxaTheme.accent,
+              child: CustomScrollView(
+                physics: const BouncingScrollPhysics(
+                  parent: AlwaysScrollableScrollPhysics(),
                 ),
-
-                // Filter Tabs
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(0, 12, 0, 4),
-                    child: SizedBox(
-                      height: 34,
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        physics: const BouncingScrollPhysics(),
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        children: [
-                          _FilterChip(
-                            label: TxaLanguage.t('recommendation'),
-                            isActive: _activeFilter == 'all',
-                            onTap: () => setState(() => _activeFilter = 'all'),
-                          ),
-                          _FilterChip(
-                            label: TxaLanguage.t('series_movies'),
-                            isActive: _activeFilter == 'series',
-                            onTap: () =>
-                                setState(() => _activeFilter = 'series'),
-                          ),
-                          _FilterChip(
-                            label: TxaLanguage.t('single_movies'),
-                            isActive: _activeFilter == 'single',
-                            onTap: () =>
-                                setState(() => _activeFilter = 'single'),
-                          ),
-                          ...categories
-                              .take(6)
-                              .map<Widget>(
-                                (cat) => _FilterChip(
-                                  label: cat['name'] ?? '',
-                                  isActive: false,
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (ctx) => CategoryListScreen(
-                                          title: cat['name'] ?? '',
-                                          slug: cat['slug'],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                        ],
-                      ),
-                    ),
+                slivers: [
+                  // Hero Slider
+                  SliverToBoxAdapter(
+                    child: featured.isNotEmpty
+                        ? _HeroSlider(movies: featured.take(10).toList())
+                        : const SizedBox(height: 100),
                   ),
-                ),
 
-                // Popular Categories ("Bạn đang quan tâm gì?")
-                if (categories.isNotEmpty)
+                  // Filter Tabs
                   SliverToBoxAdapter(
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                TxaLanguage.t('trending_categories'),
-                                style: const TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                              ),
-                              Text(
-                                TxaLanguage.t('more'),
-                                style: const TextStyle(
-                                  fontSize: 12,
-                                  color: TxaTheme.textMuted,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          SizedBox(
-                            height: 75,
-                            child: ListView.builder(
-                              scrollDirection: Axis.horizontal,
-                              physics: const BouncingScrollPhysics(),
-                              itemCount: categories.take(8).length,
-                              itemBuilder: (ctx, i) {
-                                final cat = categories[i];
-                                final colors = [
-                                  [
-                                    const Color(0xFFFACC15),
-                                    const Color(0xFFEA580C),
-                                  ], // Yellow-Orange
-                                  [
-                                    const Color(0xFFF87171),
-                                    const Color(0xFFDC2626),
-                                  ], // Red
-                                  [
-                                    const Color(0xFFF472B6),
-                                    const Color(0xFFDB2777),
-                                  ], // Pink
-                                  [
-                                    const Color(0xFF4ADE80),
-                                    const Color(0xFF16A34A),
-                                  ], // Green
-                                  [
-                                    const Color(0xFF60A5FA),
-                                    const Color(0xFF2563EB),
-                                  ], // Blue
-                                  [
-                                    const Color(0xFFC084FC),
-                                    const Color(0xFF9333EA),
-                                  ], // Purple
-                                ];
-                                final colorSet = colors[i % colors.length];
-                                return GestureDetector(
-                                  onTap: () {
-                                    Navigator.push(
-                                      context,
-                                      MaterialPageRoute(
-                                        builder: (ctx) => CategoryListScreen(
-                                          title: cat['name'] ?? '',
-                                          slug: cat['slug'],
-                                        ),
-                                      ),
-                                    );
-                                  },
-                                  child: Container(
-                                    width: 135,
-                                    margin: const EdgeInsets.only(right: 12),
-                                    decoration: BoxDecoration(
-                                      gradient: LinearGradient(
-                                        colors: colorSet,
-                                        begin: Alignment.topLeft,
-                                        end: Alignment.bottomRight,
-                                      ),
-                                      borderRadius: BorderRadius.circular(12),
-                                    ),
-                                    child: Padding(
-                                      padding: const EdgeInsets.all(12.0),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        mainAxisAlignment:
-                                            MainAxisAlignment.center,
-                                        children: [
-                                          Text(
-                                            cat['name'] ?? '',
-                                            maxLines: 1,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontWeight: FontWeight.bold,
-                                              fontSize: 13,
-                                            ),
-                                          ),
-                                          const SizedBox(height: 2),
-                                          Text(
-                                            TxaLanguage.t(
-                                              'all_movies_count',
-                                            ).replaceAll(
-                                              '%count',
-                                              (cat['count'] ?? '20+')
-                                                  .toString(),
-                                            ),
-                                            style: const TextStyle(
-                                              color: Colors.white70,
-                                              fontSize: 10,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
+                      padding: const EdgeInsets.fromLTRB(0, 12, 0, 4),
+                      child: SizedBox(
+                        height: 34,
+                        child: ListView(
+                          scrollDirection: Axis.horizontal,
+                          physics: const BouncingScrollPhysics(),
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          children: [
+                            _FilterChip(
+                              label: TxaLanguage.t('recommendation'),
+                              isActive: _activeFilter == 'all',
+                              onTap: () =>
+                                  setState(() => _activeFilter = 'all'),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                // Movie Sections
-                ...filteredSections.map(
-                  (section) => SliverToBoxAdapter(
-                    child: _MovieSection(
-                      title: section['title'],
-                      movies: section['movies'],
-                      sectionKey: section['key'],
-                    ),
-                  ),
-                ),
-
-                // Bottom spacer
-                const SliverToBoxAdapter(child: SizedBox(height: 100)),
-              ],
-            ),
-          ),
-
-        // Floating Action Header (Pinned on top)
-        Positioned(
-          top: 0,
-          left: 0,
-          right: 0,
-          child: Container(
-            padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withValues(alpha: 0.8),
-                  Colors.transparent,
-                ],
-              ),
-            ),
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  GestureDetector(
-                    onTap: () {
-                      Scaffold.of(context).openDrawer();
-                    },
-                    child: const Icon(
-                      Icons.menu_rounded,
-                      color: Colors.white,
-                      size: 28,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      Image.asset('assets/logo.png', height: 24),
-                      const SizedBox(width: 8),
-                      Text(
-                        TxaLanguage.t('app_name'),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          letterSpacing: 0.5,
+                            _FilterChip(
+                              label: TxaLanguage.t('series_movies'),
+                              isActive: _activeFilter == 'series',
+                              onTap: () =>
+                                  setState(() => _activeFilter = 'series'),
+                            ),
+                            _FilterChip(
+                              label: TxaLanguage.t('single_movies'),
+                              isActive: _activeFilter == 'single',
+                              onTap: () =>
+                                  setState(() => _activeFilter = 'single'),
+                            ),
+                            ...categories
+                                .take(6)
+                                .map<Widget>(
+                                  (cat) => _FilterChip(
+                                    label: cat['name'] ?? '',
+                                    isActive: false,
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (ctx) => CategoryListScreen(
+                                            title: cat['name'] ?? '',
+                                            slug: cat['slug'],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                          ],
                         ),
                       ),
-                    ],
+                    ),
                   ),
-                  Row(
-                    children: [
-                      _GlassIconBtn(
-                        icon: Icons.search_rounded,
-                        onTap: () => _changeTab(1),
+
+                  // Popular Categories ("Bạn đang quan tâm gì?")
+                  if (categories.isNotEmpty)
+                    SliverToBoxAdapter(
+                      child: Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text(
+                                  TxaLanguage.t('trending_categories'),
+                                  style: const TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                Text(
+                                  TxaLanguage.t('more'),
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: TxaTheme.textMuted,
+                                  ),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 12),
+                            SizedBox(
+                              height: 75,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                physics: const BouncingScrollPhysics(),
+                                itemCount: categories.take(8).length,
+                                itemBuilder: (ctx, i) {
+                                  final cat = categories[i];
+                                  final colors = [
+                                    [
+                                      const Color(0xFFFACC15),
+                                      const Color(0xFFEA580C),
+                                    ], // Yellow-Orange
+                                    [
+                                      const Color(0xFFF87171),
+                                      const Color(0xFFDC2626),
+                                    ], // Red
+                                    [
+                                      const Color(0xFFF472B6),
+                                      const Color(0xFFDB2777),
+                                    ], // Pink
+                                    [
+                                      const Color(0xFF4ADE80),
+                                      const Color(0xFF16A34A),
+                                    ], // Green
+                                    [
+                                      const Color(0xFF60A5FA),
+                                      const Color(0xFF2563EB),
+                                    ], // Blue
+                                    [
+                                      const Color(0xFFC084FC),
+                                      const Color(0xFF9333EA),
+                                    ], // Purple
+                                  ];
+                                  final colorSet = colors[i % colors.length];
+                                  return GestureDetector(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (ctx) => CategoryListScreen(
+                                            title: cat['name'] ?? '',
+                                            slug: cat['slug'],
+                                          ),
+                                        ),
+                                      );
+                                    },
+                                    child: Container(
+                                      width: 135,
+                                      margin: const EdgeInsets.only(right: 12),
+                                      decoration: BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: colorSet,
+                                          begin: Alignment.topLeft,
+                                          end: Alignment.bottomRight,
+                                        ),
+                                        borderRadius: BorderRadius.circular(12),
+                                      ),
+                                      child: Padding(
+                                        padding: const EdgeInsets.all(12.0),
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: [
+                                            Text(
+                                              cat['name'] ?? '',
+                                              maxLines: 1,
+                                              overflow: TextOverflow.ellipsis,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontWeight: FontWeight.bold,
+                                                fontSize: 13,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              TxaLanguage.t(
+                                                'all_movies_count',
+                                              ).replaceAll(
+                                                '%count',
+                                                (cat['count'] ?? '20+')
+                                                    .toString(),
+                                              ),
+                                              style: const TextStyle(
+                                                color: Colors.white70,
+                                                fontSize: 10,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
-                      const SizedBox(width: 8),
-                      _GlassIconBtn(
-                        icon: Icons.settings_rounded,
-                        onTap: () => _changeTab(3),
+                    ),
+
+                  // Movie Sections
+                  ...filteredSections.map(
+                    (section) => SliverToBoxAdapter(
+                      child: _MovieSection(
+                        title: section['title'],
+                        movies: section['movies'],
+                        sectionKey: section['key'],
                       ),
-                    ],
+                    ),
                   ),
+
+                  // Bottom spacer
+                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
                 ],
               ),
             ),
+
+          // Floating Action Header (Pinned on top)
+          Positioned(
+            top: 0,
+            left: 0,
+            right: 0,
+            child: Container(
+              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.8),
+                    Colors.transparent,
+                  ],
+                ),
+              ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    GestureDetector(
+                      onTap: () {
+                        Scaffold.of(context).openDrawer();
+                      },
+                      child: const Icon(
+                        Icons.menu_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
+                    ),
+                    Row(
+                      children: [
+                        Image.asset('assets/logo.png', height: 24),
+                        const SizedBox(width: 8),
+                        Text(
+                          TxaLanguage.t('app_name'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        _GlassIconBtn(
+                          icon: Icons.search_rounded,
+                          onTap: () => _changeTab(1),
+                        ),
+                        const SizedBox(width: 8),
+                        _GlassIconBtn(
+                          icon: Icons.settings_rounded,
+                          onTap: () => _changeTab(3),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 

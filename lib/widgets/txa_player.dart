@@ -1343,104 +1343,154 @@ class _TxaPlayerState extends State<TxaPlayer>
                   children: [
                     if (!_isEmbed && _betterPlayerController != null)
                       Padding(
-                        padding: const EdgeInsets.only(
-                          bottom: 25.0,
-                        ), // Raise the progress bar
+                        padding: const EdgeInsets.only(bottom: 25.0),
                         child: _buildProgressBar(),
                       ),
                     const SizedBox(height: 4),
                     Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
-                        // PREV EPISODE
-                        if (_currentEpisodeIndex > 0)
-                          _BottomBarItem(
-                            icon: Icons.skip_previous_rounded,
-                            label: TxaLanguage.t('prev_ep'),
-                            onTap: _playPrevious,
+                        // LEFT: Time & Speed Info
+                        Padding(
+                          padding: const EdgeInsets.only(left: 20.0),
+                          child: Row(
+                            children: [
+                              Text(
+                                _betterPlayerController != null
+                                    ? "${_formatDuration(_betterPlayerController!.videoPlayerController!.value.position)} / ${_formatDuration(_betterPlayerController!.videoPlayerController!.value.duration)}"
+                                    : "00:00 / 00:00",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 8,
+                                  vertical: 4,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: TxaTheme.accent.withValues(alpha: 0.2),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: TxaTheme.accent.withValues(
+                                      alpha: 0.3,
+                                    ),
+                                  ),
+                                ),
+                                child: Text(
+                                  "${TxaSettings.playbackSpeed}x",
+                                  style: const TextStyle(
+                                    color: TxaTheme.accent,
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        if (_currentEpisodeIndex > 0) const SizedBox(width: 32),
+                        ),
 
-                        // RATIO BUTTON — cycles aspect ratios
-                        _BottomBarItem(
-                          icon: Icons.aspect_ratio_rounded,
-                          label:
-                              '${TxaLanguage.t('player_ratio')} (${_aspectRatios[_currentRatioIndex]['label']})',
-                          onTap: _cycleAspectRatio,
-                        ),
-                        const SizedBox(width: 32),
-                        // SERVER BUTTON — opens server selection panel
-                        _BottomBarItem(
-                          icon: Icons.dns_rounded,
-                          label:
-                              widget
-                                  .servers[_currentServerIndex]['server_name'] ??
-                              TxaLanguage.t('select_server'),
-                          onTap: () => setState(() {
-                            _showServerDrawer = true;
-                            _showEpisodeDrawer = false;
-                          }),
-                          isActive: true,
-                        ),
-                        const SizedBox(width: 32),
-                        // SUBTITLE BUTTON — coming soon
-                        _BottomBarItem(
-                          icon: Icons.subtitles_rounded,
-                          label: TxaLanguage.t('player_subtitle'),
-                          onTap: () => TxaToast.show(
-                            context,
-                            TxaLanguage.t('feature_dev'),
+                        // RIGHT: Control Buttons
+                        SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              // PREV EPISODE
+                              if (_currentEpisodeIndex > 0)
+                                _BottomBarItem(
+                                  icon: Icons.skip_previous_rounded,
+                                  label: TxaLanguage.t('prev_ep'),
+                                  onTap: _playPrevious,
+                                ),
+                              if (_currentEpisodeIndex > 0)
+                                const SizedBox(width: 32),
+
+                              // RATIO BUTTON
+                              _BottomBarItem(
+                                icon: Icons.aspect_ratio_rounded,
+                                label:
+                                    '${TxaLanguage.t('player_ratio')} (${_aspectRatios[_currentRatioIndex]['label']})',
+                                onTap: _cycleAspectRatio,
+                              ),
+                              const SizedBox(width: 32),
+                              // SERVER BUTTON
+                              _BottomBarItem(
+                                icon: Icons.dns_rounded,
+                                label:
+                                    widget
+                                        .servers[_currentServerIndex]['server_name'] ??
+                                    TxaLanguage.t('select_server'),
+                                onTap: () => setState(() {
+                                  _showServerDrawer = true;
+                                  _showEpisodeDrawer = false;
+                                }),
+                                isActive: true,
+                              ),
+                              const SizedBox(width: 32),
+                              // SUBTITLE BUTTON
+                              _BottomBarItem(
+                                icon: Icons.subtitles_rounded,
+                                label: TxaLanguage.t('player_subtitle'),
+                                onTap: () => TxaToast.show(
+                                  context,
+                                  TxaLanguage.t('feature_dev'),
+                                ),
+                              ),
+                              const SizedBox(width: 32),
+                              // NEXT EPISODE
+                              if (_currentEpisodeIndex < serverData.length - 1)
+                                _BottomBarItem(
+                                  icon: Icons.skip_next_rounded,
+                                  label: TxaLanguage.t('next_ep'),
+                                  onTap: _playNext,
+                                ),
+                              if (_currentEpisodeIndex < serverData.length - 1)
+                                const SizedBox(width: 32),
+                              // SPEED BUTTON
+                              _BottomBarItem(
+                                icon: Icons.speed_rounded,
+                                label: '${TxaSettings.playbackSpeed}x',
+                                onTap: () {
+                                  double current = TxaSettings.playbackSpeed;
+                                  double next = 1.0;
+                                  if (current == 1.0) {
+                                    next = 1.25;
+                                  } else if (current == 1.25) {
+                                    next = 1.5;
+                                  } else if (current == 1.5) {
+                                    next = 2.0;
+                                  } else if (current == 2.0) {
+                                    next = 0.75;
+                                  } else {
+                                    next = 1.0;
+                                  }
+
+                                  TxaSettings.playbackSpeed = next;
+                                  _betterPlayerController?.setSpeed(next);
+                                  setState(() {});
+                                  _overlayIcon = Icons.speed_rounded;
+                                  _overlayLabel =
+                                      "${TxaLanguage.t('player_speed')}: ${next}x";
+                                  _showOverlayFeedback();
+                                },
+                              ),
+                              const SizedBox(width: 32),
+
+                              // EPISODE LIST BUTTON
+                              _BottomBarItem(
+                                icon: Icons.playlist_play_rounded,
+                                label: TxaLanguage.t('player_episodes'),
+                                onTap: () => setState(() {
+                                  _showEpisodeDrawer = true;
+                                  _showServerDrawer = false;
+                                }),
+                              ),
+                            ],
                           ),
-                        ),
-                        const SizedBox(width: 32),
-                        // NEXT EPISODE
-                        if (_currentEpisodeIndex < serverData.length - 1)
-                          _BottomBarItem(
-                            icon: Icons.skip_next_rounded,
-                            label: TxaLanguage.t('next_ep'),
-                            onTap: _playNext,
-                          ),
-                        if (_currentEpisodeIndex < serverData.length - 1)
-                          const SizedBox(width: 32),
-                        // SPEED BUTTON
-                        _BottomBarItem(
-                          icon: Icons.speed_rounded,
-                          label: '${TxaSettings.playbackSpeed}x',
-                          onTap: () {
-                            // Cycle speeds: 1.0 -> 1.25 -> 1.5 -> 2.0 -> 0.75 -> 1.0
-                            double current = TxaSettings.playbackSpeed;
-                            double next = 1.0;
-                            if (current == 1.0) {
-                              next = 1.25;
-                            } else if (current == 1.25)
-                              next = 1.5;
-                            else if (current == 1.5)
-                              next = 2.0;
-                            else if (current == 2.0)
-                              next = 0.75;
-                            else
-                              next = 1.0;
-
-                            TxaSettings.playbackSpeed = next;
-                            _betterPlayerController?.setSpeed(next);
-                            setState(() {});
-
-                            _overlayIcon = Icons.speed_rounded;
-                            _overlayLabel =
-                                "${TxaLanguage.t('player_speed')}: ${next}x";
-                            _showOverlayFeedback();
-                          },
-                        ),
-                        const SizedBox(width: 32),
-
-                        // EPISODE LIST BUTTON
-                        _BottomBarItem(
-                          icon: Icons.playlist_play_rounded,
-                          label: TxaLanguage.t('player_episodes'),
-                          onTap: () => setState(() {
-                            _showEpisodeDrawer = true;
-                            _showServerDrawer = false;
-                          }),
                         ),
                       ],
                     ),
@@ -1510,10 +1560,10 @@ class _TxaPlayerState extends State<TxaPlayer>
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text(
-                      "${_formatDuration(value.position)} / ${_formatDuration(value.duration)}",
+                      _formatDuration(value.position),
                       style: TextStyle(
                         color: TxaTheme.accent.withValues(alpha: 0.9),
-                        fontSize: 13,
+                        fontSize: 16,
                         fontWeight: FontWeight.w900,
                         letterSpacing: 0.5,
                         shadows: const [
@@ -1535,9 +1585,9 @@ class _TxaPlayerState extends State<TxaPlayer>
                 Text(
                   _formatDuration(value.duration),
                   style: const TextStyle(
-                    color: Colors.white60,
-                    fontSize: 11,
-                    fontWeight: FontWeight.w500,
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
               ],
