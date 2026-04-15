@@ -82,6 +82,13 @@ class _TxaPlayerState extends State<TxaPlayer>
   Timer? _autoNextTimer;
 
   bool _isInternalVolumeChange = false;
+  bool _isBuffering = false;
+
+  static const _dndChannel = MethodChannel('com.tphimx.tphimx/dnd');
+
+  // Clock settings
+  late Timer _clockTimer;
+  DateTime _now = DateTime.now();
 
   // Aspect ratio options
   static const List<Map<String, dynamic>> _aspectRatios = [
@@ -124,6 +131,8 @@ class _TxaPlayerState extends State<TxaPlayer>
     }
     _startControlsTimer();
     _initSystemMirrors();
+    _startClock();
+    _toggleDND(true);
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -156,26 +165,22 @@ class _TxaPlayerState extends State<TxaPlayer>
   void _initSystemMirrors() {
     try {
       ScreenBrightness().setApplicationScreenBrightness(_brightness);
-      VolumeController.instance.setVolume(_volume);
 
-      // Listen to system volume changes to intercept hardware button presses
+      // Listen to system volume changes
       VolumeController.instance.addListener((v) {
         if (!mounted || _isLocked) return;
 
-        // If it's internal change, we don't treat it as "system control blocked"
         if (_isInternalVolumeChange) {
           _isInternalVolumeChange = false;
           return;
         }
 
-        if ((v - _volume).abs() > 0.05) {
-          // Increased threshold slightly for hardware buttons
-          // Changed via hardware buttons — revert and notify
-          VolumeController.instance.setVolume(_volume);
-          _overlayIcon = Icons.phonelink_lock_rounded;
-          _overlayValue = null;
-          _overlayLabel = TxaLanguage.t('player_system_control_blocked');
-          _showOverlayFeedback();
+        if ((v - _volume).abs() > 0.01) {
+          setState(() {
+            _volume = v;
+            TxaSettings.volume = v;
+            _betterPlayerController?.setVolume(v);
+          });
         }
       });
     } catch (e) {
@@ -208,15 +213,16 @@ class _TxaPlayerState extends State<TxaPlayer>
     }
 
     // 2. Episode level markers (Override if exists)
-    if (episode != null) {
-      if (episode['intro_start'] != null) {
-        _introStart = (episode['intro_start'] as num).toDouble();
+    if (episode != null && episode['skip_markers'] != null) {
+      final sm = episode['skip_markers'];
+      final intro = sm['intro'] as List?;
+      if (intro != null && intro.length >= 2) {
+        _introStart = (intro[0] as num).toDouble();
+        _introEnd = (intro[1] as num).toDouble();
       }
-      if (episode['intro_end'] != null) {
-        _introEnd = (episode['intro_end'] as num).toDouble();
-      }
-      if (episode['outro_start'] != null) {
-        _outroStart = (episode['outro_start'] as num).toDouble();
+      final outro = sm['outro'] as List?;
+      if (outro != null && outro.isNotEmpty) {
+        _outroStart = (outro[0] as num).toDouble();
       }
     }
   }
@@ -501,6 +507,7 @@ class _TxaPlayerState extends State<TxaPlayer>
       final ct = pos?.inSeconds.toDouble() ?? 0.0;
       final dur = durObj?.inSeconds.toDouble() ?? 0.0;
 
+      // --- INTRO SKIP ---
       if (_introEnd > _introStart && ct >= _introStart && ct <= _introEnd) {
         if (!_showSkipIntro) setState(() => _showSkipIntro = true);
         if (TxaSettings.autoSkipIntro && ct < _introEnd - 2) {
@@ -510,20 +517,39 @@ class _TxaPlayerState extends State<TxaPlayer>
         if (_showSkipIntro) setState(() => _showSkipIntro = false);
       }
 
-      if (_outroStart > 0 && ct >= _outroStart && ct <= (dur)) {
-        if (!_showSkipOutro) setState(() => _showSkipOutro = true);
+      // --- OUTRO / AUTO NEXT ---
+      bool isOutroZone = false;
+      if (_outroStart > 0) {
+        // Trigger 5s before outro start
+        isOutroZone = ct >= (_outroStart - 5);
+      } else {
+        // Fallback: 10s before end
+        isOutroZone = dur > 0 && ct >= (dur - 10);
+      }
+
+      if (isOutroZone && ct <= dur && dur > 0) {
         if (TxaSettings.autoNextEpisode &&
             !_autoNextTriggered &&
             !_showAutoNextCountdownOverlay) {
           _startAutoNextCountdown();
         }
+
+        if (_outroStart > 0 && ct >= _outroStart) {
+          if (!_showSkipOutro) setState(() => _showSkipOutro = true);
+        }
       } else {
         if (_showSkipOutro) setState(() => _showSkipOutro = false);
         // Reset if seeking out
-        if (_showAutoNextCountdownOverlay && ct < _outroStart) {
-          _cancelAutoNextCountdown();
+        if (_showAutoNextCountdownOverlay && ct < (dur - 20)) {
+          _cancelAutoNextCountdown(resetTrigger: true);
         }
       }
+    } else if (event.betterPlayerEventType ==
+        BetterPlayerEventType.bufferingStart) {
+      if (mounted) setState(() => _isBuffering = true);
+    } else if (event.betterPlayerEventType ==
+        BetterPlayerEventType.bufferingEnd) {
+      if (mounted) setState(() => _isBuffering = false);
     } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
       _handlePlayerError();
     }
@@ -562,14 +588,14 @@ class _TxaPlayerState extends State<TxaPlayer>
     });
   }
 
-  void _cancelAutoNextCountdown() {
+  void _cancelAutoNextCountdown({bool resetTrigger = false}) {
     _autoNextTimer?.cancel();
     setState(() {
       _showAutoNextCountdownOverlay = false;
       _autoNextRemaining = 5;
     });
-    // Prevent re-triggering for this session unless autoNextTriggered is reset
-    _autoNextTriggered = true;
+    // Prevent re-triggering for this session unless explicitly reset (on seek back)
+    _autoNextTriggered = !resetTrigger;
   }
 
   void _playPrevious() {
@@ -772,10 +798,32 @@ class _TxaPlayerState extends State<TxaPlayer>
     });
   }
 
+  void _startClock() {
+    _now = DateTime.now();
+    _clockTimer = Timer.periodic(const Duration(milliseconds: 50), (timer) {
+      if (mounted) setState(() => _now = DateTime.now());
+    });
+  }
+
+  Future<void> _toggleDND(bool enable) async {
+    if (!TxaSettings.autoDND) return;
+    try {
+      await _dndChannel.invokeMethod('setDND', {'enable': enable});
+    } catch (e) {
+      debugPrint("DND Error: $e");
+    }
+  }
+
   @override
   void dispose() {
-    // If we are minimizing to mini player, we MUST NOT dispose the controller here.
-    // But how do we know? We check if the provider is currently holding THIS controller.
+    _toggleDND(false);
+    _clockTimer.cancel();
+    _autoNextTimer?.cancel();
+    _controlsTimer?.cancel();
+    _overlayTimer?.cancel();
+    _speedTimer?.cancel();
+    _seekDebounce?.cancel();
+
     final miniProvider = Provider.of<TxaMiniPlayerProvider>(
       context,
       listen: false,
@@ -783,12 +831,8 @@ class _TxaPlayerState extends State<TxaPlayer>
     if (miniProvider.controller != _betterPlayerController) {
       _betterPlayerController?.dispose();
     }
-    _controlsTimer?.cancel();
-    _overlayTimer?.cancel();
-    _speedTimer?.cancel();
+
     _betterPlayerController?.removeEventsListener(_onPlayerEvent);
-    _seekDebounce?.cancel();
-    _autoNextTimer?.cancel();
     VolumeController.instance.removeListener();
     ScreenBrightness().resetApplicationScreenBrightness();
     WidgetsBinding.instance.removeObserver(this);
@@ -822,9 +866,20 @@ class _TxaPlayerState extends State<TxaPlayer>
               // 1. VIDEO
               Center(
                 child: _isInitialized
-                    ? (_isEmbed
-                          ? WebViewWidget(controller: _webViewController!)
-                          : BetterPlayer(controller: _betterPlayerController!))
+                    ? Stack(
+                        children: [
+                          _isEmbed
+                              ? WebViewWidget(controller: _webViewController!)
+                              : BetterPlayer(
+                                  controller: _betterPlayerController!,
+                                ),
+                          if (_isBuffering && !_isEmbed)
+                            Container(
+                              color: Colors.black26,
+                              child: _buildLoadingUI(),
+                            ),
+                        ],
+                      )
                     : _error
                     ? _buildErrorUI()
                     : _buildLoadingUI(),
@@ -846,6 +901,35 @@ class _TxaPlayerState extends State<TxaPlayer>
                   ),
                 ),
               ),
+
+              // 2.5 CLOCK (Top-Left)
+              if (TxaSettings.showClock)
+                Positioned(
+                  top: 40,
+                  left: 20,
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 8,
+                      vertical: 4,
+                    ),
+                    decoration: BoxDecoration(
+                      color: Colors.black26,
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      TxaFormat.formatDate(
+                        _now,
+                        pattern: TxaSettings.clockFormat,
+                      ),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        letterSpacing: 1.0,
+                      ),
+                    ),
+                  ),
+                ),
 
               // 3. GESTURE FEEDBACK OVERLAY
               if (_overlayLabel != null || _overlayIcon != null)
@@ -1420,28 +1504,86 @@ class _TxaPlayerState extends State<TxaPlayer>
                 ),
               ],
             ),
-            SliderTheme(
-              data: SliderTheme.of(context).copyWith(
-                trackHeight: 6, // Thicker for premium feel
-                thumbShape: const RoundSliderThumbShape(
-                  enabledThumbRadius: 8,
-                ), // More visible thumb
-                overlayShape: const RoundSliderOverlayShape(overlayRadius: 16),
-                activeTrackColor: TxaTheme.accent,
-                inactiveTrackColor: Colors.white10,
-                activeTickMarkColor: Colors.transparent,
-                inactiveTickMarkColor: Colors.transparent,
-                trackShape:
-                    const RoundedRectSliderTrackShape(), // Smoother corners
-                thumbColor: TxaTheme.accent,
-              ),
-              child: Slider(
-                value: pos.clamp(0.0, dur > 0 ? dur : 0.0),
-                max: dur > 0 ? dur : 1.0,
-                onChanged: (v) => _betterPlayerController!.seekTo(
-                  Duration(seconds: v.toInt()),
+            Stack(
+              alignment: Alignment.center,
+              children: [
+                // 1. MARKERS
+                if (dur > 0)
+                  Positioned.fill(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      child: Stack(
+                        children: [
+                          if (_introEnd > _introStart)
+                            Positioned(
+                              left:
+                                  (_introStart / dur) *
+                                  (MediaQuery.of(context).size.width - 48),
+                              width:
+                                  ((_introEnd - _introStart) / dur) *
+                                  (MediaQuery.of(context).size.width - 48),
+                              top: 20,
+                              bottom: 20,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.amber.withOpacity(0.4),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ),
+                          if (_outroStart > 0)
+                            Positioned(
+                              left:
+                                  (_outroStart / dur) *
+                                  (MediaQuery.of(context).size.width - 48),
+                              right: 0,
+                              top: 20,
+                              bottom: 20,
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withOpacity(0.4),
+                                  borderRadius: BorderRadius.circular(2),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+
+                // 2. ACTUAL SLIDER
+                SliderTheme(
+                  data: SliderTheme.of(context).copyWith(
+                    trackHeight: 6, // Thicker for premium feel
+                    thumbShape: const RoundSliderThumbShape(
+                      enabledThumbRadius: 8,
+                    ), // More visible thumb
+                    overlayShape: const RoundSliderOverlayShape(
+                      overlayRadius: 16,
+                    ),
+                    activeTrackColor: TxaTheme.accent,
+                    inactiveTrackColor: Colors.white10,
+                    activeTickMarkColor: Colors.transparent,
+                    inactiveTickMarkColor: Colors.transparent,
+                    trackShape:
+                        const RoundedRectSliderTrackShape(), // Smoother corners
+                    thumbColor: TxaTheme.accent,
+                  ),
+                  child: Slider(
+                    value: pos.clamp(0.0, dur > 0 ? dur : 0.0),
+                    max: dur > 0 ? dur : 1.0,
+                    onChanged: (v) {
+                      _betterPlayerController!.seekTo(
+                        Duration(seconds: v.toInt()),
+                      );
+                      // Reset auto next if seeking back
+                      if (_autoNextTriggered && v < (dur - 20)) {
+                        setState(() => _autoNextTriggered = false);
+                      }
+                    },
+                  ),
                 ),
-              ),
+              ],
             ),
           ],
         );
@@ -1484,7 +1626,7 @@ class _TxaPlayerState extends State<TxaPlayer>
                       });
                       Navigator.pop(ctx);
                       _overlayIcon = Icons.speed_rounded;
-                      _overlayLabel = "${TxaLanguage.t('speed')}: ${s}x";
+                      _overlayLabel = "${TxaLanguage.t('player_speed')}: ${s}x";
                       _showOverlayFeedback();
                     }
                   },
@@ -1511,15 +1653,45 @@ class _TxaPlayerState extends State<TxaPlayer>
               value: _volume,
               onChanged: (v) {
                 setState(() {
+                  _isInternalVolumeChange = true;
                   TxaSettings.volume = v;
                   _volume = v;
+                  VolumeController.instance.setVolume(v);
                   _betterPlayerController?.setVolume(v);
                 });
               },
             ),
             const Divider(color: Colors.white10, height: 32),
 
-            // 3. TOGGLES
+            _SwitchRow(
+              label: TxaLanguage.t('player_show_clock'),
+              value: TxaSettings.showClock,
+              onChanged: (v) => setState(() => TxaSettings.showClock = v),
+            ),
+            if (TxaSettings.showClock)
+              _DropdownRow<String>(
+                label: TxaLanguage.t('player_clock_format'),
+                value: TxaSettings.clockFormat,
+                items: const {
+                  'HH:mm': 'HH:mm',
+                  'HH:mm:ss': 'HH:mm:ss',
+                  'HH:mm:ss.SSS': 'HH:mm:ss.SSS',
+                  'HH:mm dd/MM': 'HH:mm dd/MM',
+                  'HH:mm dd/MM/yyyy': 'HH:mm dd/MM/yyyy',
+                  'hh:mm a': 'hh:mm a',
+                  'hh:mm:ss a': 'hh:mm:ss a',
+                  'E, HH:mm': 'E, HH:mm',
+                },
+                onChanged: (v) => setState(() => TxaSettings.clockFormat = v!),
+              ),
+            _SwitchRow(
+              label: TxaLanguage.t('player_dnd_auto'),
+              value: TxaSettings.autoDND,
+              onChanged: (v) {
+                setState(() => TxaSettings.autoDND = v);
+                _toggleDND(v);
+              },
+            ),
             _SwitchRow(
               label: TxaLanguage.t('skip_intro'),
               value: TxaSettings.autoSkipIntro,
@@ -2275,6 +2447,57 @@ class _SliderRowState extends State<_SliderRow> {
           style: const TextStyle(color: Colors.white70, fontSize: 12),
         ),
       ],
+    );
+  }
+}
+
+class _DropdownRow<T> extends StatelessWidget {
+  final String label;
+  final T value;
+  final Map<T, String> items;
+  final ValueChanged<T?> onChanged;
+
+  const _DropdownRow({
+    required this.label,
+    required this.value,
+    required this.items,
+    required this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(
+            label,
+            style: const TextStyle(color: Colors.white, fontSize: 14),
+          ),
+          Theme(
+            data: Theme.of(context).copyWith(canvasColor: TxaTheme.primaryBg),
+            child: DropdownButton<T>(
+              value: value,
+              underline: const SizedBox.shrink(),
+              icon: const Icon(
+                Icons.keyboard_arrow_down_rounded,
+                color: TxaTheme.accent,
+                size: 20,
+              ),
+              style: const TextStyle(
+                color: TxaTheme.accent,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+              items: items.entries.map((e) {
+                return DropdownMenuItem<T>(value: e.key, child: Text(e.value));
+              }).toList(),
+              onChanged: onChanged,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

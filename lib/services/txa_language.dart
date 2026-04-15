@@ -158,11 +158,16 @@ class TxaLanguage {
       'TXA_LIST1': 'Danh sách phim',
       'player_brightness': 'Độ sáng',
       'player_audio': 'Âm thanh',
+      'player_speed': 'Tốc độ phát',
+      'loading_video': 'Đang tải video...',
       'player_lock': 'Khóa màn hình',
       'player_unlock': 'Mở khóa',
       'player_play': 'Phát',
       'player_pause': 'Tạm dừng',
       'player_close': 'Đóng phim',
+      'player_show_clock': 'Đồng hồ',
+      'player_clock_format': 'Định dạng giờ',
+      'player_dnd_auto': 'Tự động "Không làm phiền"',
       'auto_pip_label': 'Tự động bật PiP',
       'auto_pip_desc':
           'Tự động kích hoạt thu nhỏ màn hình khi thoát app đang xem phim',
@@ -370,11 +375,16 @@ class TxaLanguage {
       'TXA_LIST1': 'Movie List',
       'player_brightness': 'Brightness',
       'player_audio': 'Audio',
+      'player_speed': 'Playback Speed',
+      'loading_video': 'Loading video...',
       'player_lock': 'Lock Screen',
       'player_unlock': 'Unlock',
       'player_play': 'Play',
       'player_pause': 'Pause',
       'player_close': 'Close Player',
+      'player_show_clock': 'Clock',
+      'player_clock_format': 'Clock Format',
+      'player_dnd_auto': 'Auto "Do Not Disturb"',
       'auto_pip_label': 'Auto PiP Mode',
       'auto_pip_desc':
           'Automatically trigger Picture-in-Picture when leaving the app',
@@ -466,7 +476,10 @@ class TxaLanguage {
 
   static String t(String key, {Map<String, String>? replace}) {
     if (_dicts[_currentLang]?[key] == null) {
-      TxaLogger.log("Missing key '$key' for language '$_currentLang'", isError: true);
+      TxaLogger.log(
+        "Missing key '$key' for language '$_currentLang'",
+        isError: true,
+      );
     }
     String text = _dicts[_currentLang]?[key] ?? _dicts['en']?[key] ?? key;
     if (replace != null) {

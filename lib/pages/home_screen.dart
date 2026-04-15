@@ -56,25 +56,38 @@ class _HomeScreenState extends State<HomeScreen> {
   Future<void> _checkUpdate({bool manual = false}) async {
     try {
       if (manual) TxaToast.show(context, TxaLanguage.t('checking_update'));
-      
+
       final api = Provider.of<TxaApi>(context, listen: false);
       final updateData = await api.getCheckUpdate();
-      
+
       final Map<String, dynamic>? appData = updateData['data'];
-      final String latestVersion = appData?['latest_version'] ?? appData?['current_version'] ?? '';
+      final String latestVersion =
+          appData?['latest_version'] ?? appData?['current_version'] ?? '';
       final String minVersion = appData?['min_version'] ?? '';
       final bool forceUpdate = appData?['force_update'] == true;
-      
+
       // Get current version from PackageInfo
       final packageInfo = await PackageInfo.fromPlatform();
       final String currentVersion = packageInfo.version;
-      
-      debugPrint('[TxaUpdate] API Latest: $latestVersion, App Current: $currentVersion, Min: $minVersion');
-      
+
+      debugPrint(
+        '[TxaUpdate] API Latest: $latestVersion, App Current: $currentVersion, Min: $minVersion',
+      );
+
       bool isNewer(String latest, String current) {
-        List<int> latestParts = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-        List<int> currentParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-        for (int i = 0; i < latestParts.length && i < currentParts.length; i++) {
+        List<int> latestParts = latest
+            .split('.')
+            .map((e) => int.tryParse(e) ?? 0)
+            .toList();
+        List<int> currentParts = current
+            .split('.')
+            .map((e) => int.tryParse(e) ?? 0)
+            .toList();
+        for (
+          int i = 0;
+          i < latestParts.length && i < currentParts.length;
+          i++
+        ) {
           if (latestParts[i] > currentParts[i]) return true;
           if (latestParts[i] < currentParts[i]) return false;
         }
@@ -82,27 +95,29 @@ class _HomeScreenState extends State<HomeScreen> {
       }
 
       // Check if current version is below min_version (force update regardless)
-      final bool belowMinVersion = minVersion.isNotEmpty && isNewer(minVersion, currentVersion);
+      final bool belowMinVersion =
+          minVersion.isNotEmpty && isNewer(minVersion, currentVersion);
       final bool shouldForce = forceUpdate || belowMinVersion;
 
       if (latestVersion.isNotEmpty && isNewer(latestVersion, currentVersion)) {
         if (!mounted) return;
-        
+
         final String rawDate = appData?['release_date'] ?? '';
-        final int rawSize = int.tryParse(appData?['size']?.toString() ?? '0') ?? 0;
+        final int rawSize =
+            int.tryParse(appData?['size']?.toString() ?? '0') ?? 0;
         final String? sha256 = appData?['sha256'];
-        
+
         String? formattedDate;
         if (rawDate.isNotEmpty) {
-           try {
-             DateTime dt = DateTime.parse(rawDate);
-             formattedDate = TxaFormat.formatDate(dt);
-           } catch (_) {}
+          try {
+            DateTime dt = DateTime.parse(rawDate);
+            formattedDate = TxaFormat.formatDate(dt);
+          } catch (_) {}
         }
-        
+
         String? formattedSize;
         if (rawSize > 0) {
-           formattedSize = TxaFormat.formatSize(rawSize)['display'];
+          formattedSize = TxaFormat.formatSize(rawSize)['display'];
         }
 
         TxaUpdateModal.show(
@@ -113,9 +128,10 @@ class _HomeScreenState extends State<HomeScreen> {
           fileSize: formattedSize,
           forceUpdate: shouldForce,
           onUpdate: () async {
-            final String rawUrl = appData?['download_url'] ?? appData?['apk_url'] ?? '';
+            final String rawUrl =
+                appData?['download_url'] ?? appData?['apk_url'] ?? '';
             Navigator.pop(context); // Close modal
-            
+
             // --- PLATFORM SENSITIVE UPDATE ---
             if (defaultTargetPlatform == TargetPlatform.iOS) {
               final uri = Uri.parse(rawUrl);
@@ -123,21 +139,29 @@ class _HomeScreenState extends State<HomeScreen> {
                 await launchUrl(uri, mode: LaunchMode.externalApplication);
               } else {
                 if (!mounted) return;
-                TxaToast.show(context, TxaLanguage.t('error_opening_link'), isError: true);
+                TxaToast.show(
+                  context,
+                  TxaLanguage.t('error_opening_link'),
+                  isError: true,
+                );
               }
               return;
             }
 
             // --- ANDROID FLOW ---
             await _handleAndroidUpdate(rawUrl, latestVersion, rawSize, sha256);
-          }
+          },
         );
       } else if (manual) {
         if (!mounted) return;
-        TxaToast.show(context, TxaLanguage.t('up_to_date').replaceAll('%version', currentVersion));
+        TxaToast.show(
+          context,
+          TxaLanguage.t('up_to_date').replaceAll('%version', currentVersion),
+        );
       }
     } catch (e) {
-      if (manual && mounted) TxaToast.show(context, TxaLanguage.t('update_error'), isError: true);
+      if (manual && mounted)
+        TxaToast.show(context, TxaLanguage.t('update_error'), isError: true);
       debugPrint('Check update error: $e');
     }
   }
@@ -146,11 +170,20 @@ class _HomeScreenState extends State<HomeScreen> {
   /// 1. Check permissions (storage + install unknown apps)
   /// 2. Check if APK already cached & valid → install directly
   /// 3. Otherwise download then install
-  Future<void> _handleAndroidUpdate(String rawUrl, String version, int expectedSize, String? sha256) async {
+  Future<void> _handleAndroidUpdate(
+    String rawUrl,
+    String version,
+    int expectedSize,
+    String? sha256,
+  ) async {
     // --- STEP 1: STORAGE PERMISSION ---
     if (!await TxaPermission.checkAllRequired()) {
       if (!mounted) return;
-      TxaToast.show(context, TxaLanguage.t('permissions_required'), isError: true);
+      TxaToast.show(
+        context,
+        TxaLanguage.t('permissions_required'),
+        isError: true,
+      );
       await TxaPermission.requestInitial();
       if (!mounted) return;
       if (!await TxaPermission.checkAllRequired()) return;
@@ -160,7 +193,11 @@ class _HomeScreenState extends State<HomeScreen> {
     // Request and then ALWAYS continue to install/download after granting
     if (!await TxaPermission.requestInstall()) {
       if (!mounted) return;
-      TxaToast.show(context, TxaLanguage.t('permissions_required'), isError: true);
+      TxaToast.show(
+        context,
+        TxaLanguage.t('permissions_required'),
+        isError: true,
+      );
       return; // User explicitly denied — stop
     }
 
@@ -184,7 +221,9 @@ class _HomeScreenState extends State<HomeScreen> {
           final bytes = await cachedFile.readAsBytes();
           final localHash = _sha256Hex(bytes);
           isValid = localHash == sha256.toLowerCase();
-          debugPrint('[TxaUpdate] SHA256 check: local=$localHash, server=$sha256, match=$isValid');
+          debugPrint(
+            '[TxaUpdate] SHA256 check: local=$localHash, server=$sha256, match=$isValid',
+          );
         } else {
           // No SHA256 from server — size match is good enough
           isValid = true;
@@ -193,7 +232,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (isValid) {
         // File is already downloaded and valid → install directly!
-        debugPrint('[TxaUpdate] Cached APK valid ($localSize bytes), opening installer directly');
+        debugPrint(
+          '[TxaUpdate] Cached APK valid ($localSize bytes), opening installer directly',
+        );
         if (!mounted) return;
         TxaToast.show(context, TxaLanguage.t('installing_cached'));
         final result = await OpenFile.open(savePath);
@@ -204,35 +245,45 @@ class _HomeScreenState extends State<HomeScreen> {
         return;
       } else {
         // File corrupted or size mismatch → delete and re-download
-        debugPrint('[TxaUpdate] Cached APK invalid (local=$localSize, expected=$expectedSize), deleting...');
-        try { cachedFile.deleteSync(); } catch (_) {}
+        debugPrint(
+          '[TxaUpdate] Cached APK invalid (local=$localSize, expected=$expectedSize), deleting...',
+        );
+        try {
+          cachedFile.deleteSync();
+        } catch (_) {}
       }
     }
 
     // --- STEP 4: DOWNLOAD ---
     if (!mounted) return;
     TxaToast.show(context, TxaLanguage.t('loading_progress'));
-    
+
     // Resolve direct link (Handles Mediafire!)
     final resolved = await TxaUrlResolve.resolve(rawUrl);
     if (resolved['success']) {
-       if (!mounted) return;
-       TxaDownloadDialog.show(
-         context, 
-         resolved['url'], 
-         filename,
-         onFinished: (path) async {
-            TxaLogger.log('Download finished, opening installer: $path');
-            final result = await OpenFile.open(path);
-            if (!mounted) return;
-            if (result.type != ResultType.done) {
-               TxaToast.show(context, "Error: ${result.message}", isError: true);
-            }
-         },
-       );
+      if (!mounted) return;
+      TxaDownloadDialog.show(
+        context,
+        resolved['url'],
+        filename,
+        onFinished: (path) async {
+          TxaLogger.log('Download finished, opening installer: $path');
+          final result = await OpenFile.open(path);
+          if (!mounted) return;
+          if (result.type != ResultType.done) {
+            TxaToast.show(context, "Error: ${result.message}", isError: true);
+          }
+        },
+      );
     } else {
-       if (!mounted) return;
-       TxaToast.show(context, TxaLanguage.t('resolver_error').replaceAll('%error', resolved['error'] ?? 'Unknown'), isError: true);
+      if (!mounted) return;
+      TxaToast.show(
+        context,
+        TxaLanguage.t(
+          'resolver_error',
+        ).replaceAll('%error', resolved['error'] ?? 'Unknown'),
+        isError: true,
+      );
     }
   }
 
@@ -241,7 +292,6 @@ class _HomeScreenState extends State<HomeScreen> {
     final digest = sha256.convert(bytes);
     return digest.toString();
   }
-
 
   @override
   Widget build(BuildContext context) {
@@ -325,7 +375,10 @@ class _HomeScreenState extends State<HomeScreen> {
             const Divider(color: Colors.white10),
             // Version & Check Update
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24.0,
+                vertical: 12.0,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -334,8 +387,13 @@ class _HomeScreenState extends State<HomeScreen> {
                     builder: (context, snapshot) {
                       final version = snapshot.data?.version ?? '...';
                       return Text(
-                        TxaLanguage.t('current_version').replaceAll('%version', version),
-                        style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13),
+                        TxaLanguage.t(
+                          'current_version',
+                        ).replaceAll('%version', version),
+                        style: const TextStyle(
+                          color: TxaTheme.textMuted,
+                          fontSize: 13,
+                        ),
                       );
                     },
                   ),
@@ -344,12 +402,17 @@ class _HomeScreenState extends State<HomeScreen> {
                     width: double.infinity,
                     child: OutlinedButton.icon(
                       onPressed: () => _checkUpdate(manual: true),
-                      icon: const Icon(Icons.system_update_alt_rounded, size: 16),
+                      icon: const Icon(
+                        Icons.system_update_alt_rounded,
+                        size: 16,
+                      ),
                       label: Text(TxaLanguage.t('check_update')),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.white,
                         side: const BorderSide(color: Colors.white10),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
                       ),
                     ),
                   ),
@@ -359,7 +422,10 @@ class _HomeScreenState extends State<HomeScreen> {
             const Divider(color: Colors.white10),
             // Language Selection
             Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 24.0, vertical: 12.0),
+              padding: const EdgeInsets.symmetric(
+                horizontal: 24.0,
+                vertical: 12.0,
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
@@ -399,7 +465,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   children: [
                     Text(
                       TxaLanguage.t('check_permissions'),
-                      style: const TextStyle(color: Colors.white70, fontSize: 14),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
+                      ),
                     ),
                     const SizedBox(height: 16),
                     FutureBuilder<Map<String, PermissionStatus>>(
@@ -408,15 +477,20 @@ class _HomeScreenState extends State<HomeScreen> {
                         final statuses = snapshot.data ?? {};
                         return Column(
                           children: TxaPermission.permissions.map((p) {
-                            final status = statuses[p['id']] ?? PermissionStatus.denied;
+                            final status =
+                                statuses[p['id']] ?? PermissionStatus.denied;
                             final isGranted = status.isGranted;
                             return Padding(
                               padding: const EdgeInsets.only(bottom: 12),
                               child: Row(
                                 children: [
                                   Icon(
-                                    isGranted ? Icons.check_circle_outline : Icons.error_outline,
-                                    color: isGranted ? Colors.greenAccent : Colors.redAccent,
+                                    isGranted
+                                        ? Icons.check_circle_outline
+                                        : Icons.error_outline,
+                                    color: isGranted
+                                        ? Colors.greenAccent
+                                        : Colors.redAccent,
                                     size: 16,
                                   ),
                                   const SizedBox(width: 10),
@@ -424,7 +498,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                     child: Text(
                                       p['label'],
                                       style: TextStyle(
-                                        color: isGranted ? Colors.white70 : TxaTheme.textMuted,
+                                        color: isGranted
+                                            ? Colors.white70
+                                            : TxaTheme.textMuted,
                                         fontSize: 12,
                                       ),
                                     ),
@@ -442,10 +518,15 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () async {
                           await TxaPermission.openSettings();
-                          setState(() {}); // Refresh statuses when they come back
+                          setState(
+                            () {},
+                          ); // Refresh statuses when they come back
                         },
                         icon: const Icon(Icons.settings_rounded, size: 14),
-                        label: Text(TxaLanguage.t('go_to_settings'), style: const TextStyle(fontSize: 12)),
+                        label: Text(
+                          TxaLanguage.t('go_to_settings'),
+                          style: const TextStyle(fontSize: 12),
+                        ),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: TxaTheme.glassBg,
                           foregroundColor: Colors.white,
@@ -471,7 +552,10 @@ class _HomeScreenState extends State<HomeScreen> {
                   final build = snapshot.data?.buildNumber ?? '240';
                   return Text(
                     'Version $version (Build $build)',
-                    style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12),
+                    style: const TextStyle(
+                      color: TxaTheme.textMuted,
+                      fontSize: 12,
+                    ),
                   );
                 },
               ),
@@ -553,30 +637,6 @@ class _HomeTabState extends State<_HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    if (_loading) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(color: TxaTheme.accent),
-            const SizedBox(height: 16),
-            Text(
-              TxaLanguage.t('loading_home'),
-              style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13),
-            ),
-          ],
-        ),
-      );
-    }
-
-    if (_error != null || _data == null) {
-      return TxaErrorWidget(
-        message: TxaLanguage.t('error_loading_data'),
-        technicalDetails: _error,
-        onRetry: _loadHome,
-      );
-    }
-
     // Build sections from API data (matching Ionic logic)
     final List<Map<String, dynamic>> sections = [];
 
@@ -588,11 +648,14 @@ class _HomeTabState extends State<_HomeTab> {
 
     String getTitle(String key, String fallbackCode) {
       final val = _data![key];
-      if (val is Map && val['title'] != null) return TxaLanguage.t(val['title']);
+      if (val is Map && val['title'] != null)
+        return TxaLanguage.t(val['title']);
       return TxaLanguage.t(fallbackCode);
     }
 
-    final latest = getListData('latest').isEmpty ? getListData('items') : getListData('latest');
+    final latest = getListData('latest').isEmpty
+        ? getListData('items')
+        : getListData('latest');
     final hot = getListData('hot');
     final anime = getListData('anime');
     final series = getListData('series');
@@ -672,256 +735,323 @@ class _HomeTabState extends State<_HomeTab> {
         ? sections
         : [
             ...sections.where((s) => s['key'] == _activeFilter),
-            ...sections.where((s) => s['key'] != _activeFilter && (s['key'] == 'latest' || s['key'] == 'hot'))
+            ...sections.where(
+              (s) =>
+                  s['key'] != _activeFilter &&
+                  (s['key'] == 'latest' || s['key'] == 'hot'),
+            ),
           ];
 
     return Stack(
       children: [
-        RefreshIndicator(
-          onRefresh: _loadHome,
-          color: TxaTheme.accent,
-          child: CustomScrollView(
-            physics: const BouncingScrollPhysics(
-              parent: AlwaysScrollableScrollPhysics(),
-            ),
-            slivers: [
-              // Hero Slider
-              SliverToBoxAdapter(
-                child: featured.isNotEmpty
-                    ? _HeroSlider(movies: featured.take(10).toList())
-                    : const SizedBox(height: 100),
-              ),
-
-          // Filter Tabs
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(0, 12, 0, 4),
-              child: SizedBox(
-                height: 34,
-                child: ListView(
-                  scrollDirection: Axis.horizontal,
-                  physics: const BouncingScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  children: [
-                    _FilterChip(
-                      label: TxaLanguage.t('recommendation'),
-                      isActive: _activeFilter == 'all',
-                      onTap: () => setState(() => _activeFilter = 'all'),
-                    ),
-                    _FilterChip(
-                      label: TxaLanguage.t('series_movies'),
-                      isActive: _activeFilter == 'series',
-                      onTap: () => setState(() => _activeFilter = 'series'),
-                    ),
-                    _FilterChip(
-                      label: TxaLanguage.t('single_movies'),
-                      isActive: _activeFilter == 'single',
-                      onTap: () => setState(() => _activeFilter = 'single'),
-                    ),
-                    ...categories.take(6).map<Widget>((cat) => _FilterChip(
-                          label: cat['name'] ?? '',
-                          isActive: false,
-                          onTap: () {
-                            Navigator.push(context, MaterialPageRoute(builder: (ctx) => CategoryListScreen(title: cat['name'] ?? '', slug: cat['slug'])));
-                          },
-                        )),
-                  ],
+        if (_loading)
+          Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const CircularProgressIndicator(color: TxaTheme.accent),
+                const SizedBox(height: 16),
+                Text(
+                  TxaLanguage.t('loading_home'),
+                  style: const TextStyle(
+                    color: TxaTheme.textMuted,
+                    fontSize: 13,
+                  ),
                 ),
-              ),
+              ],
             ),
-          ),
+          )
+        else if (_error != null || _data == null)
+          TxaErrorWidget(
+            message: TxaLanguage.t('error_loading_data'),
+            technicalDetails: _error,
+            onRetry: _loadHome,
+          )
+        else
+          RefreshIndicator(
+            onRefresh: _loadHome,
+            color: TxaTheme.accent,
+            child: CustomScrollView(
+              physics: const BouncingScrollPhysics(
+                parent: AlwaysScrollableScrollPhysics(),
+              ),
+              slivers: [
+                // Hero Slider
+                SliverToBoxAdapter(
+                  child: featured.isNotEmpty
+                      ? _HeroSlider(movies: featured.take(10).toList())
+                      : const SizedBox(height: 100),
+                ),
 
-          // Popular Categories ("Bạn đang quan tâm gì?")
-          if (categories.isNotEmpty)
-            SliverToBoxAdapter(
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        Text(
-                          TxaLanguage.t('trending_categories'),
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                        Text(
-                          TxaLanguage.t('more'),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            color: TxaTheme.textMuted,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 75,
-                      child: ListView.builder(
+                // Filter Tabs
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 12, 0, 4),
+                    child: SizedBox(
+                      height: 34,
+                      child: ListView(
                         scrollDirection: Axis.horizontal,
                         physics: const BouncingScrollPhysics(),
-                        itemCount: categories.take(8).length,
-                        itemBuilder: (ctx, i) {
-                          final cat = categories[i];
-                          final colors = [
-                            [
-                              const Color(0xFFFACC15),
-                              const Color(0xFFEA580C),
-                            ], // Yellow-Orange
-                            [
-                              const Color(0xFFF87171),
-                              const Color(0xFFDC2626),
-                            ], // Red
-                            [
-                              const Color(0xFFF472B6),
-                              const Color(0xFFDB2777),
-                            ], // Pink
-                            [
-                              const Color(0xFF4ADE80),
-                              const Color(0xFF16A34A),
-                            ], // Green
-                            [
-                              const Color(0xFF60A5FA),
-                              const Color(0xFF2563EB),
-                            ], // Blue
-                            [
-                              const Color(0xFFC084FC),
-                              const Color(0xFF9333EA),
-                            ], // Purple
-                          ];
-                          final colorSet = colors[i % colors.length];
-                          return GestureDetector(
-                            onTap: () {
-                              Navigator.push(context, MaterialPageRoute(builder: (ctx) => CategoryListScreen(title: cat['name'] ?? '', slug: cat['slug'])));
-                            },
-                            child: Container(
-                              width: 135,
-                              margin: const EdgeInsets.only(right: 12),
-                              decoration: BoxDecoration(
-                                gradient: LinearGradient(
-                                  colors: colorSet,
-                                  begin: Alignment.topLeft,
-                                  end: Alignment.bottomRight,
-                                ),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Padding(
-                                padding: const EdgeInsets.all(12.0),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Text(
-                                      cat['name'] ?? '',
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontWeight: FontWeight.bold,
-                                        fontSize: 13,
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          _FilterChip(
+                            label: TxaLanguage.t('recommendation'),
+                            isActive: _activeFilter == 'all',
+                            onTap: () => setState(() => _activeFilter = 'all'),
+                          ),
+                          _FilterChip(
+                            label: TxaLanguage.t('series_movies'),
+                            isActive: _activeFilter == 'series',
+                            onTap: () =>
+                                setState(() => _activeFilter = 'series'),
+                          ),
+                          _FilterChip(
+                            label: TxaLanguage.t('single_movies'),
+                            isActive: _activeFilter == 'single',
+                            onTap: () =>
+                                setState(() => _activeFilter = 'single'),
+                          ),
+                          ...categories
+                              .take(6)
+                              .map<Widget>(
+                                (cat) => _FilterChip(
+                                  label: cat['name'] ?? '',
+                                  isActive: false,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (ctx) => CategoryListScreen(
+                                          title: cat['name'] ?? '',
+                                          slug: cat['slug'],
+                                        ),
                                       ),
-                                    ),
-                                    const SizedBox(height: 2),
-                                    Text(
-                                      TxaLanguage.t('all_movies_count').replaceAll('%count', (cat['count'] ?? '20+').toString()),
-                                      style: const TextStyle(
-                                        color: Colors.white70,
-                                        fontSize: 10,
-                                      ),
-                                    ),
-                                  ],
+                                    );
+                                  },
                                 ),
                               ),
-                            ),
-                          );
-                        },
+                        ],
                       ),
                     ),
-                  ],
+                  ),
                 ),
-              ),
-            ),
 
-          // Movie Sections
-          ...filteredSections.map(
-            (section) => SliverToBoxAdapter(
-              child: _MovieSection(
-                title: section['title'],
-                movies: section['movies'],
-                sectionKey: section['key'],
-              ),
-            ),
-          ),
-
-          // Bottom spacer
-          const SliverToBoxAdapter(child: SizedBox(height: 100)),
-        ],
-      ),
-    ),
-    
-    // Floating Action Header (Pinned on top)
-    Positioned(
-      top: 0, left: 0, right: 0,
-      child: Container(
-        padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent],
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              GestureDetector(
-                onTap: () {
-                  Scaffold.of(context).openDrawer();
-                },
-                child: const Icon(Icons.menu_rounded, color: Colors.white, size: 28),
-              ),
-              Row(
-                children: [
-                  Image.asset('assets/logo.png', height: 24),
-                  const SizedBox(width: 8),
-                  Text(
-                    TxaLanguage.t('app_name'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+                // Popular Categories ("Bạn đang quan tâm gì?")
+                if (categories.isNotEmpty)
+                  SliverToBoxAdapter(
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(
+                                TxaLanguage.t('trending_categories'),
+                                style: const TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                              Text(
+                                TxaLanguage.t('more'),
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: TxaTheme.textMuted,
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            height: 75,
+                            child: ListView.builder(
+                              scrollDirection: Axis.horizontal,
+                              physics: const BouncingScrollPhysics(),
+                              itemCount: categories.take(8).length,
+                              itemBuilder: (ctx, i) {
+                                final cat = categories[i];
+                                final colors = [
+                                  [
+                                    const Color(0xFFFACC15),
+                                    const Color(0xFFEA580C),
+                                  ], // Yellow-Orange
+                                  [
+                                    const Color(0xFFF87171),
+                                    const Color(0xFFDC2626),
+                                  ], // Red
+                                  [
+                                    const Color(0xFFF472B6),
+                                    const Color(0xFFDB2777),
+                                  ], // Pink
+                                  [
+                                    const Color(0xFF4ADE80),
+                                    const Color(0xFF16A34A),
+                                  ], // Green
+                                  [
+                                    const Color(0xFF60A5FA),
+                                    const Color(0xFF2563EB),
+                                  ], // Blue
+                                  [
+                                    const Color(0xFFC084FC),
+                                    const Color(0xFF9333EA),
+                                  ], // Purple
+                                ];
+                                final colorSet = colors[i % colors.length];
+                                return GestureDetector(
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (ctx) => CategoryListScreen(
+                                          title: cat['name'] ?? '',
+                                          slug: cat['slug'],
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  child: Container(
+                                    width: 135,
+                                    margin: const EdgeInsets.only(right: 12),
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: colorSet,
+                                        begin: Alignment.topLeft,
+                                        end: Alignment.bottomRight,
+                                      ),
+                                      borderRadius: BorderRadius.circular(12),
+                                    ),
+                                    child: Padding(
+                                      padding: const EdgeInsets.all(12.0),
+                                      child: Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.start,
+                                        mainAxisAlignment:
+                                            MainAxisAlignment.center,
+                                        children: [
+                                          Text(
+                                            cat['name'] ?? '',
+                                            maxLines: 1,
+                                            overflow: TextOverflow.ellipsis,
+                                            style: const TextStyle(
+                                              color: Colors.white,
+                                              fontWeight: FontWeight.bold,
+                                              fontSize: 13,
+                                            ),
+                                          ),
+                                          const SizedBox(height: 2),
+                                          Text(
+                                            TxaLanguage.t(
+                                              'all_movies_count',
+                                            ).replaceAll(
+                                              '%count',
+                                              (cat['count'] ?? '20+')
+                                                  .toString(),
+                                            ),
+                                            style: const TextStyle(
+                                              color: Colors.white70,
+                                              fontSize: 10,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ],
+                      ),
                     ),
                   ),
+
+                // Movie Sections
+                ...filteredSections.map(
+                  (section) => SliverToBoxAdapter(
+                    child: _MovieSection(
+                      title: section['title'],
+                      movies: section['movies'],
+                      sectionKey: section['key'],
+                    ),
+                  ),
+                ),
+
+                // Bottom spacer
+                const SliverToBoxAdapter(child: SizedBox(height: 100)),
+              ],
+            ),
+          ),
+
+        // Floating Action Header (Pinned on top)
+        Positioned(
+          top: 0,
+          left: 0,
+          right: 0,
+          child: Container(
+            padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.black.withValues(alpha: 0.8),
+                  Colors.transparent,
                 ],
               ),
-              Row(
+            ),
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  _GlassIconBtn(
-                    icon: Icons.search_rounded,
-                    onTap: () => _changeTab(1),
+                  GestureDetector(
+                    onTap: () {
+                      Scaffold.of(context).openDrawer();
+                    },
+                    child: const Icon(
+                      Icons.menu_rounded,
+                      color: Colors.white,
+                      size: 28,
+                    ),
                   ),
-                  const SizedBox(width: 8),
-                  _GlassIconBtn(
-                    icon: Icons.settings_rounded,
-                    onTap: () => _changeTab(3),
+                  Row(
+                    children: [
+                      Image.asset('assets/logo.png', height: 24),
+                      const SizedBox(width: 8),
+                      Text(
+                        TxaLanguage.t('app_name'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 0.5,
+                        ),
+                      ),
+                    ],
+                  ),
+                  Row(
+                    children: [
+                      _GlassIconBtn(
+                        icon: Icons.search_rounded,
+                        onTap: () => _changeTab(1),
+                      ),
+                      const SizedBox(width: 8),
+                      _GlassIconBtn(
+                        icon: Icons.settings_rounded,
+                        onTap: () => _changeTab(3),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
         ),
-      ),
-    ),
-  ],
-);
+      ],
+    );
   }
 
   // Method to safely switch tabs from within this child widget
@@ -1050,31 +1180,43 @@ class _HeroSliderState extends State<_HeroSlider> {
     if (slug.isEmpty) return;
 
     TxaToast.show(context, TxaLanguage.t('loading_progress'));
-    
+
     try {
       final api = Provider.of<TxaApi>(context, listen: false);
       final res = await api.getMovie(slug);
       final data = res['data'];
-      
+
       if (data != null && data['servers'] != null) {
         final servers = data['servers'] as List;
-        if (servers.isNotEmpty && (servers[0]['server_data'] as List).isNotEmpty) {
-           if (!context.mounted) return;
-           Navigator.push(context, MaterialPageRoute(builder: (ctx) => TxaPlayer(
-              movie: data['movie'],
-              servers: servers,
-              initialServerIndex: 0,
-              initialEpisodeId: servers[0]['server_data'][0]['id'].toString(),
-           )));
-           return;
+        if (servers.isNotEmpty &&
+            (servers[0]['server_data'] as List).isNotEmpty) {
+          if (!context.mounted) return;
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (ctx) => TxaPlayer(
+                movie: data['movie'],
+                servers: servers,
+                initialServerIndex: 0,
+                initialEpisodeId: servers[0]['server_data'][0]['id'].toString(),
+              ),
+            ),
+          );
+          return;
         }
       }
-      
+
       if (!context.mounted) return;
-      Navigator.push(context, MaterialPageRoute(builder: (ctx) => MovieDetailScreen(slug: slug)));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (ctx) => MovieDetailScreen(slug: slug)),
+      );
     } catch (e) {
       if (!context.mounted) return;
-      Navigator.push(context, MaterialPageRoute(builder: (ctx) => MovieDetailScreen(slug: slug)));
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (ctx) => MovieDetailScreen(slug: slug)),
+      );
     }
   }
 
@@ -1203,7 +1345,10 @@ class _HeroSliderState extends State<_HeroSlider> {
                           icon: Icons.favorite_border_rounded,
                           color: Colors.white,
                           textColor: Colors.black87,
-                          onTap: () => TxaToast.show(context, TxaLanguage.t('coming_soon_msg')),
+                          onTap: () => TxaToast.show(
+                            context,
+                            TxaLanguage.t('coming_soon_msg'),
+                          ),
                         ),
                       ],
                     ),

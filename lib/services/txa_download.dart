@@ -10,8 +10,9 @@ import 'txa_shortcut_service.dart';
 
 class TxaDownload {
   final Dio _dio = Dio();
-  final FlutterLocalNotificationsPlugin _notifications = FlutterLocalNotificationsPlugin();
-  
+  final FlutterLocalNotificationsPlugin _notifications =
+      FlutterLocalNotificationsPlugin();
+
   bool isDownloading = false;
   int downloadedBytes = 0;
   int totalBytes = 0;
@@ -35,25 +36,27 @@ class TxaDownload {
       onDidReceiveNotificationResponse: (details) async {
         final String? payload = details.payload;
         if (payload != null && payload.isNotEmpty) {
-           TxaLogger.log("Opening file from notification: $payload");
-           await OpenFile.open(payload);
+          TxaLogger.log("Opening file from notification: $payload");
+          await OpenFile.open(payload);
         }
       },
     );
   }
 
   /// Start direct file download
-  Future<File?> startDownload(String url, String filename, {
+  Future<File?> startDownload(
+    String url,
+    String filename, {
     Function(Map<String, dynamic>)? onProgress,
     bool showNotification = true,
   }) async {
     try {
       isDownloading = true;
       startTime = DateTime.now();
-      
+
       final dir = await getExternalStorageDirectory();
       final savePath = '${dir?.path}/$filename';
-      
+
       if (showNotification) {
         await _updateNotification(0, filename, 'Bắt đầu tải...');
       }
@@ -67,20 +70,22 @@ class TxaDownload {
         onReceiveProgress: (received, total) {
           downloadedBytes = received;
           totalBytes = total;
-          
+
           final now = DateTime.now();
-          
+
           // Calculate snapshots every 1 second for reactive speed
-          if (_lastSnapshotTime == null || now.difference(_lastSnapshotTime!).inMilliseconds >= 1000) {
-             if (_lastSnapshotTime != null) {
-                final deltaBytes = received - _lastBytesSnapshot;
-                final deltaTime = now.difference(_lastSnapshotTime!).inMilliseconds / 1000.0;
-                if (deltaTime > 0) {
-                   _currentSpeed = deltaBytes / deltaTime;
-                }
-             }
-             _lastBytesSnapshot = received;
-             _lastSnapshotTime = now;
+          if (_lastSnapshotTime == null ||
+              now.difference(_lastSnapshotTime!).inMilliseconds >= 1000) {
+            if (_lastSnapshotTime != null) {
+              final deltaBytes = received - _lastBytesSnapshot;
+              final deltaTime =
+                  now.difference(_lastSnapshotTime!).inMilliseconds / 1000.0;
+              if (deltaTime > 0) {
+                _currentSpeed = deltaBytes / deltaTime;
+              }
+            }
+            _lastBytesSnapshot = received;
+            _lastSnapshotTime = now;
           }
 
           final info = getProgressInfo();
@@ -88,27 +93,38 @@ class TxaDownload {
           if (onProgress != null) {
             onProgress(info);
           }
-          
+
           if (showNotification && total > 0) {
-              if (lastUpdateTime == null || now.difference(lastUpdateTime!).inMilliseconds >= 1500 || received == total) {
-                 lastUpdateTime = now;
-                 final speedFormatted = info['formatted']['speed'];
-                 final body = "🚀 $speedFormatted • ⏳ ETA: ${info['formatted']['eta']}\n📦 ${info['formatted']['downloaded']} / ${info['formatted']['total']}";
-                 _updateNotification(received * 100 ~/ total, filename, body);
-                 
-                 // UPDATE SHORTCUT (Platform Specific)
-                 if (Platform.isIOS) {
-                    final int dotCount = (received ~/ (1024 * 1024)) % 4; // Change dot every 1MB
-                    final String dots = "." * dotCount;
-                    TxaShortcutService.setDownloadStatus("${TxaLanguage.t('downloading')}$dots");
-                 } else {
-                    TxaShortcutService.setDownloadStatus(TxaLanguage.t('downloading_status', replace: {
+            if (lastUpdateTime == null ||
+                now.difference(lastUpdateTime!).inMilliseconds >= 1500 ||
+                received == total) {
+              lastUpdateTime = now;
+              final speedFormatted = info['formatted']['speed'];
+              final body =
+                  "🚀 $speedFormatted • ⏳ ETA: ${info['formatted']['eta']}\n📦 ${info['formatted']['downloaded']} / ${info['formatted']['total']}";
+              _updateNotification(received * 100 ~/ total, filename, body);
+
+              // UPDATE SHORTCUT (Platform Specific)
+              if (Platform.isIOS) {
+                final int dotCount =
+                    (received ~/ (1024 * 1024)) % 4; // Change dot every 1MB
+                final String dots = "." * dotCount;
+                TxaShortcutService.setDownloadStatus(
+                  "${TxaLanguage.t('downloading')}$dots",
+                );
+              } else {
+                TxaShortcutService.setDownloadStatus(
+                  TxaLanguage.t(
+                    'downloading_status',
+                    replace: {
                       'p': info['progress'].toInt().toString(),
                       's': speedFormatted,
                       'e': info['formatted']['eta'],
-                    }));
-                 }
+                    },
+                  ),
+                );
               }
+            }
           }
         },
       );
@@ -116,7 +132,11 @@ class TxaDownload {
       if (showNotification) {
         final String title = TxaLanguage.t('download_finished');
         final String body = TxaLanguage.t('click_to_install');
-        await _completeNotification(filename, '✅ $title $body', payload: savePath);
+        await _completeNotification(
+          filename,
+          '✅ $title $body',
+          payload: savePath,
+        );
         TxaShortcutService.setDownloadStatus(null); // Clear shortcut
       }
 
@@ -125,11 +145,12 @@ class TxaDownload {
     } catch (e) {
       isDownloading = false;
       String errorMsg = 'Tải thất bại ❌';
-      
+
       if (e is DioException) {
         if (CancelToken.isCancel(e)) {
           errorMsg = 'Đã hủy tải 🛑';
-        } else if (e.type == DioExceptionType.connectionTimeout || e.type == DioExceptionType.connectionError) {
+        } else if (e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.connectionError) {
           errorMsg = 'Lỗi mạng: Kiểm tra kết nối 🌐';
         }
       }
@@ -149,18 +170,22 @@ class TxaDownload {
 
   Map<String, dynamic> getProgressInfo() {
     final now = DateTime.now();
-    
+
     // Average speed for overall ETA
-    final durationSoFar = startTime != null ? now.difference(startTime!).inSeconds : 0;
+    final durationSoFar = startTime != null
+        ? now.difference(startTime!).inSeconds
+        : 0;
     final avgSpeed = durationSoFar > 0 ? downloadedBytes / durationSoFar : 0.0;
-    
+
     // Current reactive speed for UI
     final speed = _currentSpeed > 0 ? _currentSpeed : avgSpeed;
-    
-    final progress = totalBytes > 0 ? (downloadedBytes / totalBytes) * 100 : 0.0;
+
+    final progress = totalBytes > 0
+        ? (downloadedBytes / totalBytes) * 100
+        : 0.0;
     final remainingBytes = totalBytes - downloadedBytes;
     final etaSeconds = speed > 0 ? (remainingBytes / speed).toInt() : 0;
-    
+
     return {
       'progress': progress,
       'downloaded': downloadedBytes,
@@ -170,25 +195,33 @@ class TxaDownload {
       'formatted': {
         'downloaded': TxaFormat.formatSize(downloadedBytes)['display'],
         'total': TxaFormat.formatSize(totalBytes)['display'],
-        'speed': TxaFormat.formatSpeed(speed, decimals: 2)['display'], 
+        'speed': TxaFormat.formatSpeed(speed, decimals: 2)['display'],
         'eta': TxaFormat.formatTime(etaSeconds),
-      }
+      },
     };
   }
 
-  Future<void> _updateNotification(int progress, String title, String body) async {
+  Future<void> _updateNotification(
+    int progress,
+    String title,
+    String body,
+  ) async {
     final android = AndroidNotificationDetails(
       'txa_download',
       'TPhimX Tải về',
-      importance: Importance.low,
-      priority: Priority.low,
+      importance: Importance.max,
+      priority: Priority.high,
       showProgress: true,
       maxProgress: 100,
       progress: progress,
       ongoing: true,
       onlyAlertOnce: true,
       actions: [
-        const AndroidNotificationAction('cancel_download', 'Hủy', showsUserInterface: true),
+        const AndroidNotificationAction(
+          'cancel_download',
+          'Hủy',
+          showsUserInterface: true,
+        ),
       ],
     );
 
@@ -208,7 +241,11 @@ class TxaDownload {
     );
   }
 
-  Future<void> _completeNotification(String title, String body, {String? payload}) async {
+  Future<void> _completeNotification(
+    String title,
+    String body, {
+    String? payload,
+  }) async {
     final android = const AndroidNotificationDetails(
       'txa_download',
       'TPhimX Tải về',
