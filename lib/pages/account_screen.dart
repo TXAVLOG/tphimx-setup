@@ -196,58 +196,59 @@ class _AccountScreenState extends State<AccountScreen> {
                         ],
                       ),
                     ),
-                    const SizedBox(width: 8),
-                    // Status badge: Đã đăng ký / Chưa đăng ký
-                    Builder(
-                      builder: (_) {
-                        final isRegistered = TxaSettings.udid.isNotEmpty;
-                        return Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: isRegistered
-                                ? Colors.green.withValues(alpha: 0.15)
-                                : Colors.orange.withValues(alpha: 0.15),
-                            borderRadius: BorderRadius.circular(6),
-                            border: Border.all(
-                              color: isRegistered
-                                  ? Colors.green.withValues(alpha: 0.5)
-                                  : Colors.orange.withValues(alpha: 0.5),
-                              width: 0.5,
+                    if (Platform.isIOS) const SizedBox(width: 8),
+                    // Status badge: Đã đăng ký / Chưa đăng ký (iOS Only)
+                    if (Platform.isIOS)
+                      Builder(
+                        builder: (_) {
+                          final isRegistered = TxaSettings.udid.isNotEmpty;
+                          return Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
                             ),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(
-                                isRegistered
-                                    ? Icons.verified_rounded
-                                    : Icons.info_outline_rounded,
+                            decoration: BoxDecoration(
+                              color: isRegistered
+                                  ? Colors.green.withValues(alpha: 0.15)
+                                  : Colors.orange.withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(6),
+                              border: Border.all(
                                 color: isRegistered
-                                    ? Colors.green
-                                    : Colors.orange,
-                                size: 10,
+                                    ? Colors.green.withValues(alpha: 0.5)
+                                    : Colors.orange.withValues(alpha: 0.5),
+                                width: 0.5,
                               ),
-                              const SizedBox(width: 2),
-                              Text(
-                                isRegistered
-                                    ? TxaLanguage.t('status_registered')
-                                    : TxaLanguage.t('status_not_registered'),
-                                style: TextStyle(
+                            ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Icon(
+                                  isRegistered
+                                      ? Icons.verified_rounded
+                                      : Icons.info_outline_rounded,
                                   color: isRegistered
                                       ? Colors.green
                                       : Colors.orange,
-                                  fontSize: 9,
-                                  fontWeight: FontWeight.bold,
+                                  size: 10,
                                 ),
-                              ),
-                            ],
-                          ),
-                        );
-                      },
-                    ),
+                                const SizedBox(width: 2),
+                                Text(
+                                  isRegistered
+                                      ? TxaLanguage.t('status_registered')
+                                      : TxaLanguage.t('status_not_registered'),
+                                  style: TextStyle(
+                                    color: isRegistered
+                                        ? Colors.green
+                                        : Colors.orange,
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          );
+                        },
+                      ),
                   ],
                 ),
                 Text(

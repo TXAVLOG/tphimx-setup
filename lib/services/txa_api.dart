@@ -23,6 +23,8 @@ class TxaApi {
       connectTimeout: const Duration(seconds: 15),
       receiveTimeout: const Duration(seconds: 15),
       headers: {
+        'Accept': 'application/json',
+        'X-Requested-With': 'XMLHttpRequest',
         'X-TXC-Client': 'TPhimX-App',
         'X-TXC-Platform': Platform.isIOS ? 'iOS' : 'Android',
         'X-TXA-API-KEY': apiKey,
