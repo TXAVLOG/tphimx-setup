@@ -8,12 +8,19 @@ import '../theme/txa_theme.dart';
 import '../utils/txa_toast.dart';
 import '../widgets/txa_player.dart';
 import '../widgets/txa_error_widget.dart';
+import 'package:share_plus/share_plus.dart';
+import '../services/txa_settings.dart';
 import '../utils/txa_logger.dart';
 import '../services/txa_mini_player_provider.dart';
 
 class MovieDetailScreen extends StatefulWidget {
   final String slug;
-  const MovieDetailScreen({super.key, required this.slug});
+  final bool autoPlay;
+  const MovieDetailScreen({
+    super.key,
+    required this.slug,
+    this.autoPlay = false,
+  });
 
   @override
   State<MovieDetailScreen> createState() => _MovieDetailScreenState();
@@ -28,6 +35,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
   late TabController _tabController;
 
   int _selectedServerIndex = 0;
+  bool _autoPlayed = false;
 
   @override
   void initState() {
@@ -54,6 +62,12 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
         _data = res['data'];
         _loading = false;
       });
+
+      // Auto play if requested
+      if (widget.autoPlay && !_autoPlayed) {
+        _autoPlayed = true;
+        _playAutomatically();
+      }
     } catch (e) {
       TxaLogger.log(
         'Movie Detail Load Error [${widget.slug}]: $e',
@@ -64,6 +78,72 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
         _loading = false;
       });
     }
+  }
+
+  void _playAutomatically() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _data == null) return;
+      final s = _data!['servers'] as List? ?? [];
+      if (s.isNotEmpty && (s[0]['server_data'] as List).isNotEmpty) {
+        final m = _data!['movie'];
+        final history = _data!['history'];
+        String epId = s[0]['server_data'][0]['id'].toString();
+        double initialTime = 0;
+
+        if (history != null) {
+          epId = history['episode_id'].toString();
+          initialTime = (history['current_time'] as num).toDouble();
+        }
+
+        final miniProvider = context.read<TxaMiniPlayerProvider>();
+        if (!miniProvider.isClosed) miniProvider.close();
+
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (ctx) => TxaPlayer(
+              movie: m,
+              servers: s,
+              initialServerIndex: 0,
+              initialEpisodeId: epId,
+              initialTime: initialTime,
+            ),
+          ),
+        );
+      }
+    });
+  }
+
+  Future<void> _toggleFavorite() async {
+    final api = Provider.of<TxaApi>(context, listen: false);
+    if (TxaSettings.authToken.isEmpty) {
+      TxaToast.show(context, TxaLanguage.t('login_required'), isError: true);
+      return;
+    }
+
+    try {
+      final res = await api.toggleFavorite(_data!['movie']['id']);
+      if (res['success'] == true) {
+        setState(() {
+          _data!['movie']['is_favorite'] = res['data']['is_favorite'];
+        });
+        TxaToast.show(
+          context,
+          res['data']['is_favorite']
+              ? TxaLanguage.t('favorite_added')
+              : TxaLanguage.t('favorite_removed'),
+        );
+      }
+    } catch (e) {
+      TxaToast.show(context, TxaLanguage.t('error'), isError: true);
+    }
+  }
+
+  void _shareMovie() {
+    final movie = _data!['movie'];
+    final shareText =
+        '${movie['name']} - ${TxaLanguage.t('app_slogan')}\nXem ngay tại: https://film.nrotxa.online/movie/${widget.slug}';
+    Share.share(shareText, subject: movie['name']);
   }
 
   // Cleaned up
@@ -261,6 +341,17 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                 .read<TxaMiniPlayerProvider>();
                             if (!miniProvider.isClosed) miniProvider.close();
 
+                            final history = _data!['history'];
+                            String epId = s[0]['server_data'][0]['id']
+                                .toString();
+                            double initialTime = 0;
+
+                            if (history != null) {
+                              epId = history['episode_id'].toString();
+                              initialTime = (history['current_time'] as num)
+                                  .toDouble();
+                            }
+
                             Navigator.push(
                               context,
                               MaterialPageRoute(
@@ -268,8 +359,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                   movie: m,
                                   servers: s,
                                   initialServerIndex: 0,
-                                  initialEpisodeId: s[0]['server_data'][0]['id']
-                                      .toString(),
+                                  initialEpisodeId: epId,
+                                  initialTime: initialTime,
                                 ),
                               ),
                             );
@@ -288,9 +379,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
                           _IconBtn(
-                            icon: Icons.add_rounded,
+                            icon: (_data!['movie']['is_favorite'] == true)
+                                ? Icons.favorite_rounded
+                                : Icons.add_rounded,
+                            color: (_data!['movie']['is_favorite'] == true)
+                                ? Colors.red
+                                : Colors.white,
                             label: TxaLanguage.t('add_favorite'),
-                            onTap: () => _showComingSoon(context),
+                            onTap: _toggleFavorite,
                           ),
                           _IconBtn(
                             icon: Icons.download_rounded,
@@ -300,7 +396,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                           _IconBtn(
                             icon: Icons.share_rounded,
                             label: TxaLanguage.t('share'),
-                            onTap: () => _showComingSoon(context),
+                            onTap: _shareMovie,
                           ),
                         ],
                       ),
@@ -622,6 +718,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
               itemCount: episodes.length,
               itemBuilder: (context, index) {
                 final ep = episodes[index];
+                final history = _data!['history'];
+                final bool isActive =
+                    history != null &&
+                    history['episode_id'].toString() == ep['id'].toString();
+
                 final epName = ep['name'].toString().replaceAll(
                   RegExp(r'[^0-9]'),
                   '',
@@ -644,6 +745,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                             servers: servers,
                             initialServerIndex: _selectedServerIndex,
                             initialEpisodeId: ep['id'].toString(),
+                            initialTime: isActive
+                                ? (history['current_time'] as num).toDouble()
+                                : 0,
                           ),
                         ),
                       );
@@ -651,15 +755,26 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                   },
                   child: Container(
                     decoration: BoxDecoration(
-                      color: TxaTheme.secondaryBg,
+                      color: isActive ? TxaTheme.accent : TxaTheme.secondaryBg,
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white10),
+                      border: Border.all(
+                        color: isActive ? TxaTheme.accent : Colors.white10,
+                      ),
+                      boxShadow: isActive
+                          ? [
+                              BoxShadow(
+                                color: TxaTheme.accent.withValues(alpha: 0.3),
+                                blurRadius: 8,
+                                spreadRadius: 1,
+                              ),
+                            ]
+                          : null,
                     ),
                     alignment: Alignment.center,
                     child: Text(
                       displayName,
-                      style: const TextStyle(
-                        color: Colors.white70,
+                      style: TextStyle(
+                        color: isActive ? Colors.white : Colors.white70,
                         fontWeight: FontWeight.bold,
                         fontSize: 13,
                       ),
@@ -901,10 +1016,12 @@ class _HeroActionButton extends StatelessWidget {
 class _IconBtn extends StatelessWidget {
   final IconData icon;
   final String label;
+  final Color? color;
   final VoidCallback onTap;
   const _IconBtn({
     required this.icon,
     required this.label,
+    this.color,
     required this.onTap,
   });
 
@@ -914,7 +1031,7 @@ class _IconBtn extends StatelessWidget {
       onTap: onTap,
       child: Column(
         children: [
-          Icon(icon, color: Colors.white, size: 24),
+          Icon(icon, color: color ?? Colors.white, size: 24),
           const SizedBox(height: 6),
           Text(
             label,

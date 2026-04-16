@@ -133,4 +133,15 @@ class TxaFormat {
     final formatter = NumberFormat('#,###', 'en_US');
     return formatter.format(val);
   }
+
+  /// Format date to H:i:s d/M/yy
+  static String formatDateTime(String dateStr) {
+    if (dateStr.isEmpty) return '';
+    try {
+      final date = DateTime.parse(dateStr).toLocal();
+      return DateFormat('HH:mm:ss dd/MM/yy').format(date);
+    } catch (e) {
+      return '';
+    }
+  }
 }

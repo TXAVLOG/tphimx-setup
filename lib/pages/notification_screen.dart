@@ -68,6 +68,34 @@ class _NotificationScreenState extends State<NotificationScreen> {
     }
   }
 
+  Future<void> _clearAll() async {
+    try {
+      final api = Provider.of<TxaApi>(context, listen: false);
+      await api.clearNotifications();
+      setState(() {
+        _items = [];
+      });
+    } catch (e) {
+      // Silently fail
+    }
+  }
+
+  Future<void> _markAllRead() async {
+    try {
+      final api = Provider.of<TxaApi>(context, listen: false);
+      await api.markAllRead();
+      setState(() {
+        if (_items != null) {
+          for (var item in _items!) {
+            item['is_read'] = true;
+          }
+        }
+      });
+    } catch (e) {
+      // Silently fail
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -84,6 +112,22 @@ class _NotificationScreenState extends State<NotificationScreen> {
         ),
         centerTitle: true,
         actions: [
+          if (_items != null && _items!.isNotEmpty) ...[
+            TextButton(
+              onPressed: _markAllRead,
+              child: Text(
+                TxaLanguage.t('read_all'),
+                style: const TextStyle(color: TxaTheme.accent, fontSize: 13),
+              ),
+            ),
+            IconButton(
+              onPressed: _clearAll,
+              icon: const Icon(
+                Icons.delete_sweep_rounded,
+                color: Colors.redAccent,
+              ),
+            ),
+          ],
           IconButton(
             onPressed: _fetchNotifications,
             icon: const Icon(Icons.refresh_rounded, color: Colors.white),

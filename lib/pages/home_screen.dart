@@ -16,6 +16,7 @@ import '../pages/notification_screen.dart';
 import '../pages/premium_screen.dart';
 import '../pages/category_list_screen.dart';
 import '../pages/movie_detail_screen.dart';
+import '../pages/global_settings_screen.dart';
 import '../widgets/txa_dropdown.dart';
 import '../widgets/txa_player.dart';
 import '../utils/txa_toast.dart';
@@ -438,9 +439,22 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () => setState(() => _currentIndex = 1),
                   ),
                   const SizedBox(width: 8),
+                  _GlassIconBadge(
+                    icon: Icons.notifications_rounded,
+                    badgeCount: _unreadNotifications,
+                    onTap: () => setState(() => _currentIndex = 3),
+                  ),
+                  const SizedBox(width: 8),
                   _GlassIconBtn(
                     icon: Icons.settings_rounded,
-                    onTap: () => setState(() => _currentIndex = 3),
+                    onTap: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (ctx) => const GlobalSettingsScreen(),
+                        ),
+                      );
+                    },
                   ),
                 ],
               ),
@@ -650,8 +664,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.0.0';
-                  final build = snapshot.data?.buildNumber ?? '300';
+                  final version = snapshot.data?.version ?? '3.2.0';
+                  final build = snapshot.data?.buildNumber ?? '320';
                   return Text(
                     'Version $version (Build $build)',
                     style: const TextStyle(
@@ -1156,6 +1170,61 @@ class _GlassIconBtn extends StatelessWidget {
           border: Border.all(color: TxaTheme.glassBorder),
         ),
         child: Icon(icon, color: TxaTheme.textPrimary, size: 20),
+      ),
+    );
+  }
+}
+
+class _GlassIconBadge extends StatelessWidget {
+  final IconData icon;
+  final int badgeCount;
+  final VoidCallback onTap;
+
+  const _GlassIconBadge({
+    required this.icon,
+    required this.badgeCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: TxaTheme.glassBg,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: TxaTheme.glassBorder),
+            ),
+            child: Icon(icon, color: TxaTheme.textPrimary, size: 20),
+          ),
+          if (badgeCount > 0)
+            Positioned(
+              top: -4,
+              right: -4,
+              child: Container(
+                padding: const EdgeInsets.all(4),
+                decoration: const BoxDecoration(
+                  color: Colors.red,
+                  shape: BoxShape.circle,
+                ),
+                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
+                child: Text(
+                  badgeCount > 99 ? '99+' : badgeCount.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 8,
+                    fontWeight: FontWeight.bold,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }
@@ -1818,6 +1887,47 @@ class _MovieCard extends StatelessWidget {
                           }).toList(),
                         ),
                       ),
+                    // Update time and Favorite Heart icon overlay
+                    Positioned(
+                      bottom: 5,
+                      left: 6,
+                      right: 6,
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          // Favorite heart icon
+                          Icon(
+                            Icons.favorite,
+                            size: 14,
+                            color: (movie['is_favorite'] == true)
+                                ? Colors.red
+                                : Colors.white.withValues(alpha: 0.2),
+                          ),
+                          // Update timestamp (H:i:s d/M/yy)
+                          if (movie['updated_at'] != null)
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 4,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black54,
+                                borderRadius: BorderRadius.circular(3),
+                              ),
+                              child: Text(
+                                TxaFormat.formatDateTime(
+                                  movie['updated_at'].toString(),
+                                ),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 7,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),

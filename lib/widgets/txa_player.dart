@@ -11,6 +11,7 @@ import '../services/txa_mini_player_provider.dart';
 import '../utils/txa_format.dart';
 import '../theme/txa_theme.dart';
 import 'package:provider/provider.dart';
+import '../services/txa_api.dart';
 import '../utils/txa_toast.dart';
 import '../widgets/txa_modal.dart';
 
@@ -27,8 +28,11 @@ class TxaPlayer extends StatefulWidget {
     required this.servers,
     this.initialServerIndex,
     this.initialEpisodeId,
+    this.initialTime,
     this.existingController,
   });
+
+  final double? initialTime;
 
   @override
   State<TxaPlayer> createState() => _TxaPlayerState();
@@ -84,6 +88,8 @@ class _TxaPlayerState extends State<TxaPlayer>
   bool _isInternalVolumeChange = false;
   bool _isBuffering = false;
 
+  Timer? _historySyncTimer;
+
   static const _dndChannel = MethodChannel('com.tphimx.tphimx/dnd');
 
   // Clock settings
@@ -133,7 +139,75 @@ class _TxaPlayerState extends State<TxaPlayer>
     _initSystemMirrors();
     _startClock();
     _toggleDND(true);
+    _startHistorySync();
     WidgetsBinding.instance.addObserver(this);
+  }
+
+  void _startHistorySync() {
+    _historySyncTimer?.cancel();
+    _historySyncTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+      _syncHistory();
+    });
+  }
+
+  Future<void> _syncHistory() async {
+    if (!mounted || _betterPlayerController == null || _isEmbed) return;
+    if (TxaSettings.authToken.isEmpty) return;
+
+    final pos = _betterPlayerController!.videoPlayerController?.value.position;
+    final dur = _betterPlayerController!.videoPlayerController?.value.duration;
+
+    if (pos == null || dur == null || dur.inSeconds == 0) return;
+
+    final server = widget.servers[_currentServerIndex];
+    final ep = (server['server_data'] as List)[_currentEpisodeIndex];
+
+    try {
+      final api = Provider.of<TxaApi>(context, listen: false);
+      await api.updateWatchHistory(
+        movieId: widget.movie['id'],
+        episodeId: ep['id'],
+        currentTime: pos.inSeconds.toDouble(),
+        duration: dur.inSeconds.toDouble(),
+      );
+    } catch (_) {}
+  }
+
+  @override
+  void dispose() {
+    _toggleDND(false);
+    _historySyncTimer?.cancel();
+    _clockTimer.cancel();
+    _autoNextTimer?.cancel();
+    _controlsTimer?.cancel();
+    _overlayTimer?.cancel();
+    _speedTimer?.cancel();
+    _seekDebounce?.cancel();
+
+    // Final history synchronization
+    _syncHistory();
+
+    final TxaMiniPlayerProvider miniProvider =
+        Provider.of<TxaMiniPlayerProvider>(context, listen: false);
+    if (miniProvider.controller != _betterPlayerController) {
+      _betterPlayerController?.dispose();
+    }
+
+    _betterPlayerController?.removeEventsListener(_onPlayerEvent);
+    VolumeController.instance.removeListener();
+    VolumeController.instance.showSystemUI = true;
+    ScreenBrightness().resetApplicationScreenBrightness();
+    WidgetsBinding.instance.removeObserver(this);
+
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+    super.dispose();
   }
 
   @override
@@ -151,7 +225,6 @@ class _TxaPlayerState extends State<TxaPlayer>
         }
       }
     } else if (state == AppLifecycleState.resumed) {
-      // Returning from background — check if we were in PiP
       _checkPiPReturn();
     }
   }
@@ -443,6 +516,14 @@ class _TxaPlayerState extends State<TxaPlayer>
 
     try {
       await _betterPlayerController!.setupDataSource(dataSource);
+
+      // Resume playback
+      if (widget.initialTime != null && widget.initialTime! > 0) {
+        await _betterPlayerController!.seekTo(
+          Duration(seconds: widget.initialTime!.toInt()),
+        );
+      }
+
       _betterPlayerController!.addEventsListener(_onPlayerEvent);
 
       _betterPlayerController!.setVolume(_volume);
@@ -618,6 +699,7 @@ class _TxaPlayerState extends State<TxaPlayer>
       });
       _initializePlayer();
     } else {
+      _syncHistory(); // Final sync on exit
       Navigator.pop(context);
     }
   }
@@ -823,34 +905,6 @@ class _TxaPlayerState extends State<TxaPlayer>
     } catch (e) {
       debugPrint("DND Error: $e");
     }
-  }
-
-  @override
-  void dispose() {
-    _toggleDND(false);
-    _clockTimer.cancel();
-    _autoNextTimer?.cancel();
-    _controlsTimer?.cancel();
-    _overlayTimer?.cancel();
-    _speedTimer?.cancel();
-    _seekDebounce?.cancel();
-
-    final miniProvider = Provider.of<TxaMiniPlayerProvider>(
-      context,
-      listen: false,
-    );
-    if (miniProvider.controller != _betterPlayerController) {
-      _betterPlayerController?.dispose();
-    }
-
-    _betterPlayerController?.removeEventsListener(_onPlayerEvent);
-    VolumeController.instance.removeListener();
-    VolumeController.instance.showSystemUI = true; // Restore system volume HUD
-    ScreenBrightness().resetApplicationScreenBrightness();
-    WidgetsBinding.instance.removeObserver(this);
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-    super.dispose();
   }
 
   @override

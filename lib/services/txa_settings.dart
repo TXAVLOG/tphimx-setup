@@ -1,3 +1,5 @@
+import 'dart:io';
+import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class TxaSettings {
@@ -45,6 +47,54 @@ class TxaSettings {
 
   static double get brightness => _prefs.getDouble('player_brightness') ?? 0.5;
   static set brightness(double v) => _prefs.setDouble('player_brightness', v);
+
+  // --- Appearance ---
+  static double get fontSizeScale => _prefs.getDouble('app_font_size') ?? 1.0;
+  static set fontSizeScale(double v) => _prefs.setDouble('app_font_size', v);
+
+  static String get fontFamily =>
+      _prefs.getString('app_font_family') ?? 'Default';
+  static set fontFamily(String v) => _prefs.setString('app_font_family', v);
+
+  // --- Cache Management ---
+  static Future<int> getCacheSize() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      int totalSize = 0;
+      if (tempDir.existsSync()) {
+        totalSize += _calculateSize(tempDir);
+      }
+      return totalSize;
+    } catch (e) {
+      return 0;
+    }
+  }
+
+  static int _calculateSize(Directory dir) {
+    int total = 0;
+    try {
+      if (dir.existsSync()) {
+        dir.listSync(recursive: true, followLinks: false).forEach((entity) {
+          if (entity is File) {
+            total += entity.lengthSync();
+          }
+        });
+      }
+    } catch (_) {}
+    return total;
+  }
+
+  static Future<bool> clearCache() async {
+    try {
+      final tempDir = await getTemporaryDirectory();
+      if (tempDir.existsSync()) {
+        tempDir.deleteSync(recursive: true);
+      }
+      return true;
+    } catch (e) {
+      return false;
+    }
+  }
 
   // --- Auth ---
   static String get authToken => _prefs.getString('auth_token') ?? '';

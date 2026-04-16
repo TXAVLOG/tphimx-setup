@@ -12,6 +12,9 @@ import '../utils/txa_toast.dart';
 import 'legal_screen.dart';
 import 'auth_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'history_screen.dart';
+import 'favorite_list_screen.dart';
+import 'global_settings_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -54,19 +57,28 @@ class _AccountScreenState extends State<AccountScreen> {
         'id': 'history',
         'label': TxaLanguage.t('watching'),
         'icon': Icons.history_rounded,
-        'action': () => _handleDev(context, TxaLanguage.t('watching')),
-      },
-      {
-        'id': 'mylist',
-        'label': TxaLanguage.t('my_list_long'),
-        'icon': Icons.list_alt_rounded,
-        'action': () => _handleDev(context, TxaLanguage.t('my_list_long')),
+        'action': () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (ctx) => const HistoryScreen()),
+        ),
       },
       {
         'id': 'favorites',
         'label': TxaLanguage.t('add_favorite'),
         'icon': Icons.favorite_border_rounded,
-        'action': () => _handleDev(context, TxaLanguage.t('add_favorite')),
+        'action': () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (ctx) => const FavoriteListScreen()),
+        ),
+      },
+      {
+        'id': 'global_settings',
+        'label': TxaLanguage.t('settings'),
+        'icon': Icons.settings_rounded,
+        'action': () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (ctx) => const GlobalSettingsScreen()),
+        ),
       },
       {
         'id': 'tv_login',
@@ -507,8 +519,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.0.0';
-                  final buildNumber = snapshot.data?.buildNumber ?? '300';
+                  final version = snapshot.data?.version ?? '3.2.0';
+                  final buildNumber = snapshot.data?.buildNumber ?? '320';
                   return Text(
                     TxaLanguage.t(
                       'current_version',

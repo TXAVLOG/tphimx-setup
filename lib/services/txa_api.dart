@@ -7,7 +7,8 @@ class TxaApi {
   static const String baseUrl = 'https://film.nrotxa.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '3.0.0';
+  static const String apiVersion = '3.2.0';
+  static const String buildNumber = '320';
 
   // Community Links
   static const String facebookFanpage =
@@ -52,6 +53,13 @@ class TxaApi {
   static const String changelog = '$apiPrefix/changelog';
   static const String hotSearch = '$apiPrefix/hot-search';
   static const String searchClick = '$apiPrefix/search-click';
+  static const String favorites = '$apiPrefix/favorites';
+  static const String toggleFavoriteUrl = '$apiPrefix/favorites/toggle';
+  static const String clearNotificationsUrl = '$apiPrefix/notifications/clear';
+  static const String readAllNotificationsUrl =
+      '$apiPrefix/notifications/read-all';
+  static const String clearWatchHistoryUrl = '$apiPrefix/watch-history/clear';
+  static const String updateWatchHistoryUrl = '$apiPrefix/watch-history/update';
 
   // Auth
   static const String authLogin = '/api/auth/login';
@@ -244,6 +252,54 @@ class TxaApi {
 
   Future<Map<String, dynamic>> markNotificationRead(String id) async {
     final response = await post(readNotification, data: {'id': id});
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> clearNotifications() async {
+    final response = await post(clearNotificationsUrl);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> markAllRead() async {
+    final response = await post(readAllNotificationsUrl);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> getFavorites() async {
+    final response = await get(favorites);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> toggleFavorite(int movieId) async {
+    final response = await post(toggleFavoriteUrl, data: {'movie_id': movieId});
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> getWatchHistory() async {
+    final response = await get(watchHistory);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> clearWatchHistory() async {
+    final response = await post(clearWatchHistoryUrl);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> updateWatchHistory({
+    required int movieId,
+    required int episodeId,
+    required double currentTime,
+    required double duration,
+  }) async {
+    final response = await post(
+      updateWatchHistoryUrl,
+      data: {
+        'movie_id': movieId,
+        'episode_id': episodeId,
+        'current_time': currentTime,
+        'duration': duration,
+      },
+    );
     return response.data;
   }
 
