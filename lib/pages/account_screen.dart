@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
@@ -338,12 +339,26 @@ class _AccountScreenState extends State<AccountScreen> {
               }
 
               // Logged in state
+              Map<String, dynamic>? initialUser;
+              try {
+                if (TxaSettings.userData.isNotEmpty) {
+                  initialUser = {'data': jsonDecode(TxaSettings.userData)};
+                }
+              } catch (_) {}
+
               return FutureBuilder<Map<String, dynamic>>(
+                initialData: initialUser,
                 future: Provider.of<TxaApi>(context, listen: false).getAuthMe(),
                 builder: (context, snapshot) {
-                  final user = snapshot.data?['data'];
-                  final name = user?['name'] ?? 'User';
-                  final email = user?['email'] ?? '...';
+                  final Map<String, dynamic>? userData = snapshot.data?['data'];
+
+                  // Update cache if we got fresh data
+                  if (snapshot.hasData && userData != null) {
+                    TxaSettings.userData = jsonEncode(userData);
+                  }
+
+                  final name = userData?['name'] ?? 'User';
+                  final email = userData?['email'] ?? '...';
                   final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
 
                   return Container(
@@ -397,6 +412,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         IconButton(
                           onPressed: () {
                             TxaSettings.authToken = '';
+                            TxaSettings.userData = '';
                             Provider.of<TxaApi>(
                               context,
                               listen: false,

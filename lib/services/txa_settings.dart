@@ -50,6 +50,9 @@ class TxaSettings {
   static String get authToken => _prefs.getString('auth_token') ?? '';
   static set authToken(String value) => _prefs.setString('auth_token', value);
 
+  static String get userData => _prefs.getString('user_data') ?? '';
+  static set userData(String value) => _prefs.setString('user_data', value);
+
   // Scheduled Movies
   static bool isMovieScheduled(String movieId) {
     return _prefs.getBool('sch_$movieId') ?? false;

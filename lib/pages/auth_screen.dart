@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:dio/dio.dart';
 import '../services/txa_api.dart';
@@ -83,7 +84,12 @@ class _AuthScreenState extends State<AuthScreen>
 
       if (res.data['success'] == true) {
         final token = res.data['data']['token'];
+        final userData = res.data['data']['user'];
+
         TxaSettings.authToken = token;
+        if (userData != null) {
+          TxaSettings.userData = jsonEncode(userData);
+        }
         api.setToken(token);
 
         if (mounted) {
@@ -419,8 +425,8 @@ class _AuthScreenState extends State<AuthScreen>
           const SizedBox(height: 16),
           _buildTextField(
             controller: _registerEmailController,
-            label: 'Email',
-            hint: 'Email',
+            label: TxaLanguage.t('email'),
+            hint: TxaLanguage.t('email'),
             icon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
             errorText: _registerEmailError,
