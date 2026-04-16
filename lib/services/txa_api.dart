@@ -66,24 +66,50 @@ class TxaApi {
     String path, {
     Map<String, dynamic>? queryParameters,
   }) async {
+    final startTime = DateTime.now();
     try {
-      return await _dio.get(path, queryParameters: queryParameters);
+      final response = await _dio.get(path, queryParameters: queryParameters);
+      TxaLogger.logApi(
+        method: 'GET',
+        path: path,
+        statusCode: response.statusCode,
+        response: response.data,
+        duration: DateTime.now().difference(startTime),
+      );
+      return response;
     } on DioException catch (e) {
-      TxaLogger.log(
-        'API GET Error [$path]: ${e.type} | Code: ${e.response?.statusCode} | Body: ${e.response?.data}',
-        isError: true,
+      TxaLogger.logApi(
+        method: 'GET',
+        path: path,
+        statusCode: e.response?.statusCode,
+        response: e.response?.data,
+        duration: DateTime.now().difference(startTime),
       );
       rethrow;
     }
   }
 
   Future<Response> post(String path, {dynamic data}) async {
+    final startTime = DateTime.now();
     try {
-      return await _dio.post(path, data: data);
+      final response = await _dio.post(path, data: data);
+      TxaLogger.logApi(
+        method: 'POST',
+        path: path,
+        statusCode: response.statusCode,
+        body: data,
+        response: response.data,
+        duration: DateTime.now().difference(startTime),
+      );
+      return response;
     } on DioException catch (e) {
-      TxaLogger.log(
-        'API POST Error [$path]: ${e.type} | Code: ${e.response?.statusCode}',
-        isError: true,
+      TxaLogger.logApi(
+        method: 'POST',
+        path: path,
+        statusCode: e.response?.statusCode,
+        body: data,
+        response: e.response?.data,
+        duration: DateTime.now().difference(startTime),
       );
       rethrow;
     }

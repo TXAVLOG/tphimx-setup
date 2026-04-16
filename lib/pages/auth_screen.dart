@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:dio/dio.dart';
 import '../services/txa_api.dart';
 import '../services/txa_settings.dart';
 import '../services/txa_language.dart';
@@ -28,6 +29,9 @@ class _AuthScreenState extends State<AuthScreen>
   bool _loading = false;
   bool _showLoginPassword = false;
   bool _showRegPassword = false;
+
+  String? _loginEmailError;
+  String? _loginPasswordError;
 
   @override
   void initState() {
@@ -60,7 +64,11 @@ class _AuthScreenState extends State<AuthScreen>
       return;
     }
 
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _loginEmailError = null;
+      _loginPasswordError = null;
+    });
     try {
       final api = Provider.of<TxaApi>(context, listen: false);
       final res = await api.login(email, password);
@@ -84,8 +92,28 @@ class _AuthScreenState extends State<AuthScreen>
         }
       }
     } catch (e) {
+      String errorMsg = TxaLanguage.t('error_login');
+      if (e is DioException) {
+        final data = e.response?.data;
+        if (data != null && data['message'] != null) {
+          errorMsg = data['message'];
+          final errorCode = data['data'] != null
+              ? data['data']['error_code']
+              : null;
+
+          setState(() {
+            if (errorCode == 'USER_NOT_FOUND') {
+              _loginEmailError = errorMsg;
+            } else if (errorCode == 'INVALID_PASSWORD') {
+              _loginPasswordError = errorMsg;
+            }
+          });
+        } else if (e.type == DioExceptionType.connectionTimeout) {
+          errorMsg = 'Kết nối quá hạn. Vui lòng thử lại.';
+        }
+      }
       if (mounted) {
-        TxaToast.show(context, TxaLanguage.t('error_login'), isError: true);
+        TxaToast.show(context, errorMsg, isError: true);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -136,8 +164,14 @@ class _AuthScreenState extends State<AuthScreen>
         }
       }
     } catch (e) {
+      String errorMsg = TxaLanguage.t('error_register');
+      if (e is DioException) {
+        if (e.response?.data != null && e.response?.data['message'] != null) {
+          errorMsg = e.response?.data['message'];
+        }
+      }
       if (mounted) {
-        TxaToast.show(context, TxaLanguage.t('error_register'), isError: true);
+        TxaToast.show(context, errorMsg, isError: true);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -292,6 +326,7 @@ class _AuthScreenState extends State<AuthScreen>
             hint: 'Email',
             icon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
+            errorText: _loginEmailError,
           ),
           const SizedBox(height: 20),
           _buildTextField(
@@ -302,6 +337,7 @@ class _AuthScreenState extends State<AuthScreen>
             showPassword: _showLoginPassword,
             onTogglePassword: () =>
                 setState(() => _showLoginPassword = !_showLoginPassword),
+            errorText: _loginPasswordError,
           ),
           const SizedBox(height: 12),
           Align(
@@ -378,38 +414,68 @@ class _AuthScreenState extends State<AuthScreen>
     bool? showPassword,
     VoidCallback? onTogglePassword,
     TextInputType? keyboardType,
+    String? errorText,
   }) {
-    return Container(
-      decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.05),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
-      ),
-      child: TextField(
-        controller: controller,
-        obscureText: isPassword && (showPassword == false),
-        keyboardType: keyboardType,
-        style: const TextStyle(color: Colors.white, fontSize: 15),
-        decoration: InputDecoration(
-          hintText: hint,
-          hintStyle: const TextStyle(color: TxaTheme.textMuted, fontSize: 14),
-          prefixIcon: Icon(icon, color: TxaTheme.accent, size: 20),
-          suffixIcon: isPassword && onTogglePassword != null
-              ? IconButton(
-                  onPressed: onTogglePassword,
-                  icon: Icon(
-                    showPassword!
-                        ? Icons.visibility_off_rounded
-                        : Icons.visibility_rounded,
-                    color: TxaTheme.textMuted,
-                    size: 20,
-                  ),
-                )
-              : null,
-          border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(vertical: 16),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: errorText != null
+                  ? Colors.redAccent.withValues(alpha: 0.5)
+                  : Colors.white.withValues(alpha: 0.1),
+              width: errorText != null ? 1.5 : 1,
+            ),
+          ),
+          child: TextField(
+            controller: controller,
+            obscureText: isPassword && (showPassword == false),
+            keyboardType: keyboardType,
+            style: const TextStyle(color: Colors.white, fontSize: 15),
+            decoration: InputDecoration(
+              hintText: hint,
+              hintStyle: const TextStyle(
+                color: TxaTheme.textMuted,
+                fontSize: 14,
+              ),
+              prefixIcon: Icon(
+                icon,
+                color: errorText != null ? Colors.redAccent : TxaTheme.accent,
+                size: 20,
+              ),
+              suffixIcon: isPassword && onTogglePassword != null
+                  ? IconButton(
+                      onPressed: onTogglePassword,
+                      icon: Icon(
+                        showPassword!
+                            ? Icons.visibility_off_rounded
+                            : Icons.visibility_rounded,
+                        color: TxaTheme.textMuted,
+                        size: 20,
+                      ),
+                    )
+                  : null,
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(vertical: 16),
+            ),
+          ),
         ),
-      ),
+        if (errorText != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 6, left: 12),
+            child: Text(
+              errorText,
+              style: const TextStyle(
+                color: Colors.redAccent,
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+      ],
     );
   }
 

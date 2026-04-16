@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:dio/dio.dart';
 import '../services/txa_api.dart';
 import '../theme/txa_theme.dart';
 import '../services/txa_language.dart';
 import '../utils/txa_format.dart';
+import 'auth_screen.dart';
 
 class NotificationScreen extends StatefulWidget {
   const NotificationScreen({super.key});
@@ -16,6 +18,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
   List<dynamic>? _items;
   bool _loading = true;
   String? _error;
+  bool _isUnauthorized = false;
 
   @override
   void initState() {
@@ -27,6 +30,7 @@ class _NotificationScreenState extends State<NotificationScreen> {
     setState(() {
       _loading = true;
       _error = null;
+      _isUnauthorized = false;
     });
     try {
       final api = Provider.of<TxaApi>(context, listen: false);
@@ -36,8 +40,15 @@ class _NotificationScreenState extends State<NotificationScreen> {
         _loading = false;
       });
     } catch (e) {
+      bool unauthorized = false;
+      if (e is DioException) {
+        if (e.response?.statusCode == 401) {
+          unauthorized = true;
+        }
+      }
       setState(() {
-        _error = e.toString();
+        _isUnauthorized = unauthorized;
+        _error = unauthorized ? null : e.toString();
         _loading = false;
       });
     }
@@ -90,14 +101,71 @@ class _NotificationScreenState extends State<NotificationScreen> {
       );
     }
 
+    if (_isUnauthorized) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
+              Icons.account_circle_outlined,
+              size: 80,
+              color: TxaTheme.textMuted.withValues(alpha: 0.5),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              TxaLanguage.t('login_required_notifications'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.w500,
+              ),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 32),
+            SizedBox(
+              height: 50,
+              width: 200,
+              child: ElevatedButton(
+                onPressed: () async {
+                  final result = await Navigator.push(
+                    context,
+                    MaterialPageRoute(builder: (c) => const AuthScreen()),
+                  );
+                  if (result == true) {
+                    _fetchNotifications();
+                  }
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: TxaTheme.accent,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  elevation: 8,
+                  shadowColor: TxaTheme.accent.withValues(alpha: 0.4),
+                ),
+                child: Text(
+                  TxaLanguage.t('login'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (_error != null) {
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
             const Icon(
-              Icons.error_outline_rounded,
-              size: 48,
+              Icons.cloud_off_rounded,
+              size: 64,
               color: Colors.redAccent,
             ),
             const SizedBox(height: 16),
@@ -106,13 +174,11 @@ class _NotificationScreenState extends State<NotificationScreen> {
               style: const TextStyle(color: TxaTheme.textMuted),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
+            TextButton.icon(
               onPressed: _fetchNotifications,
-              style: ElevatedButton.styleFrom(backgroundColor: TxaTheme.accent),
-              child: Text(
-                TxaLanguage.t('retry'),
-                style: const TextStyle(color: Colors.white),
-              ),
+              icon: const Icon(Icons.refresh_rounded),
+              label: Text(TxaLanguage.t('retry')),
+              style: TextButton.styleFrom(foregroundColor: TxaTheme.accent),
             ),
           ],
         ),
@@ -126,13 +192,13 @@ class _NotificationScreenState extends State<NotificationScreen> {
           children: [
             Icon(
               Icons.notifications_none_rounded,
-              size: 64,
-              color: TxaTheme.textMuted.withValues(alpha: 0.3),
+              size: 80,
+              color: TxaTheme.textMuted.withValues(alpha: 0.1),
             ),
             const SizedBox(height: 16),
             Text(
               TxaLanguage.t('no_notifications'),
-              style: const TextStyle(color: TxaTheme.textMuted),
+              style: const TextStyle(color: TxaTheme.textMuted, fontSize: 15),
             ),
           ],
         ),

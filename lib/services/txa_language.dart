@@ -241,6 +241,10 @@ class TxaLanguage {
       'login_success': 'Đăng nhập thành công',
       'register_success': 'Đăng ký thành công',
       'logout_confirm': 'Bạn có chắc chắn muốn đăng xuất?',
+      'app_slogan': 'Phim mới cực mượt - Xem là ghiền',
+      'error_empty_fields': 'Vui lòng điền đầy đủ các trường',
+      'error_password_mismatch': 'Mật khẩu xác nhận không khớp',
+      'login_required_notifications': 'Vui lòng đăng nhập để xem thông báo.',
     },
     'en': {
       'app_name': 'TPhimX Premium',
@@ -475,6 +479,10 @@ class TxaLanguage {
       'login_success': 'Login successful',
       'register_success': 'Registration successful',
       'logout_confirm': 'Are you sure you want to logout?',
+      'app_slogan': 'Smooth streaming - Watch and crave',
+      'error_empty_fields': 'Please fill in all fields',
+      'error_password_mismatch': 'Confirm password does not match',
+      'login_required_notifications': 'Please login to view notifications.',
     },
   };
 

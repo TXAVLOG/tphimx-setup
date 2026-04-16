@@ -14,7 +14,7 @@ class TxaLogger {
         isAndroid11Plus = true;
       }
     }
-    
+
     if (isAndroid11Plus) {
       // Premium path for granted "All Files" permission (Android Only)
       final dir = Directory('/storage/emulated/0/TPHIMX/Logs');
@@ -33,24 +33,60 @@ class TxaLogger {
     }
   }
 
-  static Future<void> log(String message, {bool isError = false}) async {
+  static Future<void> log(
+    String message, {
+    bool isError = false,
+    String? tag,
+  }) async {
     try {
       final path = await _logPath;
       final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
       final file = File('$path/app_$date.log');
-      
-      final timestamp = DateFormat('HH:mm:ss').format(DateTime.now());
-      final level = isError ? 'ERROR' : 'INFO';
-      final logLine = '[$timestamp] [$level] $message\n';
-      
+
+      final now = DateTime.now();
+      final timestamp = DateFormat('HH:mm:ss.SSS').format(now);
+      final level = isError ? 'ERROR' : 'INFO ';
+      final tagStr = tag != null ? '[$tag] ' : '';
+
+      // Build a premium formatted log line
+      final logLine = '[$timestamp] [$level] $tagStr$message\n';
+
       await file.writeAsString(logLine, mode: FileMode.append, flush: true);
-      
-      // Also print to console for development
-      if (isError) {
-        if (kDebugMode) debugPrint('TPHIMX-LOG-ERR: $message');
+
+      // Also print to console for development with colors/tags
+      if (kDebugMode) {
+        final consolePrefix = isError ? '❌ [TPHIMX-ERR]' : 'ℹ️ [TPHIMX-INF]';
+        debugPrint('$consolePrefix $tagStr$message');
       }
     } catch (e) {
       if (kDebugMode) debugPrint('CRITICAL: Failed to write to log file: $e');
     }
+  }
+
+  static Future<void> logApi({
+    required String method,
+    required String path,
+    int? statusCode,
+    dynamic body,
+    dynamic response,
+    Duration? duration,
+  }) async {
+    final isError = statusCode == null || statusCode >= 400;
+    final buffer = StringBuffer();
+    buffer.writeln('─── API ${method.toUpperCase()} ──────────────────────');
+    buffer.writeln('URL: $path');
+    if (statusCode != null) buffer.writeln('STATUS: $statusCode');
+    if (duration != null) buffer.writeln('TIME: ${duration.inMilliseconds}ms');
+
+    if (body != null) {
+      buffer.writeln('REQUEST BODY: $body');
+    }
+
+    if (response != null) {
+      buffer.writeln('RESPONSE: $response');
+    }
+    buffer.writeln('──────────────────────────────────────────────');
+
+    await log(buffer.toString(), isError: isError, tag: 'API');
   }
 }
