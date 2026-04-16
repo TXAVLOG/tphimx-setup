@@ -34,8 +34,9 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
   Widget build(BuildContext context) {
     return Consumer<TxaMiniPlayerProvider>(
       builder: (context, provider, child) {
-        if (provider.isClosed || !provider.isMini)
+        if (provider.isClosed || !provider.isMini) {
           return const SizedBox.shrink();
+        }
 
         return AnimatedPositioned(
           duration: _isDragging

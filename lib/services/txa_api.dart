@@ -7,7 +7,7 @@ class TxaApi {
   static const String baseUrl = 'https://film.nrotxa.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '2.7.2';
+  static const String apiVersion = '3.0.0';
 
   // Community Links
   static const String facebookFanpage =
@@ -167,6 +167,50 @@ class TxaApi {
       searchClick,
       data: {'movie_id': movieId, 'keyword': keyword, 'platform': 'app'},
     );
+    return response.data;
+  }
+
+  // Auth Methods
+  Future<Response> login(String email, String password) async {
+    return await post(authLogin, data: {'email': email, 'password': password});
+  }
+
+  Future<Response> register(
+    String name,
+    String email,
+    String password,
+    String confirmPw,
+  ) async {
+    return await post(
+      authRegister,
+      data: {
+        'name': name,
+        'email': email,
+        'password': password,
+        'password_confirmation': confirmPw,
+        'device_name': Platform.isIOS ? 'iPhone' : 'Android',
+      },
+    );
+  }
+
+  Future<Map<String, dynamic>> getAuthMe() async {
+    final response = await get(authMe);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> verifyEmail(String token) async {
+    final response = await post('/auth/verify-email', data: {'token': token});
+    return response.data;
+  }
+
+  // Notification Methods
+  Future<Map<String, dynamic>> getNotifications() async {
+    final response = await get(notifications);
+    return response.data;
+  }
+
+  Future<Map<String, dynamic>> markNotificationRead(String id) async {
+    final response = await post(readNotification, data: {'id': id});
     return response.data;
   }
 

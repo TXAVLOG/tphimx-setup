@@ -46,6 +46,23 @@ class TxaSettings {
   static double get brightness => _prefs.getDouble('player_brightness') ?? 0.5;
   static set brightness(double v) => _prefs.setDouble('player_brightness', v);
 
+  // --- Auth ---
+  static String get authToken => _prefs.getString('auth_token') ?? '';
+  static set authToken(String value) => _prefs.setString('auth_token', value);
+
+  // Scheduled Movies
+  static bool isMovieScheduled(String movieId) {
+    return _prefs.getBool('sch_$movieId') ?? false;
+  }
+
+  static void setMovieScheduled(String movieId, bool scheduled) {
+    if (scheduled) {
+      _prefs.setBool('sch_$movieId', true);
+    } else {
+      _prefs.remove('sch_$movieId');
+    }
+  }
+
   // --- iOS Specific ---
   static String get udid => _prefs.getString('ios_device_udid') ?? '';
   static set udid(String v) => _prefs.setString('ios_device_udid', v);

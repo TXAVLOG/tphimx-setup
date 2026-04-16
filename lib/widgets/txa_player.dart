@@ -816,6 +816,7 @@ class _TxaPlayerState extends State<TxaPlayer>
       if (hasPermission == false && enable) {
         // Pause playback before opening Android settings to request DND access
         _betterPlayerController?.pause();
+        if (!mounted) return;
         TxaToast.show(context, TxaLanguage.t('pip_permission_missing'));
       }
       await _dndChannel.invokeMethod('setDND', {'enable': enable});
@@ -1432,14 +1433,21 @@ class _TxaPlayerState extends State<TxaPlayer>
                               ),
                               const SizedBox(width: 32),
                               // SUBTITLE BUTTON
-                              _BottomBarItem(
-                                icon: Icons.subtitles_rounded,
-                                label: TxaLanguage.t('player_subtitle'),
-                                onTap: () => TxaToast.show(
-                                  context,
-                                  TxaLanguage.t('feature_dev'),
+                              if (serverName.toLowerCase().contains('sub') ||
+                                  serverName.toLowerCase().contains(
+                                    'vietsub',
+                                  ) ||
+                                  serverName.toLowerCase().contains(
+                                    'thuyết minh',
+                                  ))
+                                _BottomBarItem(
+                                  icon: Icons.subtitles_rounded,
+                                  label: TxaLanguage.t('player_subtitle'),
+                                  onTap: () => TxaToast.show(
+                                    context,
+                                    TxaLanguage.t('feature_dev'),
+                                  ),
                                 ),
-                              ),
                               const SizedBox(width: 32),
                               // NEXT EPISODE
                               if (_currentEpisodeIndex < serverData.length - 1)
@@ -1674,6 +1682,8 @@ class _TxaPlayerState extends State<TxaPlayer>
                   child: Slider(
                     value: pos.clamp(0.0, dur > 0 ? dur : 0.0),
                     max: dur > 0 ? dur : 1.0,
+                    label: _formatDuration(Duration(seconds: pos.toInt())),
+                    divisions: dur > 0 ? dur.toInt() : null,
                     onChanged: (v) {
                       _betterPlayerController!.seekTo(
                         Duration(seconds: v.toInt()),

@@ -25,21 +25,30 @@ class TxaFormat {
   }
 
   /// Format size (bytes to human readable)
-  static Map<String, dynamic> formatSize(int bytes, {int decimals = 2, bool padInteger = false}) {
+  static Map<String, dynamic> formatSize(
+    int bytes, {
+    int decimals = 2,
+    bool padInteger = false,
+  }) {
     if (bytes <= 0) return {'value': 0.0, 'unit': 'B', 'display': '0.00 B'};
     const units = ['B', 'KB', 'MB', 'GB', 'TB'];
     final double value = bytes.toDouble();
     const double base = 1024.0;
-    final int i = (math.log(value.abs()) / math.log(base)).floor().clamp(0, units.length - 1);
+    final int i = (math.log(value.abs()) / math.log(base)).floor().clamp(
+      0,
+      units.length - 1,
+    );
     final double unitValue = value / math.pow(base, i);
-    
+
     // Format with decimals
     String formatted = unitValue.toStringAsFixed(decimals); // e.g. "1.45"
     if (padInteger) {
       List<String> parts = formatted.split('.');
       String integerPart = parts[0].padLeft(2, '0');
       String decimalPart = parts.length > 1 ? parts[1] : '';
-      formatted = decimalPart.isNotEmpty ? "$integerPart.$decimalPart" : integerPart;
+      formatted = decimalPart.isNotEmpty
+          ? "$integerPart.$decimalPart"
+          : integerPart;
     }
 
     final String display = '$formatted ${units[i]}';
@@ -47,7 +56,10 @@ class TxaFormat {
   }
 
   /// Format speed (bytes/s to human readable)
-  static Map<String, dynamic> formatSpeed(double bytesPerSec, {int decimals = 2}) {
+  static Map<String, dynamic> formatSpeed(
+    double bytesPerSec, {
+    int decimals = 2,
+  }) {
     final sizeInfo = formatSize(bytesPerSec.toInt(), decimals: decimals);
     return {
       'value': sizeInfo['value'],
@@ -69,6 +81,17 @@ class TxaFormat {
     return parts.isEmpty ? '0 giây' : parts.join(' ');
   }
 
+  /// Relative time (ago) from String
+  static String formatTimeAgo(String dateStr) {
+    if (dateStr.isEmpty) return '';
+    try {
+      final date = DateTime.parse(dateStr);
+      return formatAgo(date);
+    } catch (e) {
+      return '';
+    }
+  }
+
   /// Relative time (ago)
   static String formatAgo(DateTime date) {
     final now = DateTime.now();
@@ -87,7 +110,7 @@ class TxaFormat {
     if (numVal == null) return '0';
     num val = numVal is num ? numVal : double.tryParse(numVal.toString()) ?? 0;
     if (val == 0) return '0';
-    
+
     if (compact) {
       final absVal = val.abs();
       if (absVal >= 1e9) {
@@ -106,7 +129,7 @@ class TxaFormat {
         return '${s}K';
       }
     }
-    
+
     final formatter = NumberFormat('#,###', 'en_US');
     return formatter.format(val);
   }

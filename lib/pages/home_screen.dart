@@ -4,6 +4,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import 'package:provider/provider.dart';
+import '../widgets/txa_loading.dart';
 import '../services/txa_api.dart';
 import '../services/txa_language.dart';
 import '../theme/txa_theme.dart';
@@ -11,6 +12,7 @@ import '../widgets/txa_nav.dart';
 import '../pages/search_screen.dart';
 import '../pages/schedule_screen.dart';
 import '../pages/account_screen.dart';
+import '../pages/notification_screen.dart';
 import '../pages/premium_screen.dart';
 import '../pages/category_list_screen.dart';
 import '../pages/movie_detail_screen.dart';
@@ -28,7 +30,7 @@ import '../widgets/txa_download_dialog.dart';
 import '../widgets/txa_error_widget.dart';
 import '../utils/txa_logger.dart';
 import '../utils/txa_format.dart';
-import '../widgets/txa_loading.dart';
+
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
@@ -43,15 +45,45 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
+  int _unreadNotifications = 0;
   DateTime? _lastBackPressTime;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+
+  late final List<Widget> _tabs = [
+    const _HomeTab(),
+    const SearchScreen(),
+    const ScheduleScreen(),
+    const NotificationScreen(),
+    const AccountScreen(),
+    if (Platform.isIOS) const PremiumScreen(),
+  ];
 
   @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkUpdate();
+      _fetchUnreadCount();
     });
+  }
+
+  Future<void> _fetchUnreadCount() async {
+    try {
+      final res = await Provider.of<TxaApi>(
+        context,
+        listen: false,
+      ).getNotifications();
+      final List items = res['data'] is List ? res['data'] : [];
+      if (mounted) {
+        setState(() {
+          _unreadNotifications = items
+              .where((i) => i['is_read'] != true)
+              .length;
+        });
+      }
+    } catch (e) {
+      // Ignore
+    }
   }
 
   Future<void> _checkUpdate({bool manual = false}) async {
@@ -334,20 +366,86 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
 
             Positioned.fill(
-              child: AnimatedSwitcher(
-                duration: const Duration(milliseconds: 300),
-                switchInCurve: Curves.easeOutCubic,
-                switchOutCurve: Curves.easeInCubic,
-                child: _buildTabBody(),
-              ),
+              child: IndexedStack(index: _currentIndex, children: _tabs),
             ),
+
+            // Home Header (Pinned) - Only show on Home Tab
+            if (_currentIndex == 0) _buildHomeHeader(),
 
             // TxaNav
             TxaNav(
               currentIndex: _currentIndex,
-              onTap: (index) => setState(() => _currentIndex = index),
+              unreadNotifications: _unreadNotifications,
+              onTap: (index) {
+                setState(() => _currentIndex = index);
+                if (index == 3) {
+                  setState(() => _unreadNotifications = 0);
+                }
+              },
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHomeHeader() {
+    return Positioned(
+      top: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent],
+          ),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              GestureDetector(
+                onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                child: const Icon(
+                  Icons.menu_rounded,
+                  color: Colors.white,
+                  size: 28,
+                ),
+              ),
+              Row(
+                children: [
+                  Image.asset('assets/logo.png', height: 24),
+                  const SizedBox(width: 8),
+                  Text(
+                    TxaLanguage.t('app_name'),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
+                ],
+              ),
+              Row(
+                children: [
+                  _GlassIconBtn(
+                    icon: Icons.search_rounded,
+                    onTap: () => setState(() => _currentIndex = 1),
+                  ),
+                  const SizedBox(width: 8),
+                  _GlassIconBtn(
+                    icon: Icons.settings_rounded,
+                    onTap: () => setState(() => _currentIndex = 3),
+                  ),
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -552,8 +650,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '2.4.0';
-                  final build = snapshot.data?.buildNumber ?? '240';
+                  final version = snapshot.data?.version ?? '3.0.0';
+                  final build = snapshot.data?.buildNumber ?? '300';
                   return Text(
                     'Version $version (Build $build)',
                     style: const TextStyle(
@@ -569,33 +667,13 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
     );
   }
-
-  Widget _buildTabBody() {
-    final langKey = TxaLanguage.currentLang;
-    switch (_currentIndex) {
-      case 0:
-        return Builder(
-          builder: (ctx) => _HomeTab(key: ValueKey('home_$langKey')),
-        );
-      case 1:
-        return SearchScreen(key: ValueKey('search_$langKey'));
-      case 2:
-        return ScheduleScreen(key: ValueKey('schedule_$langKey'));
-      case 3:
-        return AccountScreen(key: ValueKey('account_$langKey'));
-      case 4:
-        return PremiumScreen(key: ValueKey('premium_$langKey'));
-      default:
-        return _HomeTab(key: ValueKey('home_$langKey'));
-    }
-  }
 }
 
 // =====================================================
 // HOME TAB — Trang Chủ (Ported from Ionic Home.jsx)
 // =====================================================
 class _HomeTab extends StatefulWidget {
-  const _HomeTab({super.key});
+  const _HomeTab();
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -645,12 +723,14 @@ class _HomeTabState extends State<_HomeTab> {
     final List<Map<String, dynamic>> sections = [];
 
     List getListData(String key) {
+      if (_data == null) return [];
       final val = _data![key];
       if (val is Map) return val['data'] as List? ?? [];
       return val as List? ?? [];
     }
 
     String getTitle(String key, String fallbackCode) {
+      if (_data == null) return TxaLanguage.t(fallbackCode);
       final val = _data![key];
       if (val is Map && val['title'] != null) {
         return TxaLanguage.t(val['title']);
@@ -658,84 +738,86 @@ class _HomeTabState extends State<_HomeTab> {
       return TxaLanguage.t(fallbackCode);
     }
 
-    final latest = getListData('latest').isEmpty
-        ? getListData('items')
-        : getListData('latest');
-    final hot = getListData('hot');
-    final anime = getListData('anime');
-    final series = getListData('series');
-    final single = getListData('single');
-    final cartoon = getListData('cartoon');
-    final tvshows = getListData('tvshows');
-    final theater = getListData('theater');
-    final featured = _data!['featured'] as List? ?? [];
-    final categories = _data!['categories'] as List? ?? [];
+    if (_data != null) {
+      final latest = getListData('latest').isEmpty
+          ? getListData('items')
+          : getListData('latest');
+      final hot = getListData('hot');
+      final anime = getListData('anime');
+      final series = getListData('series');
+      final single = getListData('single');
+      final cartoon = getListData('cartoon');
+      final tvshows = getListData('tvshows');
+      final theater = getListData('theater');
 
-    if (latest.isNotEmpty) {
-      sections.add({
-        'title': getTitle('latest', 'TXA_NEW1'),
-        'movies': latest,
-        'key': 'latest',
-      });
+      if (latest.isNotEmpty) {
+        sections.add({
+          'title': getTitle('latest', 'TXA_NEW1'),
+          'movies': latest,
+          'key': 'latest',
+        });
+      }
+
+      if (hot.isNotEmpty) {
+        sections.add({
+          'title': '🔥 ${getTitle('hot', 'TXA_HOT1')}',
+          'movies': hot,
+          'key': 'hot',
+        });
+      }
+
+      if (anime.isNotEmpty) {
+        sections.add({
+          'title': '🎌 ${getTitle('anime', 'TXA_HH1')}',
+          'movies': anime,
+          'key': 'anime',
+        });
+      }
+
+      if (series.isNotEmpty) {
+        sections.add({
+          'title': '📺 ${getTitle('series', 'TXA_PB1')}',
+          'movies': series,
+          'key': 'series',
+        });
+      }
+
+      if (single.isNotEmpty) {
+        sections.add({
+          'title': '🎬 ${getTitle('single', 'TXA_PL1')}',
+          'movies': single,
+          'key': 'single',
+        });
+      }
+
+      if (cartoon.isNotEmpty) {
+        sections.add({
+          'title': '✨ ${getTitle('cartoon', 'TXA_HH1')}',
+          'movies': cartoon,
+          'key': 'cartoon',
+        });
+      }
+
+      if (tvshows.isNotEmpty) {
+        sections.add({
+          'title': '🎭 ${getTitle('tvshows', 'TXA_TV1')}',
+          'movies': tvshows,
+          'key': 'tvshows',
+        });
+      }
+
+      if (theater.isNotEmpty) {
+        sections.add({
+          'title': '🍿 ${getTitle('theater', 'TXA_CR1')}',
+          'movies': theater,
+          'key': 'theater',
+        });
+      }
     }
 
-    if (hot.isNotEmpty) {
-      sections.add({
-        'title': '🔥 ${getTitle('hot', 'TXA_HOT1')}',
-        'movies': hot,
-        'key': 'hot',
-      });
-    }
+    final featured = _data?['featured'] as List? ?? [];
+    final categories = _data?['categories'] as List? ?? [];
 
-    if (anime.isNotEmpty) {
-      sections.add({
-        'title': '🎌 ${getTitle('anime', 'TXA_HH1')}',
-        'movies': anime,
-        'key': 'anime',
-      });
-    }
-
-    if (series.isNotEmpty) {
-      sections.add({
-        'title': '📺 ${getTitle('series', 'TXA_PB1')}',
-        'movies': series,
-        'key': 'series',
-      });
-    }
-
-    if (single.isNotEmpty) {
-      sections.add({
-        'title': '🎬 ${getTitle('single', 'TXA_PL1')}',
-        'movies': single,
-        'key': 'single',
-      });
-    }
-
-    if (cartoon.isNotEmpty) {
-      sections.add({
-        'title': '✨ ${getTitle('cartoon', 'TXA_HH1')}',
-        'movies': cartoon,
-        'key': 'cartoon',
-      });
-    }
-
-    if (tvshows.isNotEmpty) {
-      sections.add({
-        'title': '🎭 ${getTitle('tvshows', 'TXA_TV1')}',
-        'movies': tvshows,
-        'key': 'tvshows',
-      });
-    }
-
-    if (theater.isNotEmpty) {
-      sections.add({
-        'title': '🍿 ${getTitle('theater', 'TXA_CR1')}',
-        'movies': theater,
-        'key': 'theater',
-      });
-    }
-
-    // Filter
     final filteredSections = _activeFilter == 'all'
         ? sections
         : [
@@ -749,313 +831,306 @@ class _HomeTabState extends State<_HomeTab> {
 
     return Container(
       color: TxaTheme.primaryBg,
-      child: Stack(
-        children: [
-          if (_loading)
-            TxaLoading(message: TxaLanguage.t('loading_home'))
-          else if (_error != null || _data == null)
-            TxaErrorWidget(
-              message: TxaLanguage.t('error_loading_data'),
-              technicalDetails: _error,
-              onRetry: _loadHome,
-            )
-          else
-            RefreshIndicator(
-              onRefresh: _loadHome,
-              color: TxaTheme.accent,
-              child: CustomScrollView(
-                physics: const BouncingScrollPhysics(
-                  parent: AlwaysScrollableScrollPhysics(),
-                ),
-                slivers: [
-                  // Hero Slider
-                  SliverToBoxAdapter(
-                    child: featured.isNotEmpty
-                        ? _HeroSlider(movies: featured.take(10).toList())
-                        : const SizedBox(height: 100),
-                  ),
+      child: RefreshIndicator(
+        onRefresh: _loadHome,
+        color: TxaTheme.accent,
+        child: CustomScrollView(
+          physics: const BouncingScrollPhysics(
+            parent: AlwaysScrollableScrollPhysics(),
+          ),
+          slivers: [
+            // Spacer for Pinned Header (MediaQuery top + header height)
+            SliverToBoxAdapter(
+              child: SizedBox(height: MediaQuery.of(context).padding.top + 60),
+            ),
 
-                  // Filter Tabs
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(0, 12, 0, 4),
-                      child: SizedBox(
-                        height: 34,
-                        child: ListView(
-                          scrollDirection: Axis.horizontal,
-                          physics: const BouncingScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+            if (_loading)
+              SliverToBoxAdapter(
+                child: SingleChildScrollView(
+                  physics: const NeverScrollableScrollPhysics(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Skeleton HeroSlider
+                      const Padding(
+                        padding: EdgeInsets.all(16),
+                        child: TxaSkeleton(
+                          width: double.infinity,
+                          height: 300,
+                          borderRadius: 16,
+                        ),
+                      ),
+                      // Skeleton FilterChips
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: List.generate(
+                            4,
+                            (i) => const TxaSkeleton(
+                              width: 80,
+                              height: 30,
+                              borderRadius: 15,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      // Skeleton MovieSections
+                      ...List.generate(
+                        2,
+                        (i) => Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            _FilterChip(
-                              label: TxaLanguage.t('recommendation'),
-                              isActive: _activeFilter == 'all',
-                              onTap: () =>
-                                  setState(() => _activeFilter = 'all'),
+                            const Padding(
+                              padding: EdgeInsets.symmetric(horizontal: 16),
+                              child: TxaSkeleton(width: 120, height: 16),
                             ),
-                            _FilterChip(
-                              label: TxaLanguage.t('series_movies'),
-                              isActive: _activeFilter == 'series',
-                              onTap: () =>
-                                  setState(() => _activeFilter = 'series'),
-                            ),
-                            _FilterChip(
-                              label: TxaLanguage.t('single_movies'),
-                              isActive: _activeFilter == 'single',
-                              onTap: () =>
-                                  setState(() => _activeFilter = 'single'),
-                            ),
-                            ...categories
-                                .take(6)
-                                .map<Widget>(
-                                  (cat) => _FilterChip(
-                                    label: cat['name'] ?? '',
-                                    isActive: false,
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (ctx) => CategoryListScreen(
-                                            title: cat['name'] ?? '',
-                                            slug: cat['slug'],
-                                          ),
-                                        ),
-                                      );
-                                    },
+                            const SizedBox(height: 16),
+                            SizedBox(
+                              height: 170,
+                              child: ListView.builder(
+                                scrollDirection: Axis.horizontal,
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 16,
+                                ),
+                                itemCount: 5,
+                                physics: const NeverScrollableScrollPhysics(),
+                                itemBuilder: (ctx, idx) => const Padding(
+                                  padding: EdgeInsets.only(right: 12),
+                                  child: TxaSkeleton(
+                                    width: 120,
+                                    height: 170,
+                                    borderRadius: 12,
                                   ),
                                 ),
+                              ),
+                            ),
+                            const SizedBox(height: 32),
                           ],
                         ),
                       ),
-                    ),
+                    ],
                   ),
+                ),
+              )
+            else if (_error != null || _data == null)
+              SliverFillRemaining(
+                hasScrollBody: false,
+                child: TxaErrorWidget(
+                  message: TxaLanguage.t('error_loading_data'),
+                  technicalDetails: _error,
+                  onRetry: _loadHome,
+                ),
+              )
+            else ...[
+              // Hero Slider
+              SliverToBoxAdapter(
+                child: featured.isNotEmpty
+                    ? _HeroSlider(movies: featured.take(10).toList())
+                    : const SizedBox(height: 100),
+              ),
 
-                  // Popular Categories ("Bạn đang quan tâm gì?")
-                  if (categories.isNotEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  TxaLanguage.t('trending_categories'),
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
-                                  ),
-                                ),
-                                Text(
-                                  TxaLanguage.t('more'),
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: TxaTheme.textMuted,
-                                  ),
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            SizedBox(
-                              height: 75,
-                              child: ListView.builder(
-                                scrollDirection: Axis.horizontal,
-                                physics: const BouncingScrollPhysics(),
-                                itemCount: categories.take(8).length,
-                                itemBuilder: (ctx, i) {
-                                  final cat = categories[i];
-                                  final colors = [
-                                    [
-                                      const Color(0xFFFACC15),
-                                      const Color(0xFFEA580C),
-                                    ], // Yellow-Orange
-                                    [
-                                      const Color(0xFFF87171),
-                                      const Color(0xFFDC2626),
-                                    ], // Red
-                                    [
-                                      const Color(0xFFF472B6),
-                                      const Color(0xFFDB2777),
-                                    ], // Pink
-                                    [
-                                      const Color(0xFF4ADE80),
-                                      const Color(0xFF16A34A),
-                                    ], // Green
-                                    [
-                                      const Color(0xFF60A5FA),
-                                      const Color(0xFF2563EB),
-                                    ], // Blue
-                                    [
-                                      const Color(0xFFC084FC),
-                                      const Color(0xFF9333EA),
-                                    ], // Purple
-                                  ];
-                                  final colorSet = colors[i % colors.length];
-                                  return GestureDetector(
-                                    onTap: () {
-                                      Navigator.push(
-                                        context,
-                                        MaterialPageRoute(
-                                          builder: (ctx) => CategoryListScreen(
-                                            title: cat['name'] ?? '',
-                                            slug: cat['slug'],
-                                          ),
-                                        ),
-                                      );
-                                    },
-                                    child: Container(
-                                      width: 135,
-                                      margin: const EdgeInsets.only(right: 12),
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: colorSet,
-                                          begin: Alignment.topLeft,
-                                          end: Alignment.bottomRight,
-                                        ),
-                                        borderRadius: BorderRadius.circular(12),
-                                      ),
-                                      child: Padding(
-                                        padding: const EdgeInsets.all(12.0),
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          mainAxisAlignment:
-                                              MainAxisAlignment.center,
-                                          children: [
-                                            Text(
-                                              cat['name'] ?? '',
-                                              maxLines: 1,
-                                              overflow: TextOverflow.ellipsis,
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontWeight: FontWeight.bold,
-                                                fontSize: 13,
-                                              ),
-                                            ),
-                                            const SizedBox(height: 2),
-                                            Text(
-                                              TxaLanguage.t(
-                                                'all_movies_count',
-                                              ).replaceAll(
-                                                '%count',
-                                                (cat['count'] ?? '20+')
-                                                    .toString(),
-                                              ),
-                                              style: const TextStyle(
-                                                color: Colors.white70,
-                                                fontSize: 10,
-                                              ),
-                                            ),
-                                          ],
-                                        ),
+              // Filter Tabs
+              SliverToBoxAdapter(
+                child: Padding(
+                  padding: const EdgeInsets.fromLTRB(0, 12, 0, 4),
+                  child: SizedBox(
+                    height: 34,
+                    child: ListView(
+                      scrollDirection: Axis.horizontal,
+                      physics: const BouncingScrollPhysics(),
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      children: [
+                        _FilterChip(
+                          label: TxaLanguage.t('recommendation'),
+                          isActive: _activeFilter == 'all',
+                          onTap: () => setState(() => _activeFilter = 'all'),
+                        ),
+                        _FilterChip(
+                          label: TxaLanguage.t('series_movies'),
+                          isActive: _activeFilter == 'series',
+                          onTap: () => setState(() => _activeFilter = 'series'),
+                        ),
+                        _FilterChip(
+                          label: TxaLanguage.t('single_movies'),
+                          isActive: _activeFilter == 'single',
+                          onTap: () => setState(() => _activeFilter = 'single'),
+                        ),
+                        ...categories
+                            .take(6)
+                            .map<Widget>(
+                              (cat) => _FilterChip(
+                                label: cat['name'] ?? '',
+                                isActive: false,
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (ctx) => CategoryListScreen(
+                                        title: cat['name'] ?? '',
+                                        slug: cat['slug'],
                                       ),
                                     ),
                                   );
                                 },
                               ),
                             ),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  // Movie Sections
-                  ...filteredSections.map(
-                    (section) => SliverToBoxAdapter(
-                      child: _MovieSection(
-                        title: section['title'],
-                        movies: section['movies'],
-                        sectionKey: section['key'],
-                      ),
+                      ],
                     ),
                   ),
-
-                  // Bottom spacer
-                  const SliverToBoxAdapter(child: SizedBox(height: 100)),
-                ],
-              ),
-            ),
-
-          // Floating Action Header (Pinned on top)
-          Positioned(
-            top: 0,
-            left: 0,
-            right: 0,
-            child: Container(
-              padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.black.withValues(alpha: 0.8),
-                    Colors.transparent,
-                  ],
                 ),
               ),
-              child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    GestureDetector(
-                      onTap: () {
-                        Scaffold.of(context).openDrawer();
-                      },
-                      child: const Icon(
-                        Icons.menu_rounded,
-                        color: Colors.white,
-                        size: 28,
-                      ),
-                    ),
-                    Row(
+
+              // Popular Categories
+              if (categories.isNotEmpty)
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Image.asset('assets/logo.png', height: 24),
-                        const SizedBox(width: 8),
-                        Text(
-                          TxaLanguage.t('app_name'),
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Text(
+                              TxaLanguage.t('trending_categories'),
+                              style: const TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                            Text(
+                              TxaLanguage.t('more'),
+                              style: const TextStyle(
+                                fontSize: 12,
+                                color: TxaTheme.textMuted,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          height: 75,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            physics: const BouncingScrollPhysics(),
+                            itemCount: categories.take(8).length,
+                            itemBuilder: (ctx, i) {
+                              final cat = categories[i];
+                              final colors = [
+                                [
+                                  const Color(0xFFFACC15),
+                                  const Color(0xFFEA580C),
+                                ],
+                                [
+                                  const Color(0xFFF87171),
+                                  const Color(0xFFDC2626),
+                                ],
+                                [
+                                  const Color(0xFFF472B6),
+                                  const Color(0xFFDB2777),
+                                ],
+                                [
+                                  const Color(0xFF4ADE80),
+                                  const Color(0xFF16A34A),
+                                ],
+                                [
+                                  const Color(0xFF60A5FA),
+                                  const Color(0xFF2563EB),
+                                ],
+                                [
+                                  const Color(0xFFC084FC),
+                                  const Color(0xFF9333EA),
+                                ],
+                              ];
+                              final colorSet = colors[i % colors.length];
+                              return GestureDetector(
+                                onTap: () {
+                                  Navigator.push(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (ctx) => CategoryListScreen(
+                                        title: cat['name'] ?? '',
+                                        slug: cat['slug'],
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  width: 135,
+                                  margin: const EdgeInsets.only(right: 12),
+                                  decoration: BoxDecoration(
+                                    gradient: LinearGradient(
+                                      colors: colorSet,
+                                      begin: Alignment.topLeft,
+                                      end: Alignment.bottomRight,
+                                    ),
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                  child: Padding(
+                                    padding: const EdgeInsets.all(12.0),
+                                    child: Column(
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
+                                      mainAxisAlignment:
+                                          MainAxisAlignment.center,
+                                      children: [
+                                        Text(
+                                          cat['name'] ?? '',
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontWeight: FontWeight.bold,
+                                            fontSize: 13,
+                                          ),
+                                        ),
+                                        const SizedBox(height: 2),
+                                        Text(
+                                          TxaLanguage.t(
+                                            'all_movies_count',
+                                          ).replaceAll(
+                                            '%count',
+                                            (cat['count'] ?? '20+').toString(),
+                                          ),
+                                          style: const TextStyle(
+                                            color: Colors.white70,
+                                            fontSize: 10,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
                           ),
                         ),
                       ],
                     ),
-                    Row(
-                      children: [
-                        _GlassIconBtn(
-                          icon: Icons.search_rounded,
-                          onTap: () => _changeTab(1),
-                        ),
-                        const SizedBox(width: 8),
-                        _GlassIconBtn(
-                          icon: Icons.settings_rounded,
-                          onTap: () => _changeTab(3),
-                        ),
-                      ],
-                    ),
-                  ],
+                  ),
+                ),
+
+              // Movie Sections
+              ...filteredSections.map(
+                (section) => SliverToBoxAdapter(
+                  child: _MovieSection(
+                    title: section['title'],
+                    movies: section['movies'],
+                    sectionKey: section['key'],
+                  ),
                 ),
               ),
-            ),
-          ),
-        ],
+            ],
+
+            // Bottom spacer
+            const SliverToBoxAdapter(child: SizedBox(height: 100)),
+          ],
+        ),
       ),
     );
-  }
-
-  // Method to safely switch tabs from within this child widget
-  void _changeTab(int index) {
-    final parentState = context.findAncestorStateOfType<_HomeScreenState>();
-    if (parentState != null) {
-      parentState.setState(() {
-        parentState._currentIndex = index;
-      });
-    }
   }
 }
 

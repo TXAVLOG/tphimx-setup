@@ -1,9 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:permission_handler/permission_handler.dart';
+import 'package:intl/intl.dart';
 import 'package:provider/provider.dart';
 import '../services/txa_api.dart';
 import '../theme/txa_theme.dart';
 import '../services/txa_language.dart';
+import '../utils/txa_toast.dart';
+import '../services/txa_settings.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -31,7 +37,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   Future<void> _fetchSchedule() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() {
+      _loading = true;
+      _error = null;
+    });
     try {
       final api = Provider.of<TxaApi>(context, listen: false);
       final res = await api.getSchedule();
@@ -41,7 +50,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         _loading = false;
       });
     } catch (e) {
-      setState(() { _error = e.toString(); _loading = false; });
+      setState(() {
+        _error = e.toString();
+        _loading = false;
+      });
     }
   }
 
@@ -57,7 +69,8 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   List<dynamic> _getMoviesForDate(DateTime date) {
     if (_data == null) return [];
-    final dateStr = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    final dateStr =
+        '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
     for (final group in _data!) {
       if (group['date'] == dateStr) {
         return group['movies'] as List? ?? [];
@@ -75,7 +88,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   void _handleMonthSelect(int monthIdx) {
     setState(() {
-      _selectedDate = DateTime(_pivotDate.year, monthIdx + 1, _selectedDate.day);
+      _selectedDate = DateTime(
+        _pivotDate.year,
+        monthIdx + 1,
+        _selectedDate.day,
+      );
       // Ensure day is valid for that month
       if (_selectedDate.month != monthIdx + 1) {
         _selectedDate = DateTime(_pivotDate.year, monthIdx + 2, 0);
@@ -100,7 +117,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       isScrollControlled: true,
       builder: (ctx) => StatefulBuilder(
         builder: (context, setModalState) => Container(
-          decoration: const BoxDecoration(color: TxaTheme.primaryBg, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+          decoration: const BoxDecoration(
+            color: TxaTheme.primaryBg,
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
           padding: const EdgeInsets.all(24),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -109,19 +129,46 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   IconButton(
-                    icon: const Icon(Icons.chevron_left_rounded, color: Colors.white),
-                    onPressed: () => setModalState(() => _pivotDate = DateTime(_pivotDate.year - 1, _pivotDate.month, 1)),
+                    icon: const Icon(
+                      Icons.chevron_left_rounded,
+                      color: Colors.white,
+                    ),
+                    onPressed: () => setModalState(
+                      () => _pivotDate = DateTime(
+                        _pivotDate.year - 1,
+                        _pivotDate.month,
+                        1,
+                      ),
+                    ),
                   ),
                   GestureDetector(
                     onTap: () {
                       Navigator.pop(context);
                       _showYearPicker();
                     },
-                    child: Text(TxaLanguage.t('year_label').replaceAll('%year', _pivotDate.year.toString()), style: const TextStyle(color: TxaTheme.accent, fontWeight: FontWeight.bold, fontSize: 18)),
+                    child: Text(
+                      TxaLanguage.t(
+                        'year_label',
+                      ).replaceAll('%year', _pivotDate.year.toString()),
+                      style: const TextStyle(
+                        color: TxaTheme.accent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.chevron_right_rounded, color: Colors.white),
-                    onPressed: () => setModalState(() => _pivotDate = DateTime(_pivotDate.year + 1, _pivotDate.month, 1)),
+                    icon: const Icon(
+                      Icons.chevron_right_rounded,
+                      color: Colors.white,
+                    ),
+                    onPressed: () => setModalState(
+                      () => _pivotDate = DateTime(
+                        _pivotDate.year + 1,
+                        _pivotDate.month,
+                        1,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -129,10 +176,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 2, mainAxisSpacing: 10, crossAxisSpacing: 10),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  childAspectRatio: 2,
+                  mainAxisSpacing: 10,
+                  crossAxisSpacing: 10,
+                ),
                 itemCount: 12,
                 itemBuilder: (ctx, i) {
-                  final isSelected = _selectedDate.month == i + 1 && _selectedDate.year == _pivotDate.year;
+                  final isSelected =
+                      _selectedDate.month == i + 1 &&
+                      _selectedDate.year == _pivotDate.year;
                   return GestureDetector(
                     onTap: () => _handleMonthSelect(i),
                     child: Container(
@@ -142,7 +196,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         border: Border.all(color: TxaTheme.glassBorder),
                       ),
                       alignment: Alignment.center,
-                      child: Text(_months[i], style: TextStyle(color: isSelected ? Colors.white : TxaTheme.textPrimary, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        _months[i],
+                        style: TextStyle(
+                          color: isSelected
+                              ? Colors.white
+                              : TxaTheme.textPrimary,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   );
                 },
@@ -163,7 +225,10 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         builder: (context, setModalState) {
           final curStart = (_pivotDate.year ~/ 10) * 10 - 1;
           return Container(
-            decoration: const BoxDecoration(color: TxaTheme.primaryBg, borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+            decoration: const BoxDecoration(
+              color: TxaTheme.primaryBg,
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+            ),
             padding: const EdgeInsets.all(24),
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -172,13 +237,30 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     IconButton(
-                      icon: const Icon(Icons.chevron_left_rounded, color: Colors.white),
-                      onPressed: () => setModalState(() => _pivotDate = DateTime(_pivotDate.year - 10, 1, 1)),
+                      icon: const Icon(
+                        Icons.chevron_left_rounded,
+                        color: Colors.white,
+                      ),
+                      onPressed: () => setModalState(
+                        () => _pivotDate = DateTime(_pivotDate.year - 10, 1, 1),
+                      ),
                     ),
-                    Text('$curStart - ${curStart + 11}', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18)),
+                    Text(
+                      '$curStart - ${curStart + 11}',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                      ),
+                    ),
                     IconButton(
-                      icon: const Icon(Icons.chevron_right_rounded, color: Colors.white),
-                      onPressed: () => setModalState(() => _pivotDate = DateTime(_pivotDate.year + 10, 1, 1)),
+                      icon: const Icon(
+                        Icons.chevron_right_rounded,
+                        color: Colors.white,
+                      ),
+                      onPressed: () => setModalState(
+                        () => _pivotDate = DateTime(_pivotDate.year + 10, 1, 1),
+                      ),
                     ),
                   ],
                 ),
@@ -186,7 +268,12 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                 GridView.builder(
                   shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 2, mainAxisSpacing: 10, crossAxisSpacing: 10),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 3,
+                    childAspectRatio: 2,
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                  ),
                   itemCount: 12,
                   itemBuilder: (ctx, i) {
                     final year = curStart + i;
@@ -201,7 +288,17 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                           border: Border.all(color: TxaTheme.glassBorder),
                         ),
                         alignment: Alignment.center,
-                        child: Text('$year', style: TextStyle(color: isSelected ? Colors.white : (isSibling ? TxaTheme.textMuted : TxaTheme.textPrimary), fontWeight: FontWeight.bold)),
+                        child: Text(
+                          '$year',
+                          style: TextStyle(
+                            color: isSelected
+                                ? Colors.white
+                                : (isSibling
+                                      ? TxaTheme.textMuted
+                                      : TxaTheme.textPrimary),
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     );
                   },
@@ -216,9 +313,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
 
   String _formatEpisodeLabel(dynamic movie) {
     if (movie['type'] == 'single') return TxaLanguage.t('movie_single');
-    String val = (movie['next_episode_name'] ?? movie['episode_current'] ?? '1').toString().trim();
+    String val = (movie['next_episode_name'] ?? movie['episode_current'] ?? '1')
+        .toString()
+        .trim();
     if (val.isEmpty) return TxaLanguage.t('unknown_episode');
-    
+
     // Check if it already has "Tập" or "tap" prefix (case insensitive)
     final hasTapPrefix = RegExp(r'^tập\s', caseSensitive: false).hasMatch(val);
     if (!hasTapPrefix) {
@@ -228,13 +327,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           final number = match.group(1);
           final suffix = match.group(2)?.trim() ?? "";
           if (suffix.isNotEmpty) {
-            final formattedSuffix = suffix[0].toUpperCase() + suffix.substring(1);
+            final formattedSuffix =
+                suffix[0].toUpperCase() + suffix.substring(1);
             return "${TxaLanguage.t('episode')} $number ($formattedSuffix)";
           } else {
             return "${TxaLanguage.t('episode')} $number";
           }
         }
-      } else if (!val.toLowerCase().contains('full') && !val.toLowerCase().contains('tập') && !val.toLowerCase().contains('episode')) {
+      } else if (!val.toLowerCase().contains('full') &&
+          !val.toLowerCase().contains('tập') &&
+          !val.toLowerCase().contains('episode')) {
         return "${TxaLanguage.t('episode')} $val";
       }
     }
@@ -242,7 +344,20 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
   }
 
   static const _daysShort = ['T2', 'T3', 'T4', 'T5', 'T6', 'T7', 'CN'];
-  static const _months = ['Th1', 'Th2', 'Th3', 'Th4', 'Th5', 'Th6', 'Th7', 'Th8', 'Th9', 'Th10', 'Th11', 'Th12'];
+  static const _months = [
+    'Th1',
+    'Th2',
+    'Th3',
+    'Th4',
+    'Th5',
+    'Th6',
+    'Th7',
+    'Th8',
+    'Th9',
+    'Th10',
+    'Th11',
+    'Th12',
+  ];
 
   @override
   Widget build(BuildContext context) {
@@ -260,14 +375,26 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   onTap: _showMonthPicker,
                   child: Row(
                     children: [
-                      const Icon(Icons.calendar_today_rounded, color: TxaTheme.accent, size: 18),
+                      const Icon(
+                        Icons.calendar_today_rounded,
+                        color: TxaTheme.accent,
+                        size: 18,
+                      ),
                       const SizedBox(width: 8),
                       Text(
                         '${_months[_selectedDate.month - 1]}, ${_selectedDate.year}',
-                        style: const TextStyle(color: TxaTheme.textPrimary, fontSize: 15, fontWeight: FontWeight.w600),
+                        style: const TextStyle(
+                          color: TxaTheme.textPrimary,
+                          fontSize: 15,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                       const SizedBox(width: 4),
-                      const Icon(Icons.keyboard_arrow_down_rounded, color: TxaTheme.textMuted, size: 16),
+                      const Icon(
+                        Icons.keyboard_arrow_down_rounded,
+                        color: TxaTheme.textMuted,
+                        size: 16,
+                      ),
                     ],
                   ),
                 ),
@@ -278,12 +405,22 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                       _pivotDate = _today;
                     }),
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 10,
+                        vertical: 4,
+                      ),
                       decoration: BoxDecoration(
                         color: TxaTheme.accent.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(10),
                       ),
-                      child: Text(TxaLanguage.t('today'), style: const TextStyle(color: TxaTheme.accent, fontSize: 11, fontWeight: FontWeight.w600)),
+                      child: Text(
+                        TxaLanguage.t('today'),
+                        style: const TextStyle(
+                          color: TxaTheme.accent,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -301,13 +438,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   onTap: () => _changeWeek(-1),
                   child: const Padding(
                     padding: EdgeInsets.all(6),
-                    child: Icon(Icons.chevron_left_rounded, color: TxaTheme.textSecondary, size: 22),
+                    child: Icon(
+                      Icons.chevron_left_rounded,
+                      color: TxaTheme.textSecondary,
+                      size: 22,
+                    ),
                   ),
                 ),
                 Expanded(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: _getCurrentWeekDates().asMap().entries.map((entry) {
+                    children: _getCurrentWeekDates().asMap().entries.map((
+                      entry,
+                    ) {
                       final i = entry.key;
                       final d = entry.value;
                       final isActive = _isSameDay(d, _selectedDate);
@@ -319,9 +462,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                         }),
                         child: AnimatedContainer(
                           duration: const Duration(milliseconds: 200),
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 8,
+                            vertical: 6,
+                          ),
                           decoration: BoxDecoration(
-                            color: isActive ? TxaTheme.accent : Colors.transparent,
+                            color: isActive
+                                ? TxaTheme.accent
+                                : Colors.transparent,
                             borderRadius: BorderRadius.circular(12),
                           ),
                           child: Column(
@@ -330,7 +478,9 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                               Text(
                                 _daysShort[i],
                                 style: TextStyle(
-                                  color: isActive ? Colors.white : TxaTheme.textMuted,
+                                  color: isActive
+                                      ? Colors.white
+                                      : TxaTheme.textMuted,
                                   fontSize: 10,
                                   fontWeight: FontWeight.w500,
                                 ),
@@ -339,14 +489,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                               Text(
                                 '${d.day}',
                                 style: TextStyle(
-                                  color: isActive ? Colors.white : (isToday ? TxaTheme.accent : TxaTheme.textPrimary),
+                                  color: isActive
+                                      ? Colors.white
+                                      : (isToday
+                                            ? TxaTheme.accent
+                                            : TxaTheme.textPrimary),
                                   fontSize: 14,
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
                               if (isToday && !isActive) ...[
                                 const SizedBox(height: 2),
-                                Container(width: 4, height: 4, decoration: const BoxDecoration(color: TxaTheme.accent, shape: BoxShape.circle)),
+                                Container(
+                                  width: 4,
+                                  height: 4,
+                                  decoration: const BoxDecoration(
+                                    color: TxaTheme.accent,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
                               ],
                             ],
                           ),
@@ -359,7 +520,11 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
                   onTap: () => _changeWeek(1),
                   child: const Padding(
                     padding: EdgeInsets.all(6),
-                    child: Icon(Icons.chevron_right_rounded, color: TxaTheme.textSecondary, size: 22),
+                    child: Icon(
+                      Icons.chevron_right_rounded,
+                      color: TxaTheme.textSecondary,
+                      size: 22,
+                    ),
                   ),
                 ),
               ],
@@ -372,9 +537,7 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
           ),
 
           // Content
-          Expanded(
-            child: _buildContent(),
-          ),
+          Expanded(child: _buildContent()),
         ],
       ),
     );
@@ -386,9 +549,15 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(color: TxaTheme.accent, strokeWidth: 2),
+            const CircularProgressIndicator(
+              color: TxaTheme.accent,
+              strokeWidth: 2,
+            ),
             const SizedBox(height: 12),
-            Text(TxaLanguage.t('loading_schedule'), style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13)),
+            Text(
+              TxaLanguage.t('loading_schedule'),
+              style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13),
+            ),
           ],
         ),
       );
@@ -399,15 +568,25 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.error_outline_rounded, size: 40, color: Colors.redAccent),
+            const Icon(
+              Icons.error_outline_rounded,
+              size: 40,
+              color: Colors.redAccent,
+            ),
             const SizedBox(height: 12),
-            Text("${TxaLanguage.t('error')}: $_error", style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12)),
+            Text(
+              "${TxaLanguage.t('error')}: $_error",
+              style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12),
+            ),
             const SizedBox(height: 12),
             ElevatedButton.icon(
               onPressed: _fetchSchedule,
               icon: const Icon(Icons.refresh, size: 16),
               label: Text(TxaLanguage.t('retry')),
-              style: ElevatedButton.styleFrom(backgroundColor: TxaTheme.accent, foregroundColor: Colors.white),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: TxaTheme.accent,
+                foregroundColor: Colors.white,
+              ),
             ),
           ],
         ),
@@ -420,12 +599,19 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.calendar_today_rounded, size: 40, color: TxaTheme.textMuted.withValues(alpha: 0.3)),
+            Icon(
+              Icons.calendar_today_rounded,
+              size: 40,
+              color: TxaTheme.textMuted.withValues(alpha: 0.3),
+            ),
             const SizedBox(height: 12),
             Text(
               _isSameDay(_selectedDate, _today)
                   ? TxaLanguage.t('no_schedule_today')
-                  : TxaLanguage.t('no_schedule_date').replaceAll('%date', '${_selectedDate.day}/${_selectedDate.month}'),
+                  : TxaLanguage.t('no_schedule_date').replaceAll(
+                      '%date',
+                      '${_selectedDate.day}/${_selectedDate.month}',
+                    ),
               style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13),
             ),
           ],
@@ -439,17 +625,118 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       itemCount: movies.length,
       itemBuilder: (context, index) {
         final movie = movies[index];
-        return _ScheduleMovieCard(movie: movie, episodeLabel: _formatEpisodeLabel(movie));
+        final movieId = movie['id']?.toString() ?? movie['slug'] ?? '';
+        final isScheduled = TxaSettings.isMovieScheduled(movieId);
+
+        return _ScheduleMovieCard(
+          movie: movie,
+          episodeLabel: _formatEpisodeLabel(movie),
+          isScheduled: isScheduled,
+          onTapNotification: () => _toggleNotification(movie),
+        );
       },
     );
+  }
+
+  Future<void> _toggleNotification(dynamic movie) async {
+    final movieId = movie['id']?.toString() ?? movie['slug'] ?? '';
+    final isScheduled = TxaSettings.isMovieScheduled(movieId);
+
+    if (isScheduled) {
+      await FlutterLocalNotificationsPlugin().cancel(id: movieId.hashCode);
+      TxaSettings.setMovieScheduled(movieId, false);
+      setState(() {});
+      if (!mounted) return;
+      TxaToast.show(context, TxaLanguage.t('notification_cancelled'));
+      return;
+    }
+
+    if (await Permission.notification.isDenied) {
+      final res = await Permission.notification.request();
+      if (!res.isGranted) {
+        if (!mounted) return;
+        TxaToast.show(context, TxaLanguage.t('notification_permission_denied'));
+        return;
+      }
+    }
+
+    if (await Permission.scheduleExactAlarm.isDenied) {
+      await Permission.scheduleExactAlarm.request();
+    }
+
+    final broadcastTime = movie['broadcast_time']?.toString() ?? '';
+    if (broadcastTime.isEmpty) return;
+
+    try {
+      final timeParts = broadcastTime.split(':');
+      if (timeParts.length < 2) return;
+
+      final hour = int.parse(timeParts[0]);
+      final minute = int.parse(timeParts[1]);
+
+      var scheduledDate = DateTime(
+        _selectedDate.year,
+        _selectedDate.month,
+        _selectedDate.day,
+        hour,
+        minute,
+      );
+      scheduledDate = scheduledDate.subtract(const Duration(minutes: 15));
+
+      if (scheduledDate.isBefore(DateTime.now())) {
+        if (!mounted) return;
+        TxaToast.show(context, TxaLanguage.t('notification_time_passed'));
+        return;
+      }
+
+      final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+      final String dayOfWeek = DateFormat('EEEE', 'vi').format(_selectedDate);
+      final String title = "Nhắc nhở: Phim ${movie['name']}";
+      final String body =
+          "Phim ${movie['name']} sẽ trình chiếu vào $broadcastTime ngày $dayOfWeek. Đừng bỏ lỡ nhé!";
+
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        id: movieId.hashCode,
+        title: title,
+        body: body,
+        scheduledDate: tz.TZDateTime.from(scheduledDate, tz.local),
+        notificationDetails: const NotificationDetails(
+          android: AndroidNotificationDetails(
+            'schedule_reminders',
+            'Schedule Reminders',
+            channelDescription: 'Notifications for upcoming movie broadcasts',
+            importance: Importance.max,
+            priority: Priority.high,
+          ),
+          iOS: DarwinNotificationDetails(),
+        ),
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+
+      TxaSettings.setMovieScheduled(movieId, true);
+      setState(() {});
+      if (!mounted) return;
+      TxaToast.show(context, TxaLanguage.t('notification_scheduled'));
+    } catch (e) {
+      if (!mounted) return;
+      TxaToast.show(context, "${TxaLanguage.t('error')}: $e");
+    }
   }
 }
 
 class _ScheduleMovieCard extends StatelessWidget {
   final dynamic movie;
   final String episodeLabel;
+  final bool isScheduled;
+  final VoidCallback onTapNotification;
 
-  const _ScheduleMovieCard({required this.movie, required this.episodeLabel});
+  const _ScheduleMovieCard({
+    required this.movie,
+    required this.episodeLabel,
+    required this.isScheduled,
+    required this.onTapNotification,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -471,7 +758,10 @@ class _ScheduleMovieCard extends StatelessWidget {
         children: [
           // Poster
           ClipRRect(
-            borderRadius: const BorderRadius.only(topLeft: Radius.circular(14), bottomLeft: Radius.circular(14)),
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(14),
+              bottomLeft: Radius.circular(14),
+            ),
             child: Stack(
               children: [
                 CachedNetworkImage(
@@ -479,20 +769,39 @@ class _ScheduleMovieCard extends StatelessWidget {
                   width: 80,
                   height: 110,
                   fit: BoxFit.cover,
-                  placeholder: (ctx, url) => Container(width: 80, height: 110, color: TxaTheme.secondaryBg),
-                  errorWidget: (ctx, url, err) => Container(width: 80, height: 110, color: TxaTheme.secondaryBg, child: const Icon(Icons.movie, color: TxaTheme.textMuted)),
+                  placeholder: (ctx, url) => Container(
+                    width: 80,
+                    height: 110,
+                    color: TxaTheme.secondaryBg,
+                  ),
+                  errorWidget: (ctx, url, err) => Container(
+                    width: 80,
+                    height: 110,
+                    color: TxaTheme.secondaryBg,
+                    child: const Icon(Icons.movie, color: TxaTheme.textMuted),
+                  ),
                 ),
                 if (broadcastTime.isNotEmpty)
                   Positioned(
                     bottom: 4,
                     left: 4,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
                       decoration: BoxDecoration(
                         color: TxaTheme.accent,
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(broadcastTime, style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        broadcastTime,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
                 if (quality.isNotEmpty)
@@ -500,12 +809,22 @@ class _ScheduleMovieCard extends StatelessWidget {
                     top: 4,
                     right: 4,
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 5,
+                        vertical: 1,
+                      ),
                       decoration: BoxDecoration(
                         color: const Color(0xFF10B981),
                         borderRadius: BorderRadius.circular(4),
                       ),
-                      child: Text(quality, style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                      child: Text(
+                        quality,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -518,27 +837,56 @@ class _ScheduleMovieCard extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: TxaTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w600)),
+                  Text(
+                    name,
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: TxaTheme.textPrimary,
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                   const SizedBox(height: 4),
                   Row(
                     children: [
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
                         decoration: BoxDecoration(
                           color: TxaTheme.pink.withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(4),
                         ),
-                        child: Text(episodeLabel, style: const TextStyle(color: TxaTheme.pink, fontSize: 10, fontWeight: FontWeight.w600)),
+                        child: Text(
+                          episodeLabel,
+                          style: const TextStyle(
+                            color: TxaTheme.pink,
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
                       ),
                       if (lang.isNotEmpty) ...[
                         const SizedBox(width: 6),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 6,
+                            vertical: 2,
+                          ),
                           decoration: BoxDecoration(
                             color: TxaTheme.accent.withValues(alpha: 0.15),
                             borderRadius: BorderRadius.circular(4),
                           ),
-                          child: Text(lang, style: const TextStyle(color: TxaTheme.accent, fontSize: 10, fontWeight: FontWeight.w600)),
+                          child: Text(
+                            lang,
+                            style: const TextStyle(
+                              color: TxaTheme.accent,
+                              fontSize: 10,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
                         ),
                       ],
                     ],
@@ -547,10 +895,20 @@ class _ScheduleMovieCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Wrap(
                       spacing: 4,
-                      children: cats.take(2).map<Widget>((cat) => Text(
-                        '#${cat['name'] ?? ''}',
-                        style: TextStyle(color: TxaTheme.textMuted.withValues(alpha: 0.7), fontSize: 10),
-                      )).toList(),
+                      children: cats
+                          .take(2)
+                          .map<Widget>(
+                            (cat) => Text(
+                              '#${cat['name'] ?? ''}',
+                              style: TextStyle(
+                                color: TxaTheme.textMuted.withValues(
+                                  alpha: 0.7,
+                                ),
+                                fontSize: 10,
+                              ),
+                            ),
+                          )
+                          .toList(),
                     ),
                   ],
                 ],
@@ -560,7 +918,18 @@ class _ScheduleMovieCard extends StatelessWidget {
           // Bell icon
           Padding(
             padding: const EdgeInsets.only(right: 10),
-            child: Icon(Icons.notifications_none_rounded, color: TxaTheme.textMuted.withValues(alpha: 0.5), size: 22),
+            child: IconButton(
+              onPressed: onTapNotification,
+              icon: Icon(
+                isScheduled
+                    ? Icons.notifications_active_rounded
+                    : Icons.notifications_none_rounded,
+                color: isScheduled
+                    ? TxaTheme.accent
+                    : TxaTheme.textMuted.withValues(alpha: 0.5),
+                size: 22,
+              ),
+            ),
           ),
         ],
       ),

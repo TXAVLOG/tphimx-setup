@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 import '../theme/txa_theme.dart';
@@ -8,6 +9,7 @@ import '../services/txa_language.dart';
 import '../services/txa_api.dart';
 import '../utils/txa_toast.dart';
 import 'legal_screen.dart';
+import 'auth_screen.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
 class AccountScreen extends StatefulWidget {
@@ -260,54 +262,161 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ),
 
-          // Auth Buttons - Compact
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton.icon(
-                    onPressed: () =>
-                        _handleDev(context, TxaLanguage.t('login')),
-                    icon: const Icon(Icons.person_outline_rounded, size: 18),
-                    label: Text(
-                      TxaLanguage.t('login'),
-                      style: const TextStyle(fontSize: 13),
-                    ),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: TxaTheme.accent,
-                      foregroundColor: Colors.white,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+          // Auth Section
+          Builder(
+            builder: (context) {
+              final token = TxaSettings.authToken;
+              if (token.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: ElevatedButton.icon(
+                          onPressed: () =>
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (ctx) => const AuthScreen(),
+                                ),
+                              ).then((val) {
+                                if (val == true) setState(() {});
+                              }),
+                          icon: const Icon(
+                            Icons.person_outline_rounded,
+                            size: 18,
+                          ),
+                          label: Text(
+                            TxaLanguage.t('login'),
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: TxaTheme.accent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            elevation: 0,
+                          ),
+                        ),
                       ),
-                      elevation: 0,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () =>
-                        _handleDev(context, TxaLanguage.t('register')),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: TxaTheme.cardBg,
-                      foregroundColor: TxaTheme.textPrimary,
-                      padding: const EdgeInsets.symmetric(vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
-                        side: const BorderSide(color: TxaTheme.glassBorder),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () =>
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (ctx) => const AuthScreen(),
+                                ),
+                              ).then((val) {
+                                if (val == true) setState(() {});
+                              }),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: TxaTheme.cardBg,
+                            foregroundColor: TxaTheme.textPrimary,
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(10),
+                              side: const BorderSide(
+                                color: TxaTheme.glassBorder,
+                              ),
+                            ),
+                            elevation: 0,
+                          ),
+                          child: Text(
+                            TxaLanguage.t('register'),
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                        ),
                       ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      TxaLanguage.t('register'),
-                      style: const TextStyle(fontSize: 13),
-                    ),
+                    ],
                   ),
-                ),
-              ],
-            ),
+                );
+              }
+
+              // Logged in state
+              return FutureBuilder<Map<String, dynamic>>(
+                future: Provider.of<TxaApi>(context, listen: false).getAuthMe(),
+                builder: (context, snapshot) {
+                  final user = snapshot.data?['data'];
+                  final name = user?['name'] ?? 'User';
+                  final email = user?['email'] ?? '...';
+                  final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
+
+                  return Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 16,
+                      vertical: 20,
+                    ),
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      color: TxaTheme.cardBg,
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: TxaTheme.glassBorder),
+                    ),
+                    child: Row(
+                      children: [
+                        CircleAvatar(
+                          radius: 30,
+                          backgroundColor: TxaTheme.accent,
+                          child: Text(
+                            initial,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 24,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                email,
+                                style: const TextStyle(
+                                  color: TxaTheme.textMuted,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        IconButton(
+                          onPressed: () {
+                            TxaSettings.authToken = '';
+                            Provider.of<TxaApi>(
+                              context,
+                              listen: false,
+                            ).setToken('');
+                            setState(() {});
+                            TxaToast.show(
+                              context,
+                              TxaLanguage.t('logout_success'),
+                            );
+                          },
+                          icon: const Icon(
+                            Icons.logout_rounded,
+                            color: Colors.redAccent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                },
+              );
+            },
           ),
 
           const SizedBox(height: 16),
@@ -381,8 +490,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '2.7.2';
-                  final buildNumber = snapshot.data?.buildNumber ?? '272';
+                  final version = snapshot.data?.version ?? '3.0.0';
+                  final buildNumber = snapshot.data?.buildNumber ?? '300';
                   return Text(
                     TxaLanguage.t(
                       'current_version',

@@ -34,7 +34,10 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
     super.initState();
     _loadData();
     _scrollController.addListener(() {
-      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 200 && !_loading && _hasMore) {
+      if (_scrollController.position.pixels >=
+              _scrollController.position.maxScrollExtent - 200 &&
+          !_loading &&
+          _hasMore) {
         _loadData(loadMore: true);
       }
     });
@@ -68,9 +71,12 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
       }
 
       final data = res['data'] ?? res;
-      final List list = data is List 
-          ? data 
-          : (data?['movies']?['data'] as List? ?? data?['data'] as List? ?? data?['items'] as List? ?? []);
+      final List list = data is List
+          ? data
+          : (data?['movies']?['data'] as List? ??
+                data?['data'] as List? ??
+                data?['items'] as List? ??
+                []);
 
       setState(() {
         _items.addAll(list);
@@ -89,7 +95,10 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        title: Text(TxaLanguage.t(widget.title), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+        title: Text(
+          TxaLanguage.t(widget.title),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+        ),
         centerTitle: true,
         leading: IconButton(
           icon: const Icon(Icons.arrow_back_ios_new_rounded),
@@ -97,7 +106,9 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
         ),
       ),
       body: _items.isEmpty && _loading
-          ? const Center(child: CircularProgressIndicator(color: TxaTheme.accent))
+          ? const Center(
+              child: CircularProgressIndicator(color: TxaTheme.accent),
+            )
           : CustomScrollView(
               controller: _scrollController,
               physics: const BouncingScrollPhysics(),
@@ -105,26 +116,33 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 16, 16, 100),
                   sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
+                    gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: MediaQuery.of(context).size.width > 1200
+                          ? 7
+                          : MediaQuery.of(context).size.width > 900
+                          ? 5
+                          : MediaQuery.of(context).size.width > 600
+                          ? 4
+                          : 3,
                       childAspectRatio: 0.65,
                       mainAxisSpacing: 16,
                       crossAxisSpacing: 12,
                     ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final movie = _items[index];
-                        return _MovieGridItem(movie: movie);
-                      },
-                      childCount: _items.length,
-                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final movie = _items[index];
+                      return _MovieGridItem(movie: movie);
+                    }, childCount: _items.length),
                   ),
                 ),
                 if (_loading && _items.isNotEmpty)
                   const SliverToBoxAdapter(
                     child: Padding(
                       padding: EdgeInsets.symmetric(vertical: 20),
-                      child: Center(child: CircularProgressIndicator(color: TxaTheme.accent)),
+                      child: Center(
+                        child: CircularProgressIndicator(
+                          color: TxaTheme.accent,
+                        ),
+                      ),
                     ),
                   ),
               ],
@@ -145,7 +163,10 @@ class _MovieGridItem extends StatelessWidget {
     final quality = movie['quality'] ?? '';
 
     return GestureDetector(
-      onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => MovieDetailScreen(slug: slug))),
+      onTap: () => Navigator.push(
+        context,
+        MaterialPageRoute(builder: (ctx) => MovieDetailScreen(slug: slug)),
+      ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -158,16 +179,30 @@ class _MovieGridItem extends StatelessWidget {
                   CachedNetworkImage(
                     imageUrl: poster,
                     fit: BoxFit.cover,
-                    placeholder: (ctx, url) => Container(color: TxaTheme.cardBg),
+                    placeholder: (ctx, url) =>
+                        Container(color: TxaTheme.cardBg),
                   ),
                   if (quality.isNotEmpty)
                     Positioned(
                       top: 6,
                       right: 6,
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(color: TxaTheme.accent, borderRadius: BorderRadius.circular(4)),
-                        child: Text(quality, style: const TextStyle(color: Colors.white, fontSize: 8, fontWeight: FontWeight.bold)),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 6,
+                          vertical: 2,
+                        ),
+                        decoration: BoxDecoration(
+                          color: TxaTheme.accent,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          quality,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 8,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
                       ),
                     ),
                 ],
@@ -175,8 +210,22 @@ class _MovieGridItem extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 6),
-          Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.w600)),
-          Text(movie['origin_name'] ?? '', maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: TxaTheme.textSecondary, fontSize: 10)),
+          Text(
+            name,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          Text(
+            movie['origin_name'] ?? '',
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(color: TxaTheme.textSecondary, fontSize: 10),
+          ),
         ],
       ),
     );

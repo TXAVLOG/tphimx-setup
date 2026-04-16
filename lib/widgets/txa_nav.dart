@@ -7,11 +7,13 @@ import '../services/txa_language.dart';
 class TxaNav extends StatelessWidget {
   final int currentIndex;
   final Function(int) onTap;
+  final int unreadNotifications;
 
   const TxaNav({
     super.key,
     required this.currentIndex,
     required this.onTap,
+    this.unreadNotifications = 0,
   });
 
   @override
@@ -23,7 +25,7 @@ class TxaNav extends StatelessWidget {
       right: 20,
       child: Center(
         child: Container(
-          constraints: const BoxConstraints(maxWidth: 340),
+          constraints: const BoxConstraints(maxWidth: 400),
           child: ClipRRect(
             borderRadius: BorderRadius.circular(32),
             child: BackdropFilter(
@@ -31,7 +33,9 @@ class TxaNav extends StatelessWidget {
               child: Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0x990F172A), // More translucent for liquid feel
+                  color: const Color(
+                    0x990F172A,
+                  ), // More translucent for liquid feel
                   borderRadius: BorderRadius.circular(32),
                   border: Border.all(color: const Color(0x1FFFFFFF), width: 1),
                   boxShadow: [
@@ -64,17 +68,24 @@ class TxaNav extends StatelessWidget {
                       onTap: () => onTap(2),
                     ),
                     _NavItem(
-                      icon: Icons.person_rounded,
-                      label: TxaLanguage.t('profile'),
+                      icon: Icons.notifications_outlined,
+                      label: TxaLanguage.t('notifications'),
                       isActive: currentIndex == 3,
                       onTap: () => onTap(3),
+                      badgeCount: unreadNotifications,
+                    ),
+                    _NavItem(
+                      icon: Icons.person_rounded,
+                      label: TxaLanguage.t('profile'),
+                      isActive: currentIndex == 4,
+                      onTap: () => onTap(4),
                     ),
                     if (Platform.isIOS)
                       _NavItem(
                         icon: Icons.workspace_premium_rounded,
                         label: TxaLanguage.t('premium_tab'),
-                        isActive: currentIndex == 4,
-                        onTap: () => onTap(4),
+                        isActive: currentIndex == 5,
+                        onTap: () => onTap(5),
                       ),
                   ],
                 ),
@@ -92,12 +103,14 @@ class _NavItem extends StatelessWidget {
   final String label;
   final bool isActive;
   final VoidCallback onTap;
+  final int badgeCount;
 
   const _NavItem({
     required this.icon,
     required this.label,
     required this.isActive,
     required this.onTap,
+    this.badgeCount = 0,
   });
 
   @override
@@ -111,28 +124,60 @@ class _NavItem extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(16),
-          color: isActive ? TxaTheme.accent.withValues(alpha: 0.15) : Colors.transparent,
+          color: isActive
+              ? TxaTheme.accent.withValues(alpha: 0.15)
+              : Colors.transparent,
         ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
+        child: Stack(
+          clipBehavior: Clip.none,
           children: [
-            Icon(
-              icon,
-              color: isActive ? TxaTheme.accent : TxaTheme.textMuted,
-              size: 22,
-            ),
-            if (isActive) ...[
-              const SizedBox(height: 2),
-              Text(
-                label,
-                style: TextStyle(
+            Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Icon(
+                  icon,
                   color: isActive ? TxaTheme.accent : TxaTheme.textMuted,
-                  fontSize: 9,
-                  fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
-                  height: 1.2,
+                  size: 22,
+                ),
+                if (isActive) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: TextStyle(
+                      color: isActive ? TxaTheme.accent : TxaTheme.textMuted,
+                      fontSize: 9,
+                      fontWeight: isActive ? FontWeight.w600 : FontWeight.w400,
+                      height: 1.2,
+                    ),
+                  ),
+                ],
+              ],
+            ),
+            if (badgeCount > 0)
+              Positioned(
+                top: -2,
+                right: -2,
+                child: Container(
+                  padding: const EdgeInsets.all(4),
+                  decoration: const BoxDecoration(
+                    color: Colors.red,
+                    shape: BoxShape.circle,
+                  ),
+                  constraints: const BoxConstraints(
+                    minWidth: 12,
+                    minHeight: 12,
+                  ),
+                  child: Text(
+                    badgeCount > 99 ? '99+' : badgeCount.toString(),
+                    style: const TextStyle(
+                      color: Colors.white,
+                      fontSize: 7,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
                 ),
               ),
-            ],
           ],
         ),
       ),
