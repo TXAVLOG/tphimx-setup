@@ -199,24 +199,29 @@ class TxaApi {
   }
 
   // Auth Methods
-  Future<Response> login(String email, String password) async {
-    return await post(authLogin, data: {'email': email, 'password': password});
+  Future<Response> login(String login, String password) async {
+    return await post(authLogin, data: {'login': login, 'password': password});
   }
 
-  Future<Response> register(
-    String name,
-    String email,
-    String password,
-    String confirmPw,
-  ) async {
+  Future<Response> register({
+    required String name,
+    required String username,
+    required String email,
+    required String password,
+    required String confirmPw,
+    required String gender,
+  }) async {
     return await post(
       authRegister,
       data: {
         'name': name,
+        'username': username,
         'email': email,
         'password': password,
         'password_confirmation': confirmPw,
+        'gender': gender,
         'device_name': Platform.isIOS ? 'iPhone' : 'Android',
+        'agree': 1,
       },
     );
   }

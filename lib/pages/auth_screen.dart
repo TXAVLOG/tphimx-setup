@@ -18,20 +18,27 @@ class _AuthScreenState extends State<AuthScreen>
     with SingleTickerProviderStateMixin {
   late TabController _tabController;
 
-  final _loginEmailController = TextEditingController();
+  final _loginIdController = TextEditingController();
   final _loginPasswordController = TextEditingController();
 
-  final _regNameController = TextEditingController();
-  final _regEmailController = TextEditingController();
-  final _regPasswordController = TextEditingController();
-  final _regConfirmPasswordController = TextEditingController();
+  final _registerNameController = TextEditingController();
+  final _registerUsernameController = TextEditingController();
+  final _registerEmailController = TextEditingController();
+  final _registerPasswordController = TextEditingController();
+  final _registerConfirmPasswordController = TextEditingController();
 
   bool _loading = false;
   bool _showLoginPassword = false;
   bool _showRegPassword = false;
+  String _registerGender = 'male';
 
-  String? _loginEmailError;
+  String? _loginIdError;
   String? _loginPasswordError;
+  String? _registerNameError;
+  String? _registerUsernameError;
+  String? _registerEmailError;
+  String? _registerPasswordError;
+  String? _registerConfirmPasswordError;
 
   @override
   void initState() {
@@ -42,20 +49,21 @@ class _AuthScreenState extends State<AuthScreen>
   @override
   void dispose() {
     _tabController.dispose();
-    _loginEmailController.dispose();
+    _loginIdController.dispose();
     _loginPasswordController.dispose();
-    _regNameController.dispose();
-    _regEmailController.dispose();
-    _regPasswordController.dispose();
-    _regConfirmPasswordController.dispose();
+    _registerNameController.dispose();
+    _registerUsernameController.dispose();
+    _registerEmailController.dispose();
+    _registerPasswordController.dispose();
+    _registerConfirmPasswordController.dispose();
     super.dispose();
   }
 
   Future<void> _handleLogin() async {
-    final email = _loginEmailController.text.trim();
+    final id = _loginIdController.text.trim();
     final password = _loginPasswordController.text;
 
-    if (email.isEmpty || password.isEmpty) {
+    if (id.isEmpty || password.isEmpty) {
       TxaToast.show(
         context,
         TxaLanguage.t('error_empty_fields'),
@@ -66,14 +74,14 @@ class _AuthScreenState extends State<AuthScreen>
 
     setState(() {
       _loading = true;
-      _loginEmailError = null;
+      _loginIdError = null;
       _loginPasswordError = null;
     });
     try {
       final api = Provider.of<TxaApi>(context, listen: false);
-      final res = await api.login(email, password);
+      final res = await api.login(id, password);
 
-      if (res.statusCode == 200 && res.data['data'] != null) {
+      if (res.data['success'] == true) {
         final token = res.data['data']['token'];
         TxaSettings.authToken = token;
         api.setToken(token);
@@ -91,29 +99,30 @@ class _AuthScreenState extends State<AuthScreen>
           );
         }
       }
-    } catch (e) {
-      String errorMsg = TxaLanguage.t('error_login');
-      if (e is DioException) {
-        final data = e.response?.data;
-        if (data != null && data['message'] != null) {
-          errorMsg = data['message'];
-          final errorCode = data['data'] != null
-              ? data['data']['error_code']
-              : null;
-
-          setState(() {
-            if (errorCode == 'USER_NOT_FOUND') {
-              _loginEmailError = errorMsg;
-            } else if (errorCode == 'INVALID_PASSWORD') {
-              _loginPasswordError = errorMsg;
-            }
-          });
-        } else if (e.type == DioExceptionType.connectionTimeout) {
-          errorMsg = 'Kết nối quá hạn. Vui lòng thử lại.';
-        }
-      }
-      if (mounted) {
-        TxaToast.show(context, errorMsg, isError: true);
+    } on DioException catch (e) {
+      if (e.response?.data != null && e.response?.data['data'] != null) {
+        final errorCode = e.response?.data['data']['error_code'];
+        setState(() {
+          if (errorCode == 'USER_NOT_FOUND') {
+            _loginIdError = e.response?.data['message'];
+          } else if (errorCode == 'INVALID_PASSWORD') {
+            _loginPasswordError = e.response?.data['message'];
+          } else {
+            if (!mounted) return;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  e.response?.data['message'] ?? TxaLanguage.t('error_login'),
+                ),
+              ),
+            );
+          }
+        });
+      } else {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(TxaLanguage.t('error_connection'))),
+        );
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -121,12 +130,13 @@ class _AuthScreenState extends State<AuthScreen>
   }
 
   Future<void> _handleRegister() async {
-    final name = _regNameController.text.trim();
-    final email = _regEmailController.text.trim();
-    final password = _regPasswordController.text;
-    final confirm = _regConfirmPasswordController.text;
+    final name = _registerNameController.text.trim();
+    final username = _registerUsernameController.text.trim();
+    final email = _registerEmailController.text.trim();
+    final password = _registerPasswordController.text;
+    final confirm = _registerConfirmPasswordController.text;
 
-    if (name.isEmpty || email.isEmpty || password.isEmpty) {
+    if (name.isEmpty || username.isEmpty || email.isEmpty || password.isEmpty) {
       TxaToast.show(
         context,
         TxaLanguage.t('error_empty_fields'),
@@ -144,34 +154,63 @@ class _AuthScreenState extends State<AuthScreen>
       return;
     }
 
-    setState(() => _loading = true);
+    setState(() {
+      _loading = true;
+      _registerNameError = null;
+      _registerUsernameError = null;
+      _registerEmailError = null;
+      _registerPasswordError = null;
+      _registerConfirmPasswordError = null;
+    });
+
     try {
       final api = Provider.of<TxaApi>(context, listen: false);
-      final res = await api.register(name, email, password, confirm);
+      final res = await api.register(
+        name: name,
+        username: username,
+        email: email,
+        password: password,
+        confirmPw: confirm,
+        gender: _registerGender,
+      );
 
       if (res.statusCode == 200 || res.statusCode == 201) {
         if (mounted) {
           TxaToast.show(context, TxaLanguage.t('register_success'));
           _tabController.animateTo(0);
         }
-      } else {
-        if (mounted) {
-          TxaToast.show(
-            context,
-            res.data['message'] ?? TxaLanguage.t('error_register'),
-            isError: true,
-          );
-        }
       }
-    } catch (e) {
-      String errorMsg = TxaLanguage.t('error_register');
-      if (e is DioException) {
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 422) {
+        final errors = e.response?.data['errors'];
+        setState(() {
+          if (errors != null) {
+            if (errors['name'] != null) {
+              _registerNameError = errors['name'][0];
+            }
+            if (errors['username'] != null) {
+              _registerUsernameError = errors['username'][0];
+            }
+            if (errors['email'] != null) {
+              _registerEmailError = errors['email'][0];
+            }
+            if (errors['password'] != null) {
+              _registerPasswordError = errors['password'][0];
+            }
+          } else {
+            TxaToast.show(
+              context,
+              e.response?.data['message'] ?? TxaLanguage.t('error_register'),
+              isError: true,
+            );
+          }
+        });
+      } else {
+        String errorMsg = TxaLanguage.t('error_register');
         if (e.response?.data != null && e.response?.data['message'] != null) {
           errorMsg = e.response?.data['message'];
         }
-      }
-      if (mounted) {
-        TxaToast.show(context, errorMsg, isError: true);
+        if (mounted) TxaToast.show(context, errorMsg, isError: true);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
@@ -184,7 +223,6 @@ class _AuthScreenState extends State<AuthScreen>
       backgroundColor: TxaTheme.primaryBg,
       body: Stack(
         children: [
-          // Background Gradient
           Positioned.fill(
             child: Container(
               decoration: const BoxDecoration(
@@ -200,7 +238,6 @@ class _AuthScreenState extends State<AuthScreen>
           SafeArea(
             child: Column(
               children: [
-                // Header / Back Button
                 Padding(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 16,
@@ -222,7 +259,6 @@ class _AuthScreenState extends State<AuthScreen>
                   ),
                 ),
 
-                // Logo & Title
                 const SizedBox(height: 20),
                 Image.asset('assets/logo.png', height: 80),
                 const SizedBox(height: 16),
@@ -268,7 +304,6 @@ class _AuthScreenState extends State<AuthScreen>
 
                 const SizedBox(height: 40),
 
-                // Tabs
                 Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 32),
                   child: TabBar(
@@ -291,7 +326,6 @@ class _AuthScreenState extends State<AuthScreen>
 
                 const SizedBox(height: 32),
 
-                // Tab Views
                 Expanded(
                   child: TabBarView(
                     controller: _tabController,
@@ -322,16 +356,17 @@ class _AuthScreenState extends State<AuthScreen>
       child: Column(
         children: [
           _buildTextField(
-            controller: _loginEmailController,
-            hint: 'Email',
-            icon: Icons.email_outlined,
-            keyboardType: TextInputType.emailAddress,
-            errorText: _loginEmailError,
+            controller: _loginIdController,
+            label: TxaLanguage.t('login_id'),
+            hint: TxaLanguage.t('login_id_hint'),
+            icon: Icons.person_outline_rounded,
+            errorText: _loginIdError,
           ),
           const SizedBox(height: 20),
           _buildTextField(
             controller: _loginPasswordController,
-            hint: TxaLanguage.t('password'),
+            label: TxaLanguage.t('password'),
+            hint: TxaLanguage.t('password_hint'),
             icon: Icons.lock_outline_rounded,
             isPassword: true,
             showPassword: _showLoginPassword,
@@ -367,34 +402,71 @@ class _AuthScreenState extends State<AuthScreen>
       child: Column(
         children: [
           _buildTextField(
-            controller: _regNameController,
+            controller: _registerNameController,
+            label: TxaLanguage.t('full_name'),
             hint: TxaLanguage.t('full_name'),
             icon: Icons.person_outline_rounded,
+            errorText: _registerNameError,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           _buildTextField(
-            controller: _regEmailController,
+            controller: _registerUsernameController,
+            label: TxaLanguage.t('username'),
+            hint: TxaLanguage.t('username'),
+            icon: Icons.account_box_outlined,
+            errorText: _registerUsernameError,
+          ),
+          const SizedBox(height: 16),
+          _buildTextField(
+            controller: _registerEmailController,
+            label: 'Email',
             hint: 'Email',
             icon: Icons.email_outlined,
             keyboardType: TextInputType.emailAddress,
+            errorText: _registerEmailError,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
+          // Gender Selection
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text(
+                TxaLanguage.t('gender'),
+                style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13),
+              ),
+            ),
+          ),
+          Row(
+            children: [
+              _buildGenderChip('male', TxaLanguage.t('gender_male')),
+              const SizedBox(width: 8),
+              _buildGenderChip('female', TxaLanguage.t('gender_female')),
+              const SizedBox(width: 8),
+              _buildGenderChip('other', TxaLanguage.t('gender_other')),
+            ],
+          ),
+          const SizedBox(height: 16),
           _buildTextField(
-            controller: _regPasswordController,
-            hint: TxaLanguage.t('password'),
+            controller: _registerPasswordController,
+            label: TxaLanguage.t('password'),
+            hint: TxaLanguage.t('password_hint'),
             icon: Icons.lock_outline_rounded,
             isPassword: true,
             showPassword: _showRegPassword,
             onTogglePassword: () =>
                 setState(() => _showRegPassword = !_showRegPassword),
+            errorText: _registerPasswordError,
           ),
-          const SizedBox(height: 20),
+          const SizedBox(height: 16),
           _buildTextField(
-            controller: _regConfirmPasswordController,
+            controller: _registerConfirmPasswordController,
+            label: TxaLanguage.t('confirm_password'),
             hint: TxaLanguage.t('confirm_password'),
             icon: Icons.lock_reset_rounded,
             isPassword: true,
             showPassword: _showRegPassword,
+            errorText: _registerConfirmPasswordError,
           ),
           const SizedBox(height: 40),
           _buildAuthButton(
@@ -410,6 +482,7 @@ class _AuthScreenState extends State<AuthScreen>
     required TextEditingController controller,
     required String hint,
     required IconData icon,
+    String? label,
     bool isPassword = false,
     bool? showPassword,
     VoidCallback? onTogglePassword,
@@ -419,6 +492,18 @@ class _AuthScreenState extends State<AuthScreen>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (label != null)
+          Padding(
+            padding: const EdgeInsets.only(left: 4, bottom: 8),
+            child: Text(
+              label,
+              style: const TextStyle(
+                color: TxaTheme.textMuted,
+                fontSize: 13,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
         Container(
           decoration: BoxDecoration(
             color: Colors.white.withValues(alpha: 0.05),
@@ -476,6 +561,39 @@ class _AuthScreenState extends State<AuthScreen>
             ),
           ),
       ],
+    );
+  }
+
+  Widget _buildGenderChip(String value, String label) {
+    bool isSelected = _registerGender == value;
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _registerGender = value),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: isSelected
+                ? TxaTheme.accent.withValues(alpha: 0.2)
+                : Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: isSelected
+                  ? TxaTheme.accent.withValues(alpha: 0.5)
+                  : Colors.white.withValues(alpha: 0.1),
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                color: isSelected ? Colors.white : TxaTheme.textMuted,
+                fontSize: 13,
+                fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+              ),
+            ),
+          ),
+        ),
+      ),
     );
   }
 
