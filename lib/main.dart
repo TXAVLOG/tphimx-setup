@@ -14,6 +14,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'widgets/splash_screen.dart';
 import 'services/txa_api.dart';
+import 'services/txa_settings.dart';
 import 'services/txa_network.dart';
 import 'services/search_provider.dart';
 import 'theme/txa_theme.dart';
@@ -25,6 +26,7 @@ import 'pages/home_screen.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  await TxaSettings.init();
   await initializeDateFormatting('vi', null);
 
   try {
