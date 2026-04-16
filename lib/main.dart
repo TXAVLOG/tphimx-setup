@@ -24,9 +24,15 @@ import 'utils/txa_logger.dart';
 import 'pages/home_screen.dart';
 
 void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
   await initializeDateFormatting('vi', null);
-  tz.initializeTimeZones();
-  tz.setLocalLocation(tz.getLocation('Asia/Ho_Chi_Minh'));
+
+  try {
+    tz.initializeTimeZones();
+    tz.setLocalLocation(tz.getLocation('Asia/Ho_Chi_Minh'));
+  } catch (e) {
+    debugPrint('Timezone Init Error: $e');
+  }
 
   // Check Android TV
   bool isTV = false;
