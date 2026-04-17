@@ -123,6 +123,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
 
     try {
       final res = await api.toggleFavorite(_data!['movie']['id']);
+      if (!mounted) return;
+
       if (res['success'] == true) {
         setState(() {
           _data!['movie']['is_favorite'] = res['data']['is_favorite'];
@@ -135,7 +137,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
         );
       }
     } catch (e) {
-      TxaToast.show(context, TxaLanguage.t('error'), isError: true);
+      if (mounted) {
+        TxaToast.show(context, "${TxaLanguage.t('error')}: $e", isError: true);
+      }
     }
   }
 

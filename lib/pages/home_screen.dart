@@ -1884,7 +1884,7 @@ class _MovieCardState extends State<_MovieCard> {
     } catch (e) {
       if (mounted) {
         setState(() => _isFavorite = !_isFavorite);
-        TxaToast.show(context, TxaLanguage.t('error'));
+        TxaToast.show(context, "${TxaLanguage.t('error')}: $e", isError: true);
       }
     }
   }
