@@ -130,7 +130,10 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
                     ),
                     delegate: SliverChildBuilderDelegate((context, index) {
                       final movie = _items[index];
-                      return _MovieGridItem(movie: movie);
+                      return _MovieGridItem(
+                        key: ValueKey('grid_${movie['id']}'),
+                        movie: movie,
+                      );
                     }, childCount: _items.length),
                   ),
                 ),
@@ -153,7 +156,7 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
 
 class _MovieGridItem extends StatelessWidget {
   final dynamic movie;
-  const _MovieGridItem({required this.movie});
+  const _MovieGridItem({super.key, required this.movie});
 
   @override
   Widget build(BuildContext context) {

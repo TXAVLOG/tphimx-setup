@@ -55,19 +55,19 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
             onPanEnd: (details) {
               setState(() => _isDragging = false);
               final size = MediaQuery.of(context).size;
-              // Snap to nearest side (160 width + 16 margin)
+              // Snap to nearest side (240 width + 16 margin)
               double targetX = _offset.dx < size.width / 2
                   ? 16
-                  : size.width - 176;
-              double targetY = _offset.dy.clamp(60.0, size.height - 160.0);
+                  : size.width - 256;
+              double targetY = _offset.dy.clamp(60.0, size.height - 180.0);
               setState(() {
                 _offset = Offset(targetX, targetY);
               });
             },
             onTap: () => _restoreToFull(context, provider),
             child: Container(
-              width: 160,
-              height: 90,
+              width: 240,
+              height: 135,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
@@ -87,14 +87,7 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                     children: [
                       // Video content or Placeholder
                       Positioned.fill(
-                        child:
-                            provider.controller != null &&
-                                provider
-                                        .controller!
-                                        .videoPlayerController
-                                        ?.value
-                                        .initialized ==
-                                    true
+                        child: provider.controller != null
                             ? BetterPlayer(controller: provider.controller!)
                             : Container(
                                 color: TxaTheme.cardBg,
@@ -125,9 +118,9 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
 
                       // Status Info (Ultra Compact)
                       Positioned(
-                        top: 4,
-                        left: 8,
-                        right: 24,
+                        top: 6,
+                        left: 10,
+                        right: 30,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -137,7 +130,7 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 9,
+                                fontSize: 11,
                                 fontWeight: FontWeight.bold,
                                 shadows: [
                                   Shadow(blurRadius: 4, color: Colors.black),
@@ -145,10 +138,10 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                               ),
                             ),
                             Text(
-                              "${TxaLanguage.t('episode')} ${provider.episodeIndex + 1}",
+                              "${TxaLanguage.t('episode')} ${provider.episodeName}",
                               style: TextStyle(
                                 color: TxaTheme.accent,
-                                fontSize: 7,
+                                fontSize: 9,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),

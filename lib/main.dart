@@ -117,6 +117,9 @@ class _TPhimXAppState extends State<TPhimXApp> {
   void initState() {
     super.initState();
     _initDeepLinks();
+    TxaSettings.onSettingsChanged = () {
+      if (mounted) setState(() {});
+    };
   }
 
   void _initDeepLinks() async {
@@ -152,19 +155,39 @@ class _TPhimXAppState extends State<TPhimXApp> {
 
   @override
   Widget build(BuildContext context) {
-    return MaterialApp(
-      navigatorKey: _navigatorKey,
-      title: 'TPhimX Premium',
-      debugShowCheckedModeBanner: false,
-      theme: TxaTheme.darkTheme.copyWith(
-        textTheme: GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme),
+    final String fontFamily = TxaSettings.fontFamily;
+    TextTheme? textTheme;
+
+    switch (fontFamily) {
+      case 'Roboto':
+        textTheme = GoogleFonts.robotoTextTheme(ThemeData.dark().textTheme);
+        break;
+      case 'Inter':
+        textTheme = GoogleFonts.interTextTheme(ThemeData.dark().textTheme);
+        break;
+      case 'Open Sans':
+        textTheme = GoogleFonts.openSansTextTheme(ThemeData.dark().textTheme);
+        break;
+      default:
+        textTheme = GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme);
+    }
+
+    return MediaQuery(
+      data: MediaQuery.of(
+        context,
+      ).copyWith(textScaler: TextScaler.linear(TxaSettings.fontSizeScale)),
+      child: MaterialApp(
+        navigatorKey: _navigatorKey,
+        title: 'TPhimX Premium',
+        debugShowCheckedModeBanner: false,
+        theme: TxaTheme.darkTheme.copyWith(textTheme: textTheme),
+        home: widget.isTV ? const TVBlockScreen() : const MainEntry(),
+        builder: (context, child) {
+          return Stack(
+            children: [child ?? const SizedBox.shrink(), const TxaMiniPlayer()],
+          );
+        },
       ),
-      home: widget.isTV ? const TVBlockScreen() : const MainEntry(),
-      builder: (context, child) {
-        return Stack(
-          children: [child ?? const SizedBox.shrink(), const TxaMiniPlayer()],
-        );
-      },
     );
   }
 }

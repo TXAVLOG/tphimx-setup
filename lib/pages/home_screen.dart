@@ -31,6 +31,7 @@ import '../widgets/txa_download_dialog.dart';
 import '../widgets/txa_error_widget.dart';
 import '../utils/txa_logger.dart';
 import '../utils/txa_format.dart';
+import '../services/txa_settings.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
@@ -664,8 +665,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.2.0';
-                  final build = snapshot.data?.buildNumber ?? '320';
+                  final version = snapshot.data?.version ?? '3.2.1';
+                  final build = snapshot.data?.buildNumber ?? '321';
                   return Text(
                     'Version $version (Build $build)',
                     style: const TextStyle(
@@ -1478,15 +1479,55 @@ class _HeroSliderState extends State<_HeroSlider> {
                           onTap: () => _playMovie(context, currentMovie),
                         ),
                         const SizedBox(width: 12),
-                        _HeroActionButton(
-                          label: TxaLanguage.t('add_favorite'),
-                          icon: Icons.favorite_border_rounded,
-                          color: Colors.white,
-                          textColor: Colors.black87,
-                          onTap: () => TxaToast.show(
-                            context,
-                            TxaLanguage.t('coming_soon_msg'),
-                          ),
+                        Builder(
+                          builder: (ctx) {
+                            final isFav = currentMovie['is_favorite'] == true;
+                            return _HeroActionButton(
+                              label: isFav
+                                  ? TxaLanguage.t('favorite_added')
+                                  : TxaLanguage.t('add_favorite'),
+                              icon: isFav
+                                  ? Icons.favorite_rounded
+                                  : Icons.favorite_border_rounded,
+                              color: isFav ? Colors.pinkAccent : Colors.white,
+                              textColor: isFav ? Colors.white : Colors.black87,
+                              onTap: () async {
+                                final int? id = currentMovie['id'];
+                                if (id == null) return;
+                                if (TxaSettings.authToken.isEmpty) {
+                                  TxaToast.show(
+                                    context,
+                                    TxaLanguage.t('verify_email_msg'),
+                                  );
+                                  return;
+                                }
+                                try {
+                                  final api = Provider.of<TxaApi>(
+                                    context,
+                                    listen: false,
+                                  );
+                                  await api.toggleFavorite(id);
+                                  setState(() {
+                                    currentMovie['is_favorite'] = !isFav;
+                                  });
+                                  if (context.mounted) {
+                                    TxaToast.show(
+                                      context,
+                                      !isFav
+                                          ? TxaLanguage.t('favorite_added')
+                                          : TxaLanguage.t('favorite_removed'),
+                                    );
+                                  }
+                                } catch (e) {
+                                  if (context.mounted)
+                                    TxaToast.show(
+                                      context,
+                                      TxaLanguage.t('error'),
+                                    );
+                                }
+                              },
+                            );
+                          },
                         ),
                       ],
                     ),
@@ -1753,7 +1794,10 @@ class _MovieSection extends StatelessWidget {
               itemBuilder: (context, index) {
                 return Padding(
                   padding: const EdgeInsets.only(right: 10),
-                  child: _MovieCard(movie: movies[index]),
+                  child: _MovieCard(
+                    key: ValueKey('mov_${movies[index]['id']}'),
+                    movie: movies[index],
+                  ),
                 );
               },
             ),
@@ -1764,43 +1808,89 @@ class _MovieSection extends StatelessWidget {
   }
 }
 
-class _MovieCard extends StatelessWidget {
+class _MovieCard extends StatefulWidget {
   final dynamic movie;
+  const _MovieCard({super.key, required this.movie});
 
-  const _MovieCard({required this.movie});
+  @override
+  State<_MovieCard> createState() => _MovieCardState();
+}
+
+class _MovieCardState extends State<_MovieCard> {
+  late bool _isFavorite;
+
+  @override
+  void initState() {
+    super.initState();
+    _isFavorite = widget.movie['is_favorite'] == true;
+  }
 
   List<Map<String, String>> _getBadges() {
     final badges = <Map<String, String>>[];
-    final type = movie['type'] ?? '';
+    final type = widget.movie['type'] ?? '';
     if (type == 'series') badges.add({'text': 'PB', 'cls': 'type'});
     if (type == 'single') badges.add({'text': 'PL', 'cls': 'quality'});
-    final epCurrent = movie['episode_current']?.toString();
+    final epCurrent = widget.movie['episode_current']?.toString();
     if (epCurrent != null && epCurrent.isNotEmpty) {
       badges.add({'text': epCurrent, 'cls': 'episode'});
     }
-    final quality = movie['quality']?.toString();
+    final quality = widget.movie['quality']?.toString();
     if (quality != null && quality.isNotEmpty) {
       badges.add({'text': quality, 'cls': 'quality'});
     }
-    final lang = movie['lang']?.toString();
+    final lang = widget.movie['lang']?.toString();
     if (lang != null && lang.isNotEmpty) {
       badges.add({'text': lang == 'Vietsub' ? 'VS' : lang, 'cls': 'sub'});
     }
     return badges;
   }
 
+  Future<void> _toggleFavorite() async {
+    if (TxaSettings.authToken.isEmpty) {
+      TxaToast.show(
+        context,
+        TxaLanguage.t('verify_email_msg'),
+      ); // "Vui lòng đăng nhập" fallback
+      return;
+    }
+
+    final int? id = widget.movie['id'];
+    if (id == null) return;
+
+    setState(() => _isFavorite = !_isFavorite);
+
+    try {
+      final api = Provider.of<TxaApi>(context, listen: false);
+      await api.toggleFavorite(id);
+      if (mounted) {
+        TxaToast.show(
+          context,
+          _isFavorite
+              ? TxaLanguage.t('favorite_added')
+              : TxaLanguage.t('favorite_removed'),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() => _isFavorite = !_isFavorite);
+        TxaToast.show(context, TxaLanguage.t('error'));
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final name = movie['name'] ?? 'Không rõ';
-    final originName = movie['origin_name'] ?? '';
-    final posterUrl = movie['thumb_url'] ?? movie['poster_url'] ?? '';
+    final name = widget.movie['name'] ?? 'Không rõ';
+    final originName = widget.movie['origin_name'] ?? '';
+    final posterUrl =
+        widget.movie['thumb_url'] ?? widget.movie['poster_url'] ?? '';
     final badges = _getBadges();
 
     return GestureDetector(
       onTap: () => Navigator.push(
         context,
         MaterialPageRoute(
-          builder: (ctx) => MovieDetailScreen(slug: movie['slug'] ?? ''),
+          builder: (ctx) => MovieDetailScreen(slug: widget.movie['slug'] ?? ''),
         ),
       ),
       child: SizedBox(
@@ -1896,15 +1986,20 @@ class _MovieCard extends StatelessWidget {
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
                           // Favorite heart icon
-                          Icon(
-                            Icons.favorite,
-                            size: 14,
-                            color: (movie['is_favorite'] == true)
-                                ? Colors.red
-                                : Colors.white.withValues(alpha: 0.2),
+                          GestureDetector(
+                            onTap: _toggleFavorite,
+                            child: Icon(
+                              _isFavorite
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              size: 16,
+                              color: _isFavorite
+                                  ? Colors.red
+                                  : Colors.white.withValues(alpha: 0.6),
+                            ),
                           ),
                           // Update timestamp (H:i:s d/M/yy)
-                          if (movie['updated_at'] != null)
+                          if (widget.movie['updated_at'] != null)
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 4,
@@ -1916,7 +2011,7 @@ class _MovieCard extends StatelessWidget {
                               ),
                               child: Text(
                                 TxaFormat.formatDateTime(
-                                  movie['updated_at'].toString(),
+                                  widget.movie['updated_at'].toString(),
                                 ),
                                 style: const TextStyle(
                                   color: Colors.white70,

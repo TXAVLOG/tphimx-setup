@@ -8,7 +8,7 @@ class TxaMiniPlayerProvider with ChangeNotifier {
   List<dynamic>? _servers;
   int _serverIndex = 0;
   int _episodeIndex = 0;
-  
+
   bool _isMini = false;
   bool _isClosed = true;
 
@@ -19,6 +19,19 @@ class TxaMiniPlayerProvider with ChangeNotifier {
   bool get isMini => _isMini;
   bool get isClosed => _isClosed;
   int get episodeIndex => _episodeIndex;
+
+  String get episodeName {
+    try {
+      if (_servers != null &&
+          _serverIndex < _servers!.length &&
+          _episodeIndex <
+              (_servers![_serverIndex]['server_data'] as List).length) {
+        return _servers![_serverIndex]['server_data'][_episodeIndex]['name']
+            .toString();
+      }
+    } catch (_) {}
+    return "Tập ${_episodeIndex + 1}";
+  }
 
   void switchToMini({
     required BetterPlayerController controller,
@@ -34,7 +47,7 @@ class TxaMiniPlayerProvider with ChangeNotifier {
     _episodeIndex = episodeIndex;
     _isMini = true;
     _isClosed = false;
-    
+
     TxaShortcutService.setPlayerStatus(
       miniActive: true,
       isPlaying: controller.videoPlayerController!.value.isPlaying,
@@ -65,7 +78,9 @@ class TxaMiniPlayerProvider with ChangeNotifier {
     } else {
       _controller!.play();
     }
-    TxaShortcutService.setPlayerStatus(isPlaying: _controller!.videoPlayerController!.value.isPlaying);
+    TxaShortcutService.setPlayerStatus(
+      isPlaying: _controller!.videoPlayerController!.value.isPlaying,
+    );
     notifyListeners();
   }
 }

@@ -403,14 +403,62 @@ class _AccountScreenState extends State<AccountScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      name,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (userData?['email_verified_at'] != null)
+                                    Container(
+                                      margin: const EdgeInsets.only(left: 8),
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.blue.withValues(
+                                          alpha: 0.15,
+                                        ),
+                                        borderRadius: BorderRadius.circular(6),
+                                        border: Border.all(
+                                          color: Colors.blue.withValues(
+                                            alpha: 0.4,
+                                          ),
+                                          width: 0.5,
+                                        ),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          const Icon(
+                                            Icons.verified_user_rounded,
+                                            color: Colors.blue,
+                                            size: 10,
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            TxaLanguage.t('email_verified'),
+                                            style: const TextStyle(
+                                              color: Colors.blue,
+                                              fontSize: 9,
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ),
+                                ],
                               ),
+                              const SizedBox(height: 2),
                               Text(
                                 email,
                                 style: const TextStyle(
@@ -519,8 +567,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.2.0';
-                  final buildNumber = snapshot.data?.buildNumber ?? '320';
+                  final version = snapshot.data?.version ?? '3.2.1';
+                  final buildNumber = snapshot.data?.buildNumber ?? '321';
                   return Text(
                     TxaLanguage.t(
                       'current_version',

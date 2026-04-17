@@ -56,6 +56,8 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
         children: [
           _buildSectionTitle(TxaLanguage.t('appearance')),
           _buildFontScaleTile(),
+          const SizedBox(height: 8),
+          _buildFontFamilyTile(),
           const Divider(color: Colors.white10, height: 32),
           _buildSectionTitle(TxaLanguage.t('system')),
           ListTile(
@@ -131,6 +133,87 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildFontFamilyTile() {
+    final fonts = [
+      {'name': 'Outfit', 'label': TxaLanguage.t('font_outfit')},
+      {'name': 'Roboto', 'label': TxaLanguage.t('font_roboto')},
+      {'name': 'Inter', 'label': TxaLanguage.t('font_inter')},
+      {'name': 'Open Sans', 'label': TxaLanguage.t('font_open_sans')},
+    ];
+
+    return ListTile(
+      contentPadding: EdgeInsets.zero,
+      leading: const Icon(Icons.font_download_rounded, color: Colors.white70),
+      title: Text(
+        TxaLanguage.t('font_family'),
+        style: const TextStyle(color: Colors.white),
+      ),
+      subtitle: Text(
+        fonts.firstWhere(
+          (f) => f['name'] == TxaSettings.fontFamily,
+          orElse: () => fonts[0],
+        )['label']!,
+        style: const TextStyle(color: TxaTheme.textMuted),
+      ),
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: TxaTheme.secondaryBg,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (ctx) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 20),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Text(
+                        TxaLanguage.t('font_family'),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    ...fonts.map((f) {
+                      final isSelected = TxaSettings.fontFamily == f['name'];
+                      return ListTile(
+                        onTap: () {
+                          setState(() => TxaSettings.fontFamily = f['name']!);
+                          Navigator.pop(ctx);
+                        },
+                        title: Text(
+                          f['label']!,
+                          style: TextStyle(
+                            color: isSelected ? TxaTheme.accent : Colors.white,
+                            fontWeight: isSelected
+                                ? FontWeight.bold
+                                : FontWeight.normal,
+                          ),
+                        ),
+                        trailing: isSelected
+                            ? const Icon(
+                                Icons.check_circle_rounded,
+                                color: TxaTheme.accent,
+                              )
+                            : null,
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
