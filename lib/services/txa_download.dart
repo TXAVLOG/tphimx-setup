@@ -19,6 +19,7 @@ class TxaDownload {
   DateTime? startTime;
   DateTime? lastUpdateTime;
   CancelToken? _cancelToken;
+  String? lastError;
 
   // For reactive speed calculation
   int _lastBytesSnapshot = 0;
@@ -51,6 +52,7 @@ class TxaDownload {
     bool showNotification = true,
   }) async {
     try {
+      lastError = null;
       isDownloading = true;
       startTime = DateTime.now();
 
@@ -144,19 +146,21 @@ class TxaDownload {
       return File(savePath);
     } catch (e) {
       isDownloading = false;
-      String errorMsg = 'Tải thất bại ❌';
-
       if (e is DioException) {
         if (CancelToken.isCancel(e)) {
-          errorMsg = 'Đã hủy tải 🛑';
+          lastError = 'Đã hủy tải 🛑';
         } else if (e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.sendTimeout ||
+            e.type == DioExceptionType.receiveTimeout ||
             e.type == DioExceptionType.connectionError) {
-          errorMsg = 'Lỗi mạng: Kiểm tra kết nối 🌐';
+          lastError = TxaLanguage.t('download_failed_network');
+        } else if (e.response != null) {
+          lastError = TxaLanguage.t('download_failed_server');
         }
       }
 
       if (showNotification) {
-        await _completeNotification(filename, '❌ $errorMsg');
+        await _completeNotification(filename, '❌ $lastError');
         TxaShortcutService.setDownloadStatus(null);
       }
       return null;

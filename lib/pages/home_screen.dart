@@ -61,6 +61,15 @@ class _HomeScreenState extends State<HomeScreen> {
   ];
 
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    // Refetch when dependencies change (like auth token)
+    if (TxaSettings.authToken.isNotEmpty && _unreadNotifications == 0) {
+      _fetchUnreadCount();
+    }
+  }
+
+  @override
   void initState() {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -70,6 +79,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _fetchUnreadCount() async {
+    if (TxaSettings.authToken.isEmpty) {
+      if (mounted) setState(() => _unreadNotifications = 0);
+      return;
+    }
     try {
       final res = await Provider.of<TxaApi>(
         context,
@@ -1497,7 +1510,7 @@ class _HeroSliderState extends State<_HeroSlider> {
                                 if (TxaSettings.authToken.isEmpty) {
                                   TxaToast.show(
                                     context,
-                                    TxaLanguage.t('verify_email_msg'),
+                                    TxaLanguage.t('login_required_favorites'),
                                   );
                                   return;
                                 }
@@ -1519,11 +1532,12 @@ class _HeroSliderState extends State<_HeroSlider> {
                                     );
                                   }
                                 } catch (e) {
-                                  if (context.mounted)
+                                  if (context.mounted) {
                                     TxaToast.show(
                                       context,
                                       TxaLanguage.t('error'),
                                     );
+                                  }
                                 }
                               },
                             );
@@ -1847,10 +1861,7 @@ class _MovieCardState extends State<_MovieCard> {
 
   Future<void> _toggleFavorite() async {
     if (TxaSettings.authToken.isEmpty) {
-      TxaToast.show(
-        context,
-        TxaLanguage.t('verify_email_msg'),
-      ); // "Vui lòng đăng nhập" fallback
+      TxaToast.show(context, TxaLanguage.t('login_required_favorites'));
       return;
     }
 

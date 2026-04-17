@@ -206,7 +206,7 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
                               )
                             : null,
                       );
-                    }).toList(),
+                    }),
                   ],
                 ),
               ),

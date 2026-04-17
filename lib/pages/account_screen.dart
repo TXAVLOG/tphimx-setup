@@ -359,18 +359,62 @@ class _AccountScreenState extends State<AccountScreen> {
               } catch (_) {}
 
               return FutureBuilder<Map<String, dynamic>>(
-                initialData: initialUser,
                 future: Provider.of<TxaApi>(context, listen: false).getAuthMe(),
                 builder: (context, snapshot) {
-                  final Map<String, dynamic>? userData = snapshot.data?['data'];
+                  Map<String, dynamic>? userData;
 
-                  // Update cache if we got fresh data
-                  if (snapshot.hasData && userData != null) {
-                    TxaSettings.userData = jsonEncode(userData);
+                  if (snapshot.hasData) {
+                    userData = snapshot.data?['data'];
+                    // Update cache silently
+                    if (userData != null) {
+                      TxaSettings.userData = jsonEncode(userData);
+                    }
+                  } else if (initialUser != null) {
+                    // Fallback to cache while loading or on error
+                    userData = initialUser['data'];
                   }
 
-                  final name = userData?['name'] ?? 'User';
+                  if (userData == null && snapshot.hasError) {
+                    return Container(
+                      padding: const EdgeInsets.all(20),
+                      margin: const EdgeInsets.symmetric(horizontal: 16),
+                      decoration: BoxDecoration(
+                        color: TxaTheme.cardBg,
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.redAccent.withValues(alpha: 0.3),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          const Icon(
+                            Icons.error_outline_rounded,
+                            color: Colors.redAccent,
+                            size: 32,
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            snapshot.error?.toString() ??
+                                TxaLanguage.t('error_connection'),
+                            textAlign: TextAlign.center,
+                            style: const TextStyle(
+                              color: TxaTheme.textSecondary,
+                              fontSize: 13,
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          TextButton(
+                            onPressed: () => setState(() {}),
+                            child: Text(TxaLanguage.t('retry')),
+                          ),
+                        ],
+                      ),
+                    );
+                  }
+
+                  final name = userData?['name'] ?? 'TPhimX User';
                   final email = userData?['email'] ?? '...';
+                  final isVerified = userData?['email_verified_at'] != null;
                   final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
 
                   return Container(
@@ -403,60 +447,15 @@ class _AccountScreenState extends State<AccountScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      name,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (userData?['email_verified_at'] != null)
-                                    Container(
-                                      margin: const EdgeInsets.only(left: 8),
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.blue.withValues(
-                                          alpha: 0.15,
-                                        ),
-                                        borderRadius: BorderRadius.circular(6),
-                                        border: Border.all(
-                                          color: Colors.blue.withValues(
-                                            alpha: 0.4,
-                                          ),
-                                          width: 0.5,
-                                        ),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          const Icon(
-                                            Icons.verified_user_rounded,
-                                            color: Colors.blue,
-                                            size: 10,
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(
-                                            TxaLanguage.t('email_verified'),
-                                            style: const TextStyle(
-                                              color: Colors.blue,
-                                              fontSize: 9,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                ],
+                              Text(
+                                name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
                               ),
                               const SizedBox(height: 2),
                               Text(
@@ -466,6 +465,52 @@ class _AccountScreenState extends State<AccountScreen> {
                                   fontSize: 13,
                                 ),
                               ),
+                              const SizedBox(height: 6),
+                              if (isVerified)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: Colors.green.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: Colors.green.withValues(
+                                        alpha: 0.3,
+                                      ),
+                                    ),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      const Icon(
+                                        Icons.verified_rounded,
+                                        color: Colors.greenAccent,
+                                        size: 14,
+                                      ),
+                                      const SizedBox(width: 4),
+                                      Text(
+                                        TxaLanguage.t('email_verified'),
+                                        style: const TextStyle(
+                                          color: Colors.greenAccent,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                )
+                              else
+                                Text(
+                                  TxaLanguage.t('email_not_verified'),
+                                  style: TextStyle(
+                                    color: Colors.redAccent.withValues(
+                                      alpha: 0.7,
+                                    ),
+                                    fontSize: 11,
+                                  ),
+                                ),
                             ],
                           ),
                         ),

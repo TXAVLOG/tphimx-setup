@@ -14,19 +14,20 @@ class TxaMiniPlayer extends StatefulWidget {
 }
 
 class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
-  Offset _offset = const Offset(
-    -20,
-    -100,
-  ); // Default bottom-right (relative to screen dimensions)
+  // Mini-player dimensions
+  static const double miniWidth = 320;
+  static const double miniHeight = 180;
+  static const double miniMargin = 16;
+
+  Offset _offset = const Offset(-20, -100);
   bool _isDragging = false;
 
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Initialize offset based on screen size if not set
     final size = MediaQuery.of(context).size;
     if (_offset.dx < 0) {
-      _offset = Offset(size.width - 240, size.height - 180);
+      _offset = Offset(size.width - miniWidth - miniMargin, size.height - 200);
     }
   }
 
@@ -55,19 +56,18 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
             onPanEnd: (details) {
               setState(() => _isDragging = false);
               final size = MediaQuery.of(context).size;
-              // Snap to nearest side (240 width + 16 margin)
               double targetX = _offset.dx < size.width / 2
-                  ? 16
-                  : size.width - 256;
-              double targetY = _offset.dy.clamp(60.0, size.height - 180.0);
+                  ? miniMargin
+                  : size.width - miniWidth - miniMargin;
+              double targetY = _offset.dy.clamp(60.0, size.height - 220.0);
               setState(() {
                 _offset = Offset(targetX, targetY);
               });
             },
             onTap: () => _restoreToFull(context, provider),
             child: Container(
-              width: 240,
-              height: 135,
+              width: miniWidth,
+              height: miniHeight,
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
@@ -85,10 +85,12 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                   borderRadius: BorderRadius.circular(14),
                   child: Stack(
                     children: [
-                      // Video content or Placeholder
                       Positioned.fill(
                         child: provider.controller != null
-                            ? BetterPlayer(controller: provider.controller!)
+                            ? BetterPlayer(
+                                key: ValueKey(provider.controller.hashCode),
+                                controller: provider.controller!,
+                              )
                             : Container(
                                 color: TxaTheme.cardBg,
                                 child: const Center(
@@ -99,8 +101,6 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                                 ),
                               ),
                       ),
-
-                      // Overlay Controls (Subtle Gradient)
                       Positioned.fill(
                         child: Container(
                           decoration: BoxDecoration(
@@ -115,22 +115,25 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                           ),
                         ),
                       ),
-
-                      // Status Info (Ultra Compact)
                       Positioned(
-                        top: 6,
-                        left: 10,
-                        right: 30,
+                        top: 8,
+                        left: 12,
+                        right: 36,
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              provider.movie['name'] ?? '',
+                              provider.movie != null &&
+                                      (provider.movie['name'] ?? '')
+                                          .toString()
+                                          .isNotEmpty
+                                  ? provider.movie['name'].toString()
+                                  : 'TPhimX Premium',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 11,
+                                fontSize: 14,
                                 fontWeight: FontWeight.bold,
                                 shadows: [
                                   Shadow(blurRadius: 4, color: Colors.black),
@@ -139,9 +142,9 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                             ),
                             Text(
                               "${TxaLanguage.t('episode')} ${provider.episodeName}",
-                              style: TextStyle(
+                              style: const TextStyle(
                                 color: TxaTheme.accent,
-                                fontSize: 9,
+                                fontSize: 12,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),

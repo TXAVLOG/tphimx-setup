@@ -19,11 +19,20 @@ class TxaDownloadDialog extends StatefulWidget {
   State<TxaDownloadDialog> createState() => _TxaDownloadDialogState();
 
   /// Static helper to show the dialog
-  static Future<void> show(BuildContext context, String url, String filename, {Function(String path)? onFinished}) {
+  static Future<void> show(
+    BuildContext context,
+    String url,
+    String filename, {
+    Function(String path)? onFinished,
+  }) {
     return showDialog(
       context: context,
       barrierDismissible: false, // Lock UI
-      builder: (ctx) => TxaDownloadDialog(url: url, filename: filename, onFinished: onFinished),
+      builder: (ctx) => TxaDownloadDialog(
+        url: url,
+        filename: filename,
+        onFinished: onFinished,
+      ),
     );
   }
 }
@@ -55,8 +64,11 @@ class _TxaDownloadDialogState extends State<TxaDownloadDialog> {
       if (widget.onFinished != null) widget.onFinished!(file.path);
     } else {
       // If error (and not cancelled)
-      if (!_downloader.isDownloading && _downloader.downloadedBytes < _downloader.totalBytes) {
-         setState(() => _error = TxaLanguage.t('video_error'));
+      if (!_downloader.isDownloading) {
+        setState(
+          () => _error =
+              _downloader.lastError ?? TxaLanguage.t('cannot_download_update'),
+        );
       }
     }
   }
@@ -65,7 +77,7 @@ class _TxaDownloadDialogState extends State<TxaDownloadDialog> {
   Widget build(BuildContext context) {
     final info = _progress;
     final progressVal = (info?['progress'] ?? 0.0) / 100.0;
-    
+
     return PopScope(
       canPop: false, // Prevent back button
       child: Center(
@@ -80,11 +92,19 @@ class _TxaDownloadDialogState extends State<TxaDownloadDialog> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(Icons.downloading_rounded, color: TxaTheme.accent, size: 48),
+              const Icon(
+                Icons.downloading_rounded,
+                color: TxaTheme.accent,
+                size: 48,
+              ),
               const SizedBox(height: 16),
               Text(
                 _error ?? TxaLanguage.t('downloading'),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
               ),
               const SizedBox(height: 8),
               if (_error == null) ...[
@@ -110,11 +130,18 @@ class _TxaDownloadDialogState extends State<TxaDownloadDialog> {
                   children: [
                     Text(
                       "${info?['formatted']?['downloaded'] ?? '0B'} / ${info?['formatted']?['total'] ?? '0B'}",
-                      style: const TextStyle(color: Colors.white60, fontSize: 11),
+                      style: const TextStyle(
+                        color: Colors.white60,
+                        fontSize: 11,
+                      ),
                     ),
                     Text(
                       "${(progressVal * 100).toInt()}%",
-                      style: const TextStyle(color: TxaTheme.accent, fontWeight: FontWeight.bold, fontSize: 12),
+                      style: const TextStyle(
+                        color: TxaTheme.accent,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12,
+                      ),
                     ),
                   ],
                 ),
@@ -124,22 +151,31 @@ class _TxaDownloadDialogState extends State<TxaDownloadDialog> {
                   children: [
                     Text(
                       "${TxaLanguage.t('speed')}: ${info?['formatted']?['speed'] ?? '0 B/s'}",
-                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                      ),
                     ),
                     Text(
                       "ETA: ${info?['formatted']?['eta'] ?? '00:00'}",
-                      style: const TextStyle(color: Colors.white70, fontSize: 11),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 11,
+                      ),
                     ),
                   ],
                 ),
               ] else ...[
                 const SizedBox(height: 16),
-                Text(_error!, style: const TextStyle(color: Colors.redAccent, fontSize: 13)),
+                Text(
+                  _error!,
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+                ),
               ],
               const SizedBox(height: 24),
               Row(
                 children: [
-                   Expanded(
+                  Expanded(
                     child: OutlinedButton(
                       onPressed: () {
                         _downloader.cancelDownload();
@@ -148,10 +184,16 @@ class _TxaDownloadDialogState extends State<TxaDownloadDialog> {
                       style: OutlinedButton.styleFrom(
                         side: const BorderSide(color: Colors.white10),
                         foregroundColor: Colors.white70,
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
                       ),
-                      child: Text(_error != null ? TxaLanguage.t('close') : TxaLanguage.t('cancel')),
+                      child: Text(
+                        _error != null
+                            ? TxaLanguage.t('close')
+                            : TxaLanguage.t('cancel'),
+                      ),
                     ),
                   ),
                 ],

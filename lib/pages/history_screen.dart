@@ -6,6 +6,8 @@ import '../services/txa_language.dart';
 import '../theme/txa_theme.dart';
 import '../utils/txa_format.dart';
 import 'movie_detail_screen.dart';
+import '../services/txa_settings.dart';
+import 'auth_screen.dart';
 
 class HistoryScreen extends StatefulWidget {
   const HistoryScreen({super.key});
@@ -26,6 +28,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
   }
 
   Future<void> _loadHistory() async {
+    if (TxaSettings.authToken.isEmpty) {
+      setState(() {
+        _loading = false;
+        _error = 'LOGIN_REQUIRED';
+      });
+      return;
+    }
     setState(() {
       _loading = true;
       _error = null;
@@ -90,17 +99,51 @@ class _HistoryScreenState extends State<HistoryScreen> {
     }
 
     if (_error != null) {
+      final bool isLoginReq = _error == 'LOGIN_REQUIRED';
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Text(
-              TxaLanguage.t('error'),
-              style: const TextStyle(color: Colors.white),
+            Icon(
+              isLoginReq
+                  ? Icons.lock_outline_rounded
+                  : Icons.error_outline_rounded,
+              size: 64,
+              color: TxaTheme.textMuted.withValues(alpha: 0.3),
             ),
-            TextButton(
-              onPressed: _loadHistory,
-              child: Text(TxaLanguage.t('retry')),
+            const SizedBox(height: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 40),
+              child: Text(
+                isLoginReq
+                    ? TxaLanguage.t('login_required_history')
+                    : TxaLanguage.t('error_loading_data'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: TxaTheme.textMuted),
+              ),
+            ),
+            const SizedBox(height: 24),
+            ElevatedButton(
+              onPressed: isLoginReq
+                  ? () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (ctx) => const AuthScreen()),
+                      ).then((val) {
+                        if (val == true) _loadHistory();
+                      });
+                    }
+                  : _loadHistory,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: TxaTheme.accent,
+                foregroundColor: Colors.white,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(20),
+                ),
+              ),
+              child: Text(
+                isLoginReq ? TxaLanguage.t('login') : TxaLanguage.t('retry'),
+              ),
             ),
           ],
         ),

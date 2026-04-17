@@ -172,22 +172,22 @@ class _TPhimXAppState extends State<TPhimXApp> {
         textTheme = GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme);
     }
 
-    return MediaQuery(
-      data: MediaQuery.of(
-        context,
-      ).copyWith(textScaler: TextScaler.linear(TxaSettings.fontSizeScale)),
-      child: MaterialApp(
-        navigatorKey: _navigatorKey,
-        title: 'TPhimX Premium',
-        debugShowCheckedModeBanner: false,
-        theme: TxaTheme.darkTheme.copyWith(textTheme: textTheme),
-        home: widget.isTV ? const TVBlockScreen() : const MainEntry(),
-        builder: (context, child) {
-          return Stack(
+    return MaterialApp(
+      navigatorKey: _navigatorKey,
+      title: 'TPhimX Premium',
+      debugShowCheckedModeBanner: false,
+      theme: TxaTheme.darkTheme.copyWith(textTheme: textTheme),
+      home: widget.isTV ? const TVBlockScreen() : const MainEntry(),
+      builder: (context, child) {
+        return MediaQuery(
+          data: MediaQuery.of(
+            context,
+          ).copyWith(textScaler: TextScaler.linear(TxaSettings.fontSizeScale)),
+          child: Stack(
             children: [child ?? const SizedBox.shrink(), const TxaMiniPlayer()],
-          );
-        },
-      ),
+          ),
+        );
+      },
     );
   }
 }
@@ -293,6 +293,8 @@ class _MainEntryState extends State<MainEntry> {
         },
       );
     }
-    return const HomeScreen(); // Now using the real HomeScreen with API & TxaNav
+    return HomeScreen(
+      key: ValueKey(TxaSettings.authToken),
+    ); // Pass ValueKey to force rebuild on auth change
   }
 }

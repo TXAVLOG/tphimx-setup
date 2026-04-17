@@ -126,9 +126,15 @@ class _AuthScreenState extends State<AuthScreen>
         });
       } else {
         if (!mounted) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(TxaLanguage.t('error_connection'))),
-        );
+        String errorMsg = TxaLanguage.t('error_connection');
+        if (e.type == DioExceptionType.connectionTimeout ||
+            e.type == DioExceptionType.receiveTimeout) {
+          errorMsg = "${TxaLanguage.t('error_connection')} (Timeout)";
+        } else if (e.response?.data != null &&
+            e.response?.data['message'] != null) {
+          errorMsg = e.response?.data['message'];
+        }
+        TxaToast.show(context, errorMsg, isError: true);
       }
     } finally {
       if (mounted) setState(() => _loading = false);
