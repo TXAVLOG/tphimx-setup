@@ -247,7 +247,10 @@ class TxaApi {
   }
 
   Future<Map<String, dynamic>> verifyEmail(String token) async {
-    final response = await post('/auth/verify-email', data: {'token': token});
+    final response = await post(
+      '/api/auth/verify-email',
+      data: {'token': token},
+    );
     return response.data;
   }
 

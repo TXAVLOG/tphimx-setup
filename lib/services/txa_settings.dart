@@ -130,10 +130,16 @@ class TxaSettings {
 
   // --- Auth ---
   static String get authToken => _prefs.getString('auth_token') ?? '';
-  static set authToken(String value) => _prefs.setString('auth_token', value);
+  static set authToken(String value) {
+    _prefs.setString('auth_token', value);
+    _notify();
+  }
 
   static String get userData => _prefs.getString('user_data') ?? '';
-  static set userData(String value) => _prefs.setString('user_data', value);
+  static set userData(String value) {
+    _prefs.setString('user_data', value);
+    _notify();
+  }
 
   // Scheduled Movies
   static bool isMovieScheduled(String movieId) {
