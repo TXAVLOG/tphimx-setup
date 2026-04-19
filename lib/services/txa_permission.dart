@@ -14,20 +14,26 @@ class TxaPermission {
       },
     ];
     // manageExternalStorage is Android-only — crashes on iOS
-      if (Platform.isAndroid) {
-        perms.add({
-          'id': 'storage',
-          'label': TxaLanguage.t('permission_storage_label'),
-          'desc': TxaLanguage.t('permission_storage_desc'),
-          'permission': Permission.manageExternalStorage,
-        });
-        perms.add({
-          'id': 'overlay',
-          'label': TxaLanguage.t('permission_overlay_label'),
-          'desc': TxaLanguage.t('permission_overlay_desc'),
-          'permission': Permission.systemAlertWindow,
-        });
-      }
+    if (Platform.isAndroid) {
+      perms.add({
+        'id': 'storage',
+        'label': TxaLanguage.t('permission_storage_label'),
+        'desc': TxaLanguage.t('permission_storage_desc'),
+        'permission': Permission.manageExternalStorage,
+      });
+      perms.add({
+        'id': 'overlay',
+        'label': TxaLanguage.t('permission_overlay_label'),
+        'desc': TxaLanguage.t('permission_overlay_desc'),
+        'permission': Permission.systemAlertWindow,
+      });
+      perms.add({
+        'id': 'dnd',
+        'label': TxaLanguage.t('permission_dnd_label'),
+        'desc': TxaLanguage.t('permission_dnd_desc'),
+        'permission': Permission.accessNotificationPolicy,
+      });
+    }
     return perms;
   }
 
@@ -56,6 +62,9 @@ class TxaPermission {
       // On Android 11+ this opens the "Manage All Files" screen correctly.
       // For earlier versions, it acts as a storage request.
       await Permission.manageExternalStorage.request();
+
+      // 3. Do Not Disturb Access
+      await Permission.accessNotificationPolicy.request();
     }
   }
 

@@ -3,7 +3,6 @@ import 'package:provider/provider.dart';
 import 'package:better_player_plus/better_player_plus.dart';
 import '../services/txa_mini_player_provider.dart';
 import '../theme/txa_theme.dart';
-import '../services/txa_language.dart';
 import 'txa_player.dart';
 
 class TxaMiniPlayer extends StatefulWidget {
@@ -87,10 +86,7 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                     children: [
                       Positioned.fill(
                         child: provider.controller != null
-                            ? BetterPlayer(
-                                key: ValueKey(provider.controller.hashCode),
-                                controller: provider.controller!,
-                              )
+                            ? BetterPlayer(controller: provider.controller!)
                             : Container(
                                 color: TxaTheme.cardBg,
                                 child: const Center(
@@ -123,17 +119,13 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              provider.movie != null &&
-                                      (provider.movie['name'] ?? '')
-                                          .toString()
-                                          .isNotEmpty
-                                  ? provider.movie['name'].toString()
-                                  : 'TPhimX Premium',
+                              provider.movie?['name']?.toString() ??
+                                  'TPhimX Premium',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                               style: const TextStyle(
                                 color: Colors.white,
-                                fontSize: 14,
+                                fontSize: 13,
                                 fontWeight: FontWeight.bold,
                                 shadows: [
                                   Shadow(blurRadius: 4, color: Colors.black),
@@ -141,10 +133,10 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                               ),
                             ),
                             Text(
-                              "${TxaLanguage.t('episode')} ${provider.episodeName}",
+                              provider.episodeName,
                               style: const TextStyle(
                                 color: TxaTheme.accent,
-                                fontSize: 12,
+                                fontSize: 11,
                                 fontWeight: FontWeight.w900,
                               ),
                             ),

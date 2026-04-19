@@ -18,6 +18,7 @@ import '../pages/category_list_screen.dart';
 import '../pages/movie_detail_screen.dart';
 import '../pages/global_settings_screen.dart';
 import '../widgets/txa_dropdown.dart';
+import '../services/favorite_provider.dart';
 import '../widgets/txa_player.dart';
 import '../utils/txa_toast.dart';
 import 'package:flutter/services.dart';
@@ -659,8 +660,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.2.2';
-                  final build = snapshot.data?.buildNumber ?? '322';
+                  final version = snapshot.data?.version ?? '3.2.3';
+                  final build = snapshot.data?.buildNumber ?? '323';
                   return Text(
                     'Version $version (Build $build)',
                     style: const TextStyle(
@@ -713,6 +714,16 @@ class _HomeTabState extends State<_HomeTab> {
       final api = Provider.of<TxaApi>(context, listen: false);
       final result = await api.getHome();
       final data = result['data'] ?? result;
+
+      // Sync favorite IDs to provider
+      if (mounted && data['favorite_ids'] != null) {
+        Provider.of<FavoriteProvider>(context, listen: false).loadFavoriteIds(
+          (data['favorite_ids'] as List)
+              .map((e) => int.parse(e.toString()))
+              .toList(),
+        );
+      }
+
       setState(() {
         _data = data;
         _loading = false;
@@ -1496,18 +1507,21 @@ class _HeroSliderState extends State<_HeroSlider> {
                                   return;
                                 }
                                 try {
-                                  final api = Provider.of<TxaApi>(
-                                    context,
-                                    listen: false,
-                                  );
-                                  await api.toggleFavorite(id);
-                                  setState(() {
-                                    currentMovie['is_favorite'] = !isFav;
-                                  });
-                                  if (context.mounted) {
+                                  final favProvider =
+                                      Provider.of<FavoriteProvider>(
+                                        context,
+                                        listen: false,
+                                      );
+                                  final success = await favProvider
+                                      .toggleFavorite(id);
+
+                                  if (context.mounted && success) {
+                                    final newStatus = favProvider.isFavorite(
+                                      id,
+                                    );
                                     TxaToast.show(
                                       context,
-                                      !isFav
+                                      newStatus
                                           ? TxaLanguage.t('favorite_added')
                                           : TxaLanguage.t('favorite_removed'),
                                     );

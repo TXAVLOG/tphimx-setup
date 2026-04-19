@@ -22,6 +22,14 @@ class FavoriteProvider extends ChangeNotifier {
     }
   }
 
+  void loadFavoriteIds(List<int> ids) {
+    _favorites.clear();
+    for (var id in ids) {
+      _favorites[id] = true;
+    }
+    notifyListeners();
+  }
+
   Future<bool> toggleFavorite(int movieId) async {
     if (TxaSettings.authToken.isEmpty) return false;
 

@@ -37,11 +37,17 @@ class TxaLogger {
     String message, {
     bool isError = false,
     String? tag,
+    String type = 'app',
   }) async {
     try {
       final path = await _logPath;
       final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final file = File('$path/app_$date.log');
+      final file = File('$path/${type}_$date.log');
+
+      // Auto-clean if file > 5MB
+      if (await file.exists() && await file.length() > 5 * 1024 * 1024) {
+        await file.delete();
+      }
 
       final now = DateTime.now();
       final timestamp = DateFormat('HH:mm:ss.SSS').format(now);
@@ -55,7 +61,9 @@ class TxaLogger {
 
       // Also print to console for development with colors/tags
       if (kDebugMode) {
-        final consolePrefix = isError ? '❌ [TPHIMX-ERR]' : 'ℹ️ [TPHIMX-INF]';
+        final consolePrefix = isError
+            ? '❌ [TPHIMX-$type]'
+            : 'ℹ️ [TPHIMX-$type]';
         debugPrint('$consolePrefix $tagStr$message');
       }
     } catch (e) {
@@ -87,6 +95,6 @@ class TxaLogger {
     }
     buffer.writeln('──────────────────────────────────────────────');
 
-    await log(buffer.toString(), isError: isError, tag: 'API');
+    await log(buffer.toString(), isError: isError, tag: 'API', type: 'api');
   }
 }

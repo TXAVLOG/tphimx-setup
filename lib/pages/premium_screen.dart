@@ -52,10 +52,20 @@ class _PremiumScreenState extends State<PremiumScreen> {
       if (m != null && m.isNotEmpty) {
         final bool isValid = RegExp(r'^[a-fA-F0-9\-]{20,45}$').hasMatch(m);
         if (isValid) {
-          setState(() { TxaSettings.udid = m; });
-          if (mounted) TxaToast.show(context, TxaLanguage.t('udid_auto_detected'));
+          setState(() {
+            TxaSettings.udid = m;
+          });
+          if (mounted) {
+            TxaToast.show(context, TxaLanguage.t('udid_auto_detected'));
+          }
         } else {
-          if (mounted) TxaToast.show(context, TxaLanguage.t('udid_invalid').replaceAll('%m', m), isError: true);
+          if (mounted) {
+            TxaToast.show(
+              context,
+              TxaLanguage.t('udid_invalid').replaceAll('%m', m),
+              isError: true,
+            );
+          }
         }
       }
     }
@@ -65,9 +75,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
     final Uri url = Uri.parse(urlStr);
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(TxaLanguage.t('not_open_link'))),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(TxaLanguage.t('not_open_link'))));
     }
   }
 
@@ -81,14 +91,17 @@ class _PremiumScreenState extends State<PremiumScreen> {
       } catch (e) {
         deviceName = "iOS Device";
       }
-      final String url = "https://asset.nrotxa.online/uuid?device_name=${Uri.encodeComponent(deviceName)}";
+      final String url =
+          "https://asset.nrotxa.online/uuid?device_name=${Uri.encodeComponent(deviceName)}";
       if (!context.mounted) return;
       await _launchUrl(context, url);
     }
   }
 
   void _handleDeleteUdid() {
-    setState(() { TxaSettings.udid = ''; });
+    setState(() {
+      TxaSettings.udid = '';
+    });
     TxaToast.show(context, TxaLanguage.t('udid_deleted'));
   }
 
@@ -107,11 +120,21 @@ class _PremiumScreenState extends State<PremiumScreen> {
         ),
         title: Row(
           children: [
-            const Icon(Icons.fingerprint_rounded, color: TxaTheme.accent, size: 20),
+            const Icon(
+              Icons.fingerprint_rounded,
+              color: TxaTheme.accent,
+              size: 20,
+            ),
             const SizedBox(width: 8),
             Text(
-              TxaSettings.udid.isEmpty ? TxaLanguage.t('udid_register_title') : TxaLanguage.t('udid_update_title'),
-              style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
+              TxaSettings.udid.isEmpty
+                  ? TxaLanguage.t('udid_register_title')
+                  : TxaLanguage.t('udid_update_title'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
             ),
           ],
         ),
@@ -121,12 +144,22 @@ class _PremiumScreenState extends State<PremiumScreen> {
             TextField(
               controller: controller,
               autofocus: true,
-              style: const TextStyle(color: Colors.white, fontSize: 14, fontFamily: 'monospace'),
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontFamily: 'monospace',
+              ),
               decoration: InputDecoration(
                 filled: true,
                 fillColor: Colors.black26,
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 16,
+                  vertical: 12,
+                ),
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(12),
+                  borderSide: BorderSide.none,
+                ),
                 hintText: TxaLanguage.t('udid_hint'),
                 hintStyle: const TextStyle(color: Colors.white30, fontSize: 13),
               ),
@@ -136,15 +169,23 @@ class _PremiumScreenState extends State<PremiumScreen> {
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
-            child: Text(TxaLanguage.t('cancel'), style: const TextStyle(color: Colors.white38, fontSize: 13)),
+            child: Text(
+              TxaLanguage.t('cancel'),
+              style: const TextStyle(color: Colors.white38, fontSize: 13),
+            ),
           ),
           ElevatedButton(
             onPressed: () {
               final val = controller.text.trim();
               if (val.isNotEmpty) {
-                setState(() { TxaSettings.udid = val; });
+                setState(() {
+                  TxaSettings.udid = val;
+                });
                 Navigator.pop(ctx);
-                TxaToast.show(context, '✅ ${TxaLanguage.t('udid_save')} ${TxaLanguage.t('success')}!');
+                TxaToast.show(
+                  context,
+                  '✅ ${TxaLanguage.t('udid_save')} ${TxaLanguage.t('success')}!',
+                );
               }
             },
             style: ElevatedButton.styleFrom(
@@ -152,9 +193,14 @@ class _PremiumScreenState extends State<PremiumScreen> {
               foregroundColor: Colors.white,
               elevation: 0,
               padding: const EdgeInsets.symmetric(horizontal: 20),
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
             ),
-            child: Text(TxaLanguage.t('udid_save'), style: const TextStyle(fontWeight: FontWeight.bold)),
+            child: Text(
+              TxaLanguage.t('udid_save'),
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
           ),
         ],
       ),
@@ -166,24 +212,35 @@ class _PremiumScreenState extends State<PremiumScreen> {
       final dir = await getApplicationDocumentsDirectory();
       final logDir = Directory('${dir.path}/Logs');
       if (!await logDir.exists()) {
-        if (mounted) TxaToast.show(context, TxaLanguage.t('no_logs_found'), isError: true);
+        if (mounted) {
+          TxaToast.show(context, TxaLanguage.t('no_logs_found'), isError: true);
+        }
         return;
       }
 
-      final files = await logDir.list().where((f) => f.path.endsWith('.log')).toList();
+      final files = await logDir
+          .list()
+          .where((f) => f.path.endsWith('.log'))
+          .toList();
       if (files.isEmpty) {
-        if (mounted) TxaToast.show(context, TxaLanguage.t('no_logs_found'), isError: true);
+        if (mounted) {
+          TxaToast.show(context, TxaLanguage.t('no_logs_found'), isError: true);
+        }
         return;
       }
 
       final xFiles = files.map((f) => XFile(f.path)).toList();
-      await Share.shareXFiles(
-        xFiles,
-        subject: TxaLanguage.t('share_logs_subject'),
+      await SharePlus.instance.share(
+        ShareParams(
+          files: xFiles,
+          subject: TxaLanguage.t('share_logs_subject'),
+        ),
       );
     } catch (e) {
       TxaLogger.log('Share logs error: $e', isError: true);
-      if (mounted) TxaToast.show(context, '${TxaLanguage.t('error')}: $e', isError: true);
+      if (mounted) {
+        TxaToast.show(context, '${TxaLanguage.t('error')}: $e', isError: true);
+      }
     }
   }
 
@@ -207,18 +264,28 @@ class _PremiumScreenState extends State<PremiumScreen> {
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: isRegistered
-                          ? [Colors.green.withValues(alpha: 0.2), Colors.green.withValues(alpha: 0.05)]
-                          : [TxaTheme.accent.withValues(alpha: 0.2), TxaTheme.accent.withValues(alpha: 0.05)],
+                          ? [
+                              Colors.green.withValues(alpha: 0.2),
+                              Colors.green.withValues(alpha: 0.05),
+                            ]
+                          : [
+                              TxaTheme.accent.withValues(alpha: 0.2),
+                              TxaTheme.accent.withValues(alpha: 0.05),
+                            ],
                       begin: Alignment.topLeft,
                       end: Alignment.bottomRight,
                     ),
                     borderRadius: BorderRadius.circular(16),
                     border: Border.all(
-                      color: isRegistered ? Colors.green.withValues(alpha: 0.3) : TxaTheme.accent.withValues(alpha: 0.3),
+                      color: isRegistered
+                          ? Colors.green.withValues(alpha: 0.3)
+                          : TxaTheme.accent.withValues(alpha: 0.3),
                     ),
                   ),
                   child: Icon(
-                    isRegistered ? Icons.verified_rounded : Icons.workspace_premium_rounded,
+                    isRegistered
+                        ? Icons.verified_rounded
+                        : Icons.workspace_premium_rounded,
                     color: isRegistered ? Colors.green : TxaTheme.accent,
                     size: 32,
                   ),
@@ -230,14 +297,22 @@ class _PremiumScreenState extends State<PremiumScreen> {
                     children: [
                       Text(
                         TxaLanguage.t('ios_service_title'),
-                        style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                       const SizedBox(height: 4),
                       Text(
                         isRegistered
                             ? TxaLanguage.t('ios_ready_desc')
                             : TxaLanguage.t('ios_premium_desc'),
-                        style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12, height: 1.4),
+                        style: const TextStyle(
+                          color: TxaTheme.textMuted,
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
                       ),
                     ],
                   ),
@@ -253,29 +328,43 @@ class _PremiumScreenState extends State<PremiumScreen> {
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   colors: isRegistered
-                      ? [Colors.green.withValues(alpha: 0.1), Colors.transparent]
-                      : [TxaTheme.accent.withValues(alpha: 0.1), Colors.transparent],
+                      ? [
+                          Colors.green.withValues(alpha: 0.1),
+                          Colors.transparent,
+                        ]
+                      : [
+                          TxaTheme.accent.withValues(alpha: 0.1),
+                          Colors.transparent,
+                        ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
                 borderRadius: BorderRadius.circular(20),
                 border: Border.all(
-                  color: isRegistered ? Colors.green.withValues(alpha: 0.3) : TxaTheme.accent.withValues(alpha: 0.3),
+                  color: isRegistered
+                      ? Colors.green.withValues(alpha: 0.3)
+                      : TxaTheme.accent.withValues(alpha: 0.3),
                 ),
               ),
               child: Column(
                 children: [
                   Icon(
-                    isRegistered ? Icons.check_circle_rounded : Icons.info_outline_rounded,
+                    isRegistered
+                        ? Icons.check_circle_rounded
+                        : Icons.info_outline_rounded,
                     color: isRegistered ? Colors.green : TxaTheme.accent,
                     size: 48,
                   ),
                   const SizedBox(height: 12),
                   Text(
-                    isRegistered ? TxaLanguage.t('udid_registered_badge') : TxaLanguage.t('ios_premium_desc'),
+                    isRegistered
+                        ? TxaLanguage.t('udid_registered_badge')
+                        : TxaLanguage.t('ios_premium_desc'),
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      color: isRegistered ? Colors.green : TxaTheme.textSecondary,
+                      color: isRegistered
+                          ? Colors.green
+                          : TxaTheme.textSecondary,
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                     ),
@@ -285,11 +374,16 @@ class _PremiumScreenState extends State<PremiumScreen> {
                     // UDID display (compact)
                     GestureDetector(
                       onTap: () {
-                        Clipboard.setData(ClipboardData(text: TxaSettings.udid));
+                        Clipboard.setData(
+                          ClipboardData(text: TxaSettings.udid),
+                        );
                         TxaToast.show(context, TxaLanguage.t('udid_copied'));
                       },
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 10,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.black26,
                           borderRadius: BorderRadius.circular(12),
@@ -297,15 +391,27 @@ class _PremiumScreenState extends State<PremiumScreen> {
                         ),
                         child: Row(
                           children: [
-                            const Icon(Icons.fingerprint_rounded, color: TxaTheme.accent, size: 16),
+                            const Icon(
+                              Icons.fingerprint_rounded,
+                              color: TxaTheme.accent,
+                              size: 16,
+                            ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: Text(
                                 TxaSettings.udid,
-                                style: const TextStyle(color: Colors.white70, fontSize: 12, fontFamily: 'monospace'),
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 12,
+                                  fontFamily: 'monospace',
+                                ),
                               ),
                             ),
-                            const Icon(Icons.copy_rounded, color: TxaTheme.accent, size: 16),
+                            const Icon(
+                              Icons.copy_rounded,
+                              color: TxaTheme.accent,
+                              size: 16,
+                            ),
                           ],
                         ),
                       ),
@@ -321,14 +427,17 @@ class _PremiumScreenState extends State<PremiumScreen> {
             if (isRegistered) ...[
               // Install button
               ElevatedButton.icon(
-                onPressed: () => _launchUrl(context, 'https://asset.nrotxa.online/install'),
+                onPressed: () =>
+                    _launchUrl(context, 'https://asset.nrotxa.online/install'),
                 icon: const Icon(Icons.auto_awesome_rounded, size: 20),
                 label: Text(TxaLanguage.t('udid_install_btn')),
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.green.withValues(alpha: 0.8),
                   foregroundColor: Colors.white,
                   minimumSize: const Size(double.infinity, 48),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                   elevation: 0,
                 ),
               ),
@@ -345,7 +454,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
                         backgroundColor: TxaTheme.glassBg,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                         elevation: 0,
                       ),
                     ),
@@ -358,9 +469,14 @@ class _PremiumScreenState extends State<PremiumScreen> {
                       label: Text(TxaLanguage.t('udid_delete_btn')),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: Colors.redAccent,
-                        side: const BorderSide(color: Colors.redAccent, width: 0.5),
+                        side: const BorderSide(
+                          color: Colors.redAccent,
+                          width: 0.5,
+                        ),
                         padding: const EdgeInsets.symmetric(vertical: 12),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                   ),
@@ -380,7 +496,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
                         backgroundColor: TxaTheme.accent,
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         elevation: 0,
                       ),
                     ),
@@ -395,7 +513,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
                         foregroundColor: TxaTheme.accent,
                         side: const BorderSide(color: TxaTheme.accent),
                         padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(10),
+                        ),
                       ),
                     ),
                   ),
@@ -424,7 +544,11 @@ class _PremiumScreenState extends State<PremiumScreen> {
                         color: TxaTheme.glassBg,
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Icon(Icons.share_rounded, color: TxaTheme.textPrimary, size: 20),
+                      child: const Icon(
+                        Icons.share_rounded,
+                        color: TxaTheme.textPrimary,
+                        size: 20,
+                      ),
                     ),
                     const SizedBox(width: 14),
                     Expanded(
@@ -433,17 +557,28 @@ class _PremiumScreenState extends State<PremiumScreen> {
                         children: [
                           Text(
                             TxaLanguage.t('share_logs'),
-                            style: const TextStyle(color: TxaTheme.textPrimary, fontSize: 15, fontWeight: FontWeight.w600),
+                            style: const TextStyle(
+                              color: TxaTheme.textPrimary,
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                            ),
                           ),
                           const SizedBox(height: 2),
                           Text(
                             TxaLanguage.t('share_logs_desc'),
-                            style: const TextStyle(color: TxaTheme.textMuted, fontSize: 11),
+                            style: const TextStyle(
+                              color: TxaTheme.textMuted,
+                              fontSize: 11,
+                            ),
                           ),
                         ],
                       ),
                     ),
-                    const Icon(Icons.chevron_right_rounded, color: TxaTheme.textMuted, size: 20),
+                    const Icon(
+                      Icons.chevron_right_rounded,
+                      color: TxaTheme.textMuted,
+                      size: 20,
+                    ),
                   ],
                 ),
               ),

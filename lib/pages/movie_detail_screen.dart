@@ -65,7 +65,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
       });
 
       // Sync with FavoriteProvider
-      if (_data != null && _data!['movie'] != null) {
+      if (mounted && _data != null && _data!['movie'] != null) {
         context.read<FavoriteProvider>().setFavoriteStatus(
           _data!['movie']['id'],
           _data!['movie']['is_favorite'] == true,
@@ -158,7 +158,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
     final movie = _data!['movie'];
     final shareText =
         '${movie['name']} - ${TxaLanguage.t('app_slogan')}\nXem ngay tại: https://film.nrotxa.online/movie/${widget.slug}';
-    Share.share(shareText, subject: movie['name']);
+    SharePlus.instance.share(
+      ShareParams(text: shareText, subject: movie['name']),
+    );
   }
 
   // Cleaned up

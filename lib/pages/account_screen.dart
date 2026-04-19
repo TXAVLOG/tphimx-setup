@@ -56,15 +56,6 @@ class _AccountScreenState extends State<AccountScreen> {
   Widget build(BuildContext context) {
     final menuItems = [
       {
-        'id': 'history',
-        'label': TxaLanguage.t('watching'),
-        'icon': Icons.history_rounded,
-        'action': () => Navigator.push(
-          context,
-          MaterialPageRoute(builder: (ctx) => const HistoryScreen()),
-        ),
-      },
-      {
         'id': 'favorites',
         'label': TxaLanguage.t('add_favorite'),
         'icon': Icons.favorite_border_rounded,
@@ -411,18 +402,26 @@ class _AccountScreenState extends State<AccountScreen> {
                     ),
                     child: Row(
                       children: [
-                        CircleAvatar(
-                          radius: 30,
-                          backgroundColor: TxaTheme.accent,
-                          child: Text(
-                            initial,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 24,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
+                        userData?['avatar'] != null &&
+                                userData!['avatar'].toString().isNotEmpty
+                            ? CircleAvatar(
+                                radius: 30,
+                                backgroundImage: CachedNetworkImageProvider(
+                                  userData['avatar'],
+                                ),
+                              )
+                            : CircleAvatar(
+                                radius: 30,
+                                backgroundColor: TxaTheme.accent,
+                                child: Text(
+                                  initial,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
                         const SizedBox(width: 16),
                         Expanded(
                           child: Column(
@@ -598,8 +597,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.2.2';
-                  final buildNumber = snapshot.data?.buildNumber ?? '322';
+                  final version = snapshot.data?.version ?? '3.2.3';
+                  final buildNumber = snapshot.data?.buildNumber ?? '323';
                   return Text(
                     TxaLanguage.t(
                       'current_version',
