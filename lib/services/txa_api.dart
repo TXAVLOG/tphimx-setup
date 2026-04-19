@@ -7,8 +7,8 @@ class TxaApi {
   static const String baseUrl = 'https://film.nrotxa.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '3.2.1';
-  static const String buildNumber = '321';
+  static const String apiVersion = '3.2.2';
+  static const String buildNumber = '322';
 
   // Community Links
   static const String facebookFanpage =
