@@ -1,7 +1,6 @@
 plugins {
     id("com.android.application")
-    id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
+    id("org.jetbrains.kotlin.android")
     id("dev.flutter.flutter-gradle-plugin")
 }
 
@@ -16,10 +15,8 @@ android {
         isCoreLibraryDesugaringEnabled = true
     }
 
-    kotlin {
-        compilerOptions {
-            jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_19)
-        }
+    kotlinOptions {
+        jvmTarget = "19"
     }
 
     defaultConfig {

@@ -20,6 +20,8 @@ import 'services/search_provider.dart';
 import 'theme/txa_theme.dart';
 import 'services/txa_mini_player_provider.dart';
 import 'services/txa_shortcut_service.dart';
+import 'services/favorite_provider.dart';
+import 'services/notification_provider.dart';
 import 'widgets/txa_mini_player.dart';
 import 'utils/txa_logger.dart';
 import 'pages/home_screen.dart';
@@ -90,6 +92,12 @@ void main() async {
         Provider<TxaApi>(create: (_) => TxaApi()),
         Provider<TxaNetwork>(create: (_) => TxaNetwork()),
         ChangeNotifierProvider<SearchProvider>(create: (_) => SearchProvider()),
+        ChangeNotifierProvider<FavoriteProvider>(
+          create: (context) => FavoriteProvider(context.read<TxaApi>()),
+        ),
+        ChangeNotifierProvider<NotificationProvider>(
+          create: (context) => NotificationProvider(context.read<TxaApi>()),
+        ),
         ChangeNotifierProvider<TxaMiniPlayerProvider>(
           create: (_) => TxaMiniPlayerProvider(),
         ),

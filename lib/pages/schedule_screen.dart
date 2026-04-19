@@ -661,7 +661,16 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     }
 
     if (await Permission.scheduleExactAlarm.isDenied) {
-      await Permission.scheduleExactAlarm.request();
+      final res = await Permission.scheduleExactAlarm.request();
+      if (!res.isGranted) {
+        if (!mounted) return;
+        TxaToast.show(
+          context,
+          TxaLanguage.t('exact_alarm_permission_denied'),
+          isError: true,
+        );
+        return;
+      }
     }
 
     final broadcastTime = movie['broadcast_time']?.toString() ?? '';

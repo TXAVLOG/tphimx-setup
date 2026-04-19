@@ -12,6 +12,7 @@ import 'package:share_plus/share_plus.dart';
 import '../services/txa_settings.dart';
 import '../utils/txa_logger.dart';
 import '../services/txa_mini_player_provider.dart';
+import '../services/favorite_provider.dart';
 
 class MovieDetailScreen extends StatefulWidget {
   final String slug;
@@ -62,6 +63,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
         _data = res['data'];
         _loading = false;
       });
+
+      // Sync with FavoriteProvider
+      if (_data != null && _data!['movie'] != null) {
+        context.read<FavoriteProvider>().setFavoriteStatus(
+          _data!['movie']['id'],
+          _data!['movie']['is_favorite'] == true,
+        );
+      }
 
       // Auto play if requested
       if (widget.autoPlay && !_autoPlayed) {
@@ -115,23 +124,25 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
   }
 
   Future<void> _toggleFavorite() async {
-    final api = Provider.of<TxaApi>(context, listen: false);
     if (TxaSettings.authToken.isEmpty) {
       TxaToast.show(context, TxaLanguage.t('login_required'), isError: true);
       return;
     }
 
     try {
-      final res = await api.toggleFavorite(_data!['movie']['id']);
+      final favProvider = context.read<FavoriteProvider>();
+      final success = await favProvider.toggleFavorite(_data!['movie']['id']);
       if (!mounted) return;
 
-      if (res['success'] == true) {
+      if (success) {
         setState(() {
-          _data!['movie']['is_favorite'] = res['data']['is_favorite'];
+          _data!['movie']['is_favorite'] = favProvider.isFavorite(
+            _data!['movie']['id'],
+          );
         });
         TxaToast.show(
           context,
-          res['data']['is_favorite']
+          favProvider.isFavorite(_data!['movie']['id'])
               ? TxaLanguage.t('favorite_added')
               : TxaLanguage.t('favorite_removed'),
         );
@@ -382,15 +393,20 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceAround,
                         children: [
-                          _IconBtn(
-                            icon: (_data!['movie']['is_favorite'] == true)
-                                ? Icons.favorite_rounded
-                                : Icons.add_rounded,
-                            color: (_data!['movie']['is_favorite'] == true)
-                                ? Colors.red
-                                : Colors.white,
-                            label: TxaLanguage.t('add_favorite'),
-                            onTap: _toggleFavorite,
+                          Consumer<FavoriteProvider>(
+                            builder: (context, fav, child) {
+                              final isFav = fav.isFavorite(
+                                _data!['movie']['id'],
+                              );
+                              return _IconBtn(
+                                icon: isFav
+                                    ? Icons.favorite_rounded
+                                    : Icons.add_rounded,
+                                color: isFav ? Colors.red : Colors.white,
+                                label: TxaLanguage.t('add_favorite'),
+                                onTap: _toggleFavorite,
+                              );
+                            },
                           ),
                           _IconBtn(
                             icon: Icons.download_rounded,

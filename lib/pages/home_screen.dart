@@ -32,6 +32,7 @@ import '../widgets/txa_error_widget.dart';
 import '../utils/txa_logger.dart';
 import '../utils/txa_format.dart';
 import '../services/txa_settings.dart';
+import '../services/notification_provider.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
@@ -47,7 +48,6 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
-  int _unreadNotifications = 0;
   DateTime? _lastBackPressTime;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
@@ -63,10 +63,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    // Refetch when dependencies change (like auth token)
-    if (TxaSettings.authToken.isNotEmpty && _unreadNotifications == 0) {
-      _fetchUnreadCount();
-    }
   }
 
   @override
@@ -74,31 +70,7 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkUpdate();
-      _fetchUnreadCount();
     });
-  }
-
-  Future<void> _fetchUnreadCount() async {
-    if (TxaSettings.authToken.isEmpty) {
-      if (mounted) setState(() => _unreadNotifications = 0);
-      return;
-    }
-    try {
-      final res = await Provider.of<TxaApi>(
-        context,
-        listen: false,
-      ).getNotifications();
-      final List items = res['data'] is List ? res['data'] : [];
-      if (mounted) {
-        setState(() {
-          _unreadNotifications = items
-              .where((i) => i['is_read'] != true)
-              .length;
-        });
-      }
-    } catch (e) {
-      // Ignore
-    }
   }
 
   Future<void> _checkUpdate({bool manual = false}) async {
@@ -388,14 +360,19 @@ class _HomeScreenState extends State<HomeScreen> {
             if (_currentIndex == 0) _buildHomeHeader(),
 
             // TxaNav
-            TxaNav(
-              currentIndex: _currentIndex,
-              unreadNotifications: _unreadNotifications,
-              onTap: (index) {
-                setState(() => _currentIndex = index);
-                if (index == 3) {
-                  setState(() => _unreadNotifications = 0);
-                }
+            Consumer<NotificationProvider>(
+              builder: (context, notif, child) {
+                return TxaNav(
+                  currentIndex: _currentIndex,
+                  unreadNotifications: notif.unreadCount,
+                  onTap: (index) {
+                    setState(() => _currentIndex = index);
+                    if (index == 3) {
+                      notif
+                          .markAllRead(); // Or keep as is depending on business logic
+                    }
+                  },
+                );
               },
             ),
           ],
@@ -453,10 +430,14 @@ class _HomeScreenState extends State<HomeScreen> {
                     onTap: () => setState(() => _currentIndex = 1),
                   ),
                   const SizedBox(width: 8),
-                  _GlassIconBadge(
-                    icon: Icons.notifications_rounded,
-                    badgeCount: _unreadNotifications,
-                    onTap: () => setState(() => _currentIndex = 3),
+                  Consumer<NotificationProvider>(
+                    builder: (context, notif, child) {
+                      return _GlassIconBadge(
+                        icon: Icons.notifications_rounded,
+                        badgeCount: notif.unreadCount,
+                        onTap: () => setState(() => _currentIndex = 3),
+                      );
+                    },
                   ),
                   const SizedBox(width: 8),
                   _GlassIconBtn(

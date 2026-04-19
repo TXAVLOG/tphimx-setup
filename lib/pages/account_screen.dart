@@ -15,6 +15,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'history_screen.dart';
 import 'favorite_list_screen.dart';
 import 'global_settings_screen.dart';
+import 'movie_detail_screen.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -374,42 +376,21 @@ class _AccountScreenState extends State<AccountScreen> {
                     userData = initialUser['data'];
                   }
 
-                  if (userData == null && snapshot.hasError) {
-                    return Container(
-                      padding: const EdgeInsets.all(20),
-                      margin: const EdgeInsets.symmetric(horizontal: 16),
-                      decoration: BoxDecoration(
-                        color: TxaTheme.cardBg,
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: Colors.redAccent.withValues(alpha: 0.3),
-                        ),
-                      ),
-                      child: Column(
-                        children: [
-                          const Icon(
-                            Icons.error_outline_rounded,
-                            color: Colors.redAccent,
-                            size: 32,
-                          ),
-                          const SizedBox(height: 12),
-                          Text(
-                            snapshot.error?.toString() ??
-                                TxaLanguage.t('error_connection'),
-                            textAlign: TextAlign.center,
-                            style: const TextStyle(
-                              color: TxaTheme.textSecondary,
-                              fontSize: 13,
-                            ),
-                          ),
-                          const SizedBox(height: 12),
-                          TextButton(
-                            onPressed: () => setState(() {}),
-                            child: Text(TxaLanguage.t('retry')),
-                          ),
-                        ],
-                      ),
-                    );
+                  if (snapshot.hasError) {
+                    final err = snapshot.error.toString();
+                    if (err.contains('401') || err.contains('Unauthorized')) {
+                      // Token expired/invalid, logout silently
+                      WidgetsBinding.instance.addPostFrameCallback((_) {
+                        TxaSettings.authToken = '';
+                        TxaSettings.userData = '';
+                        Provider.of<TxaApi>(
+                          context,
+                          listen: false,
+                        ).setToken('');
+                        if (mounted) setState(() {});
+                      });
+                    }
+                    return _buildErrorCard(snapshot.error?.toString());
                   }
 
                   final name = userData?['name'] ?? 'TPhimX User';
@@ -543,6 +524,11 @@ class _AccountScreenState extends State<AccountScreen> {
 
           const SizedBox(height: 16),
 
+          // Watching List (History Preview)
+          if (TxaSettings.authToken.isNotEmpty) _buildWatchingSection(),
+
+          const SizedBox(height: 16),
+
           // Menu Items - Compact Grid Layout
           Expanded(
             child: ListView.builder(
@@ -630,6 +616,162 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildErrorCard(dynamic message) {
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: Colors.red.withValues(alpha: 0.1),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.error_outline_rounded,
+            color: Colors.redAccent,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message?.toString() ?? 'Unknown Error',
+              style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+            ),
+          ),
+          IconButton(
+            onPressed: () => setState(() {}),
+            icon: const Icon(
+              Icons.refresh_rounded,
+              color: Colors.redAccent,
+              size: 20,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildWatchingSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                TxaLanguage.t('watching'),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              TextButton(
+                onPressed: () => Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (ctx) => const HistoryScreen()),
+                ),
+                child: Text(
+                  TxaLanguage.t('view_all'),
+                  style: const TextStyle(color: TxaTheme.accent, fontSize: 14),
+                ),
+              ),
+            ],
+          ),
+        ),
+        SizedBox(
+          height: 120,
+          child: FutureBuilder<Map<String, dynamic>>(
+            future: Provider.of<TxaApi>(
+              context,
+              listen: false,
+            ).getWatchHistory(),
+            builder: (context, snapshot) {
+              if (snapshot.connectionState == ConnectionState.waiting) {
+                return const Center(
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                );
+              }
+              final List<dynamic> items = snapshot.data?['data'] is List
+                  ? snapshot.data!['data']
+                  : [];
+              if (items.isEmpty) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Text(
+                    TxaLanguage.t('no_history'),
+                    style: const TextStyle(
+                      color: TxaTheme.textMuted,
+                      fontSize: 13,
+                    ),
+                  ),
+                );
+              }
+
+              return ListView.builder(
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 16),
+                itemCount: items.take(5).length,
+                itemBuilder: (ctx, index) {
+                  final item = items[index];
+                  final movie = item['movie'] ?? {};
+                  return GestureDetector(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (ctx) => MovieDetailScreen(
+                          slug: movie['slug'],
+                          autoPlay: true,
+                        ),
+                      ),
+                    ).then((_) => setState(() {})),
+                    child: Container(
+                      width: 160,
+                      margin: const EdgeInsets.only(right: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(12),
+                        image: DecorationImage(
+                          image: CachedNetworkImageProvider(
+                            movie['thumb_url'] ?? '',
+                          ),
+                          fit: BoxFit.cover,
+                          colorFilter: ColorFilter.mode(
+                            Colors.black.withValues(alpha: 0.3),
+                            BlendMode.darken,
+                          ),
+                        ),
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.end,
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            movie['name'] ?? '',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
+            },
+          ),
+        ),
+      ],
     );
   }
 }
