@@ -52,7 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
   DateTime? _lastBackPressTime;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  late final List<Widget> _tabs = [
+  List<Widget> get _tabs => [
     const _HomeTab(),
     const SearchScreen(),
     const ScheduleScreen(),
@@ -660,8 +660,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.2.6';
-                  final build = snapshot.data?.buildNumber ?? '326';
+                  final version = snapshot.data?.version ?? '3.2.7';
+                  final build = snapshot.data?.buildNumber ?? '327';
                   return Text(
                     'Version $version (Build $build)',
                     style: const TextStyle(

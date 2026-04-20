@@ -25,10 +25,12 @@ import 'services/notification_provider.dart';
 import 'widgets/txa_mini_player.dart';
 import 'utils/txa_logger.dart';
 import 'pages/home_screen.dart';
+import 'services/txa_language.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await TxaSettings.init();
+  await TxaLanguage.init();
   await initializeDateFormatting('vi', null);
 
   try {
@@ -126,6 +128,9 @@ class _TPhimXAppState extends State<TPhimXApp> {
     super.initState();
     _initDeepLinks();
     TxaSettings.onSettingsChanged = () {
+      if (mounted) setState(() {});
+    };
+    TxaLanguage.onLanguageChanged = () {
       if (mounted) setState(() {});
     };
   }
@@ -302,7 +307,7 @@ class _MainEntryState extends State<MainEntry> {
       );
     }
     return HomeScreen(
-      key: ValueKey(TxaSettings.authToken),
-    ); // Pass ValueKey to force rebuild on auth change
+      key: ValueKey("${TxaSettings.authToken}_${TxaLanguage.currentLang}"),
+    ); // Pass ValueKey to force rebuild on auth/lang change
   }
 }

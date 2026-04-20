@@ -4,6 +4,7 @@ import '../utils/txa_logger.dart';
 
 class TxaLanguage {
   static String _currentLang = 'vi';
+  static Function()? onLanguageChanged;
   static final Map<String, Map<String, String>> _dicts = {
     'vi': {
       'app_name': 'TPhimX Premium',
@@ -616,6 +617,7 @@ class TxaLanguage {
       _currentLang = lang;
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('txa_lang', lang);
+      onLanguageChanged?.call();
     }
   }
 

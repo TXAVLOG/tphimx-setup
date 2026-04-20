@@ -221,13 +221,20 @@ class _TxaPlayerState extends State<TxaPlayer>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      // PiP via floating package (native Android)
-      if (TxaSettings.autoPiP && _isInitialized && !_error && !_isLocked) {
-        final isPlaying =
-            _betterPlayerController?.videoPlayerController?.value.isPlaying ??
-            false;
+      if (!_isInitialized || _error || _isLocked) return;
+
+      final isPlaying =
+          _betterPlayerController?.videoPlayerController?.value.isPlaying ??
+          false;
+
+      if (TxaSettings.autoPiP && isPlaying) {
+        // Trigger Native PiP (Android)
+        _floating.enable(ImmediatePiP(aspectRatio: const Rational(16, 9)));
+      } else {
+        // If autoPiP is off or video is already paused, we pause properly
+        // since handleLifecycle: false is set.
         if (isPlaying) {
-          _floating.enable(ImmediatePiP(aspectRatio: const Rational(16, 9)));
+          _betterPlayerController?.pause();
         }
       }
     } else if (state == AppLifecycleState.resumed) {
@@ -511,6 +518,8 @@ class _TxaPlayerState extends State<TxaPlayer>
       autoPlay: true,
       fullScreenByDefault: true,
       allowedScreenSleep: false,
+      handleLifecycle:
+          false, // Manage lifecycle manually for smooth PiP transition
       controlsConfiguration: const BetterPlayerControlsConfiguration(
         showControls: false, // WE BUILD OUR OWN PREMIUM OVERLAY
         enablePlaybackSpeed: true,
@@ -1309,15 +1318,10 @@ class _TxaPlayerState extends State<TxaPlayer>
                   _HeaderIcon(
                     icon: Icons.picture_in_picture_alt_rounded,
                     onTap: () {
-                      if (_betterPlayerController != null) {
-                        context.read<TxaMiniPlayerProvider>().switchToMini(
-                          controller: _betterPlayerController!,
-                          movie: widget.movie,
-                          servers: widget.servers,
-                          serverIndex: _currentServerIndex,
-                          episodeIndex: _currentEpisodeIndex,
+                      if (_betterPlayerController != null && _isInitialized) {
+                        _floating.enable(
+                          ImmediatePiP(aspectRatio: const Rational(16, 9)),
                         );
-                        Navigator.pop(context);
                       }
                     },
                   ),
