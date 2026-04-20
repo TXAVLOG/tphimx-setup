@@ -33,6 +33,19 @@ class TxaMiniPlayerProvider with ChangeNotifier {
     return "Tập ${_episodeIndex + 1}";
   }
 
+  String get currentEpisodeId {
+    try {
+      if (_servers != null &&
+          _serverIndex < _servers!.length &&
+          _episodeIndex <
+              (_servers![_serverIndex]['server_data'] as List).length) {
+        return _servers![_serverIndex]['server_data'][_episodeIndex]['id']
+            .toString();
+      }
+    } catch (_) {}
+    return "0";
+  }
+
   void switchToMini({
     required BetterPlayerController controller,
     required dynamic movie,

@@ -144,4 +144,9 @@ class TxaFormat {
       return '';
     }
   }
+
+  /// Format battery level
+  static String formatBattery(int level) {
+    return '$level%';
+  }
 }

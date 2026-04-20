@@ -15,6 +15,8 @@ import '../services/txa_api.dart';
 import '../utils/txa_toast.dart';
 import '../widgets/txa_modal.dart';
 import 'package:floating/floating.dart';
+import '../utils/txa_logger.dart';
+import 'package:battery_plus/battery_plus.dart';
 
 class TxaPlayer extends StatefulWidget {
   final dynamic movie;
@@ -110,6 +112,12 @@ class _TxaPlayerState extends State<TxaPlayer>
   // PiP via floating package
   final Floating _floating = Floating();
 
+  // Battery monitoring
+  final Battery _battery = Battery();
+  int _batteryLevel = 100;
+  BatteryState _batteryState = BatteryState.unknown;
+  StreamSubscription<BatteryState>? _batterySubscription;
+
   @override
   void initState() {
     super.initState();
@@ -119,6 +127,7 @@ class _TxaPlayerState extends State<TxaPlayer>
     _volume = TxaSettings.volume;
 
     _loadMarkers();
+    _initBattery();
 
     if (widget.initialEpisodeId != null && widget.servers.isNotEmpty) {
       final episodes =
@@ -149,7 +158,7 @@ class _TxaPlayerState extends State<TxaPlayer>
 
   void _startHistorySync() {
     _historySyncTimer?.cancel();
-    _historySyncTimer = Timer.periodic(const Duration(seconds: 30), (timer) {
+    _historySyncTimer = Timer.periodic(const Duration(seconds: 2), (timer) {
       _syncHistory();
     });
   }
@@ -168,13 +177,20 @@ class _TxaPlayerState extends State<TxaPlayer>
 
     try {
       final api = Provider.of<TxaApi>(context, listen: false);
+      final mId = int.tryParse(widget.movie['id'].toString()) ?? 0;
+      final eId = int.tryParse(ep['id'].toString()) ?? 0;
+
+      if (mId == 0 || eId == 0) return;
+
       await api.updateWatchHistory(
-        movieId: widget.movie['id'],
-        episodeId: ep['id'],
+        movieId: mId,
+        episodeId: eId,
         currentTime: pos.inSeconds.toDouble(),
         duration: dur.inSeconds.toDouble(),
       );
-    } catch (_) {}
+    } catch (e) {
+      TxaLogger.log("WatchHistory Sync Error: $e", isError: true);
+    }
   }
 
   @override
@@ -214,6 +230,7 @@ class _TxaPlayerState extends State<TxaPlayer>
     // Cancel autoPiP on dispose
     _floating.cancelOnLeavePiP();
 
+    _batterySubscription?.cancel();
     super.dispose();
   }
 
@@ -700,6 +717,7 @@ class _TxaPlayerState extends State<TxaPlayer>
 
   void _playPrevious() {
     if (_currentEpisodeIndex > 0) {
+      _syncHistory(); // Sync current before switching
       setState(() {
         _currentEpisodeIndex--;
       });
@@ -711,6 +729,7 @@ class _TxaPlayerState extends State<TxaPlayer>
     final serverData =
         widget.servers[_currentServerIndex]['server_data'] as List;
     if (_currentEpisodeIndex < serverData.length - 1) {
+      _syncHistory(); // Sync current before switching
       setState(() {
         _currentEpisodeIndex++;
       });
@@ -719,6 +738,71 @@ class _TxaPlayerState extends State<TxaPlayer>
       _syncHistory(); // Final sync on exit
       Navigator.pop(context);
     }
+  }
+
+  void _initBattery() async {
+    try {
+      _batteryLevel = await _battery.batteryLevel;
+      _batteryState = await _battery.batteryState;
+      _batterySubscription = _battery.onBatteryStateChanged.listen((state) {
+        if (mounted) {
+          setState(() {
+            _batteryState = state;
+          });
+        }
+      });
+      // Periodically update level
+      Timer.periodic(const Duration(seconds: 30), (timer) async {
+        if (!mounted) {
+          timer.cancel();
+          return;
+        }
+        final level = await _battery.batteryLevel;
+        if (level != _batteryLevel) {
+          if (mounted) setState(() => _batteryLevel = level);
+        }
+      });
+    } catch (_) {}
+  }
+
+  Widget _buildBatteryIndicator() {
+    IconData icon;
+    Color color = Colors.white70;
+
+    if (_batteryState == BatteryState.charging) {
+      icon = Icons.battery_charging_full_rounded;
+      color = Colors.greenAccent;
+    } else {
+      if (_batteryLevel <= 15) {
+        icon = Icons.battery_alert_rounded;
+        color = Colors.redAccent;
+      } else if (_batteryLevel <= 30) {
+        icon = Icons.battery_3_bar_rounded;
+        color = Colors.orangeAccent;
+      } else if (_batteryLevel <= 50) {
+        icon = Icons.battery_4_bar_rounded;
+      } else if (_batteryLevel <= 80) {
+        icon = Icons.battery_5_bar_rounded;
+      } else {
+        icon = Icons.battery_full_rounded;
+      }
+    }
+
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          "$_batteryLevel%",
+          style: TextStyle(
+            color: color,
+            fontSize: 10,
+            fontWeight: FontWeight.w900,
+          ),
+        ),
+        const SizedBox(width: 2),
+        Icon(icon, color: color, size: 14),
+      ],
+    );
   }
 
   // --- SERVER SWITCHING ---
@@ -999,17 +1083,24 @@ class _TxaPlayerState extends State<TxaPlayer>
                       color: Colors.black26,
                       borderRadius: BorderRadius.circular(6),
                     ),
-                    child: Text(
-                      TxaFormat.formatDate(
-                        _now,
-                        pattern: TxaSettings.clockFormat,
-                      ),
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        letterSpacing: 1.0,
-                      ),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          TxaFormat.formatDate(
+                            _now,
+                            pattern: TxaSettings.clockFormat,
+                          ),
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 1.0,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
+                        _buildBatteryIndicator(),
+                      ],
                     ),
                   ),
                 ),
@@ -1263,17 +1354,22 @@ class _TxaPlayerState extends State<TxaPlayer>
                       color: Colors.white,
                       size: 28,
                     ),
-                    onPressed: () {
+                    onPressed: () async {
+                      // Save history BEFORE exiting
+                      await _syncHistory();
+
                       if (_betterPlayerController != null) {
-                        context.read<TxaMiniPlayerProvider>().switchToMini(
-                          controller: _betterPlayerController!,
-                          movie: widget.movie,
-                          servers: widget.servers,
-                          serverIndex: _currentServerIndex,
-                          episodeIndex: _currentEpisodeIndex,
-                        );
+                        if (mounted) {
+                          context.read<TxaMiniPlayerProvider>().switchToMini(
+                            controller: _betterPlayerController!,
+                            movie: widget.movie,
+                            servers: widget.servers,
+                            serverIndex: _currentServerIndex,
+                            episodeIndex: _currentEpisodeIndex,
+                          );
+                        }
                       }
-                      Navigator.pop(context);
+                      if (mounted) Navigator.pop(context);
                     },
                   ),
                   const SizedBox(width: 8),
@@ -1317,8 +1413,9 @@ class _TxaPlayerState extends State<TxaPlayer>
                   const Spacer(),
                   _HeaderIcon(
                     icon: Icons.picture_in_picture_alt_rounded,
-                    onTap: () {
+                    onTap: () async {
                       if (_betterPlayerController != null && _isInitialized) {
+                        await _syncHistory(); // Sync before PiP
                         _floating.enable(
                           ImmediatePiP(aspectRatio: const Rational(16, 9)),
                         );
