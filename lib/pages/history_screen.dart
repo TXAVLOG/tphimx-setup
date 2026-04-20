@@ -243,7 +243,9 @@ class _HistoryScreenState extends State<HistoryScreen> {
                                               (item['duration'] as num))
                                           .clamp(0.0, 1.0),
                                   backgroundColor: Colors.white10,
-                                  color: TxaTheme.accent,
+                                  color: const Color(
+                                    0xFF3B82F6,
+                                  ), // Xanh dương tinh tế
                                   minHeight: 3,
                                 ),
                               ),
