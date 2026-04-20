@@ -214,16 +214,17 @@ class _TxaPlayerState extends State<TxaPlayer>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      if (TxaSettings.autoPiP && _isInitialized && !_error && !_isLocked) {
-        final isPlaying =
-            _betterPlayerController?.videoPlayerController?.value.isPlaying ??
-            false;
-        if (isPlaying) {
-          _betterPlayerController?.enablePictureInPicture(
-            _betterPlayerController!.betterPlayerGlobalKey!,
-          );
-        }
-      }
+      // Tạm thời comment tính năng PiP (Bảo trì)
+      // if (TxaSettings.autoPiP && _isInitialized && !_error && !_isLocked) {
+      //   final isPlaying =
+      //       _betterPlayerController?.videoPlayerController?.value.isPlaying ??
+      //       false;
+      //   if (isPlaying) {
+      //     _betterPlayerController?.enablePictureInPicture(
+      //       _betterPlayerController!.betterPlayerGlobalKey!,
+      //     );
+      //   }
+      // }
     } else if (state == AppLifecycleState.resumed) {
       _checkPiPReturn();
     }

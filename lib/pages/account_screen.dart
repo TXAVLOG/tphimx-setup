@@ -598,8 +598,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.2.4';
-                  final buildNumber = snapshot.data?.buildNumber ?? '324';
+                  final version = snapshot.data?.version ?? '3.2.5';
+                  final buildNumber = snapshot.data?.buildNumber ?? '325';
                   return Text(
                     TxaLanguage.t(
                       'current_version',
@@ -821,14 +821,38 @@ class _PlayerSettingsBottomSheetState
     });
   }
 
-  Future<void> _requestOverlayPermission() async {
-    final status = await Permission.systemAlertWindow.request();
-    if (status.isGranted) {
-      setState(() => _hasOverlayPermission = true);
-    } else {
-      openAppSettings();
-    }
-  }
+  // Future<void> _requestOverlayPermission() async {
+  //   final status = await Permission.systemAlertWindow.request();
+  //   if (status.isGranted) {
+  //     setState(() {
+  //       _hasOverlayPermission = true;
+  //       TxaSettings.autoPiP = true;
+  //     });
+  //   } else {
+  //     if (mounted) {
+  //       showDialog(
+  //         context: context,
+  //         builder: (ctx) => AlertDialog(
+  //           title: Text(TxaLanguage.t('permission_overlay_label')),
+  //           content: Text(TxaLanguage.t('permission_overlay_desc')),
+  //           actions: [
+  //             TextButton(
+  //               onPressed: () => Navigator.pop(ctx),
+  //               child: Text(TxaLanguage.t('close')),
+  //             ),
+  //             TextButton(
+  //               onPressed: () {
+  //                 Navigator.pop(ctx);
+  //                 openAppSettings();
+  //               },
+  //               child: Text(TxaLanguage.t('go_to_settings')),
+  //             ),
+  //           ],
+  //         ),
+  //       );
+  //     }
+  //   }
+  // }
 
   @override
   Widget build(BuildContext context) {
@@ -905,55 +929,17 @@ class _PlayerSettingsBottomSheetState
 
           // 3. Auto PiP with Permission Check (Android Only)
           if (Platform.isAndroid)
-            _hasOverlayPermission
-                ? _SettingToggle(
-                    label: TxaLanguage.t('auto_pip_label'),
-                    value: TxaSettings.autoPiP,
-                    onChanged: (v) => setState(() => TxaSettings.autoPiP = v),
-                  )
-                : Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.red.withValues(alpha: 0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.red.withValues(alpha: 0.3),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        const Icon(
-                          Icons.warning_amber_rounded,
-                          color: Colors.orange,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            TxaLanguage.t('pip_permission_missing'),
-                            style: const TextStyle(
-                              color: Colors.white70,
-                              fontSize: 13,
-                            ),
-                          ),
-                        ),
-                        TextButton(
-                          onPressed: _requestOverlayPermission,
-                          child: Text(
-                            TxaLanguage.t('grant'),
-                            style: const TextStyle(
-                              color: TxaTheme.accent,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-
+            Opacity(
+              opacity: 0.5,
+              child: _SettingToggle(
+                label: '${TxaLanguage.t('auto_pip_label')} (Đang sửa)',
+                value: false,
+                onChanged: (v) {
+                  // Comment PIP tạm thời
+                  // setState(() => TxaSettings.autoPiP = v);
+                },
+              ),
+            ),
           if (Platform.isAndroid) const SizedBox(height: 8),
           if (Platform.isAndroid)
             Text(
