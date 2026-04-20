@@ -43,7 +43,13 @@ class _HistoryScreenState extends State<HistoryScreen> {
       final api = Provider.of<TxaApi>(context, listen: false);
       final res = await api.getWatchHistory();
       setState(() {
-        _items = res['data'] is List ? res['data'] : [];
+        _items = res['data'] is List ? List<dynamic>.from(res['data']) : [];
+        // Sort: most recent watched first
+        _items!.sort((a, b) {
+          final aTime = a['updated_at']?.toString() ?? '';
+          final bTime = b['updated_at']?.toString() ?? '';
+          return bTime.compareTo(aTime);
+        });
         _loading = false;
       });
     } catch (e) {

@@ -598,8 +598,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.2.5';
-                  final buildNumber = snapshot.data?.buildNumber ?? '325';
+                  final version = snapshot.data?.version ?? '3.2.6';
+                  final buildNumber = snapshot.data?.buildNumber ?? '326';
                   return Text(
                     TxaLanguage.t(
                       'current_version',
@@ -701,6 +701,12 @@ class _AccountScreenState extends State<AccountScreen> {
               final List<dynamic> items = snapshot.data?['data'] is List
                   ? snapshot.data!['data']
                   : [];
+              // Sort: most recent watched first
+              items.sort((a, b) {
+                final aTime = a['updated_at']?.toString() ?? '';
+                final bTime = b['updated_at']?.toString() ?? '';
+                return bTime.compareTo(aTime);
+              });
               if (items.isEmpty) {
                 return Padding(
                   padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -927,18 +933,12 @@ class _PlayerSettingsBottomSheetState
 
           const Divider(color: Colors.white10, height: 32),
 
-          // 3. Auto PiP with Permission Check (Android Only)
+          // 3. Auto PiP (Android Only) - Powered by floating package
           if (Platform.isAndroid)
-            Opacity(
-              opacity: 0.5,
-              child: _SettingToggle(
-                label: '${TxaLanguage.t('auto_pip_label')} (Đang sửa)',
-                value: false,
-                onChanged: (v) {
-                  // Comment PIP tạm thời
-                  // setState(() => TxaSettings.autoPiP = v);
-                },
-              ),
+            _SettingToggle(
+              label: TxaLanguage.t('auto_pip_label'),
+              value: TxaSettings.autoPiP,
+              onChanged: (v) => setState(() => TxaSettings.autoPiP = v),
             ),
           if (Platform.isAndroid) const SizedBox(height: 8),
           if (Platform.isAndroid)

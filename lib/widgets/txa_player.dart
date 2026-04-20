@@ -14,6 +14,7 @@ import 'package:provider/provider.dart';
 import '../services/txa_api.dart';
 import '../utils/txa_toast.dart';
 import '../widgets/txa_modal.dart';
+import 'package:floating/floating.dart';
 
 class TxaPlayer extends StatefulWidget {
   final dynamic movie;
@@ -105,6 +106,9 @@ class _TxaPlayerState extends State<TxaPlayer>
     {'label': 'Fit', 'value': null, 'fit': BoxFit.fitWidth},
   ];
   int _currentRatioIndex = 0;
+
+  // PiP via floating package
+  final Floating _floating = Floating();
 
   @override
   void initState() {
@@ -207,6 +211,9 @@ class _TxaPlayerState extends State<TxaPlayer>
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
+    // Cancel autoPiP on dispose
+    _floating.cancelOnLeavePiP();
+
     super.dispose();
   }
 
@@ -214,26 +221,26 @@ class _TxaPlayerState extends State<TxaPlayer>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      // Tạm thời comment tính năng PiP (Bảo trì)
-      // if (TxaSettings.autoPiP && _isInitialized && !_error && !_isLocked) {
-      //   final isPlaying =
-      //       _betterPlayerController?.videoPlayerController?.value.isPlaying ??
-      //       false;
-      //   if (isPlaying) {
-      //     _betterPlayerController?.enablePictureInPicture(
-      //       _betterPlayerController!.betterPlayerGlobalKey!,
-      //     );
-      //   }
-      // }
+      // PiP via floating package (native Android)
+      if (TxaSettings.autoPiP && _isInitialized && !_error && !_isLocked) {
+        final isPlaying =
+            _betterPlayerController?.videoPlayerController?.value.isPlaying ??
+            false;
+        if (isPlaying) {
+          _floating.enable(ImmediatePiP(aspectRatio: const Rational(16, 9)));
+        }
+      }
     } else if (state == AppLifecycleState.resumed) {
       _checkPiPReturn();
     }
   }
 
-  void _checkPiPReturn() {
-    // If we return and find ourselves in PiP or about to exit it,
-    // we can transition to MiniPlayer if the user isn't on the player screen anymore.
-    // However, since TxaPlayer is technically still on top, we might just stay full screen.
+  void _checkPiPReturn() async {
+    // Check if we are still in PiP mode when user returns
+    final status = await _floating.pipStatus;
+    if (status == PiPStatus.disabled) {
+      // Back to full screen - nothing to do
+    }
   }
 
   void _initSystemMirrors() {

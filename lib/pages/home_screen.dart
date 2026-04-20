@@ -660,8 +660,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.2.5';
-                  final build = snapshot.data?.buildNumber ?? '325';
+                  final version = snapshot.data?.version ?? '3.2.6';
+                  final build = snapshot.data?.buildNumber ?? '326';
                   return Text(
                     'Version $version (Build $build)',
                     style: const TextStyle(
