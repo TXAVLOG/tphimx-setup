@@ -1486,7 +1486,15 @@ class _HeroSliderState extends State<_HeroSlider> {
                         const SizedBox(width: 12),
                         Builder(
                           builder: (ctx) {
-                            final isFav = currentMovie['is_favorite'] == true;
+                            final int? mId = currentMovie['id'];
+                            final isFav =
+                                (mId != null &&
+                                    TxaSettings.authToken.isNotEmpty)
+                                ? ctx.select<FavoriteProvider, bool>(
+                                    (p) => p.isFavorite(mId),
+                                  )
+                                : (currentMovie['is_favorite'] == true);
+
                             return _HeroActionButton(
                               label: isFav
                                   ? TxaLanguage.t('favorite_added')
@@ -1826,14 +1834,6 @@ class _MovieCard extends StatefulWidget {
 }
 
 class _MovieCardState extends State<_MovieCard> {
-  late bool _isFavorite;
-
-  @override
-  void initState() {
-    super.initState();
-    _isFavorite = widget.movie['is_favorite'] == true;
-  }
-
   List<Map<String, String>> _getBadges() {
     final badges = <Map<String, String>>[];
     final type = widget.movie['type'] ?? '';
@@ -1863,22 +1863,20 @@ class _MovieCardState extends State<_MovieCard> {
     final int? id = widget.movie['id'];
     if (id == null) return;
 
-    setState(() => _isFavorite = !_isFavorite);
-
     try {
-      final api = Provider.of<TxaApi>(context, listen: false);
-      await api.toggleFavorite(id);
-      if (mounted) {
+      final favProvider = Provider.of<FavoriteProvider>(context, listen: false);
+      final success = await favProvider.toggleFavorite(id);
+      if (mounted && success) {
+        final newStatus = favProvider.isFavorite(id);
         TxaToast.show(
           context,
-          _isFavorite
+          newStatus
               ? TxaLanguage.t('favorite_added')
               : TxaLanguage.t('favorite_removed'),
         );
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isFavorite = !_isFavorite);
         TxaToast.show(context, "${TxaLanguage.t('error')}: $e", isError: true);
       }
     }
@@ -1886,6 +1884,11 @@ class _MovieCardState extends State<_MovieCard> {
 
   @override
   Widget build(BuildContext context) {
+    final int? mId = widget.movie['id'];
+    final bool isFav = (mId != null && TxaSettings.authToken.isNotEmpty)
+        ? context.select<FavoriteProvider, bool>((p) => p.isFavorite(mId))
+        : (widget.movie['is_favorite'] == true);
+
     final name = widget.movie['name'] ?? 'Không rõ';
     final originName = widget.movie['origin_name'] ?? '';
     final posterUrl =
@@ -1995,11 +1998,9 @@ class _MovieCardState extends State<_MovieCard> {
                           GestureDetector(
                             onTap: _toggleFavorite,
                             child: Icon(
-                              _isFavorite
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
+                              isFav ? Icons.favorite : Icons.favorite_border,
                               size: 16,
-                              color: _isFavorite
+                              color: isFav
                                   ? Colors.red
                                   : Colors.white.withValues(alpha: 0.6),
                             ),

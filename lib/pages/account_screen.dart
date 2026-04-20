@@ -17,6 +17,7 @@ import 'favorite_list_screen.dart';
 import 'global_settings_screen.dart';
 import 'movie_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../utils/txa_format.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -761,6 +762,20 @@ class _AccountScreenState extends State<AccountScreen> {
                             maxLines: 2,
                             overflow: TextOverflow.ellipsis,
                           ),
+                          if (item['current_time'] != null &&
+                              item['duration'] != null &&
+                              (item['duration'] as num) > 0)
+                            Padding(
+                              padding: const EdgeInsets.only(top: 4),
+                              child: Text(
+                                '${TxaFormat.formatTime((item['current_time'] as num).toInt())} / ${TxaFormat.formatTime((item['duration'] as num).toInt())}',
+                                style: const TextStyle(
+                                  color: Colors.white70,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
                         ],
                       ),
                     ),

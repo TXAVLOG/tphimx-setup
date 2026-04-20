@@ -228,6 +228,38 @@ class _HistoryScreenState extends State<HistoryScreen> {
                           fontSize: 12,
                         ),
                       ),
+                      if (item['current_time'] != null &&
+                          item['duration'] != null &&
+                          (item['duration'] as num) > 0) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(2),
+                                child: LinearProgressIndicator(
+                                  value:
+                                      ((item['current_time'] as num) /
+                                              (item['duration'] as num))
+                                          .clamp(0.0, 1.0),
+                                  backgroundColor: Colors.white10,
+                                  color: TxaTheme.accent,
+                                  minHeight: 3,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              '${TxaFormat.formatTime((item['current_time'] as num).toInt())} / ${TxaFormat.formatTime((item['duration'] as num).toInt())}',
+                              style: const TextStyle(
+                                color: TxaTheme.textMuted,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
                       const SizedBox(height: 4),
                       Text(
                         TxaFormat.formatTimeAgo(item['updated_at'] ?? ''),
