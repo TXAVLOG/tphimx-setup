@@ -150,14 +150,19 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                     ),
                   ],
                 ),
-                child: TxaTheme.glassConnector(
-                  radius: 22,
-                  padding: EdgeInsets.zero,
+                child: Container(
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(
+                      color: TxaTheme.accent.withValues(alpha: 0.2),
+                      width: 1.5,
+                    ),
+                  ),
                   child: ClipRRect(
                     borderRadius: BorderRadius.circular(22),
                     child: Stack(
                       children: [
-                        // Video Content
+                        // Video Content — NO glass overlay so video is fully visible
                         Positioned.fill(
                           child: provider.controller != null
                               ? BetterPlayer(controller: provider.controller!)

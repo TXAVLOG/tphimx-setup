@@ -238,14 +238,16 @@ class _TxaPlayerState extends State<TxaPlayer>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      if (!_isInitialized || _error || _isLocked) return;
+      if (!_isInitialized || _error || _isLocked || _isEmbed) return;
 
       final isPlaying =
           _betterPlayerController?.videoPlayerController?.value.isPlaying ??
           false;
 
       if (TxaSettings.autoPiP && isPlaying) {
-        // Trigger Native PiP (Android)
+        // Enable native PiP via floating package
+        // enableOnLeavePiP handles the transition automatically,
+        // but we also call enable() as immediate fallback
         _floating.enable(ImmediatePiP(aspectRatio: const Rational(16, 9)));
       } else {
         // If autoPiP is off or video is already paused, we pause properly
@@ -256,6 +258,19 @@ class _TxaPlayerState extends State<TxaPlayer>
       }
     } else if (state == AppLifecycleState.resumed) {
       _checkPiPReturn();
+      // Re-enable auto PiP for next leave
+      _enableAutoPiP();
+    }
+  }
+
+  void _enableAutoPiP() {
+    if (!_isInitialized || _error || _isEmbed) return;
+    if (!TxaSettings.autoPiP) return;
+
+    try {
+      _floating.enable(OnLeavePiP(aspectRatio: const Rational(16, 9)));
+    } catch (e) {
+      TxaLogger.log('Auto PiP enable error: $e', isError: true);
     }
   }
 
@@ -569,6 +584,7 @@ class _TxaPlayerState extends State<TxaPlayer>
           _isEmbed = false;
           _error = false;
         });
+        _enableAutoPiP();
       }
     } catch (e) {
       if (isLast) {

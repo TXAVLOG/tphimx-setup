@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:cached_network_image/cached_network_image.dart';
@@ -16,15 +17,46 @@ class HistoryScreen extends StatefulWidget {
   State<HistoryScreen> createState() => _HistoryScreenState();
 }
 
-class _HistoryScreenState extends State<HistoryScreen> {
+class _HistoryScreenState extends State<HistoryScreen>
+    with WidgetsBindingObserver {
   List<dynamic>? _items;
   bool _loading = true;
   String? _error;
 
+  // Timer to refresh "X giây trước" every second
+  Timer? _tickTimer;
+
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadHistory();
+    _startTickTimer();
+  }
+
+  @override
+  void dispose() {
+    _tickTimer?.cancel();
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      // Reload history when user comes back to app
+      _loadHistory();
+    }
+  }
+
+  void _startTickTimer() {
+    _tickTimer?.cancel();
+    _tickTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      // Only rebuild if data exists and widget is mounted
+      if (mounted && _items != null && _items!.isNotEmpty) {
+        setState(() {});
+      }
+    });
   }
 
   Future<void> _loadHistory() async {
@@ -176,114 +208,114 @@ class _HistoryScreenState extends State<HistoryScreen> {
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(16),
-      itemCount: _items!.length,
-      itemBuilder: (context, index) {
-        final item = _items![index];
-        final movie = item['movie'] ?? {};
-        return Padding(
-          padding: const EdgeInsets.only(bottom: 12),
-          child: InkWell(
-            onTap: () async {
-              // Show loading overlay or just go to detail with autoPlay
-              // For better UX and consistency, we fetch detail first or let DetailScreen handle it.
-              // Here we'll just go to DetailScreen and it will already highlight the episode.
-              // If the user wants "automatic", we could add a flag to MovieDetailScreen.
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (ctx) =>
-                      MovieDetailScreen(slug: movie['slug'], autoPlay: true),
-                ),
-              ).then((_) => _loadHistory());
-            },
-            borderRadius: BorderRadius.circular(12),
-            child: Row(
-              children: [
-                ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: CachedNetworkImage(
-                    imageUrl: movie['thumb_url'] ?? '',
-                    width: 100,
-                    height: 60,
-                    fit: BoxFit.cover,
-                    placeholder: (ctx, url) =>
-                        Container(color: TxaTheme.secondaryBg),
+    return RefreshIndicator(
+      onRefresh: _loadHistory,
+      color: TxaTheme.accent,
+      backgroundColor: TxaTheme.secondaryBg,
+      child: ListView.builder(
+        physics: const AlwaysScrollableScrollPhysics(),
+        padding: const EdgeInsets.all(16),
+        itemCount: _items!.length,
+        itemBuilder: (context, index) {
+          final item = _items![index];
+          final movie = item['movie'] ?? {};
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 12),
+            child: InkWell(
+              onTap: () async {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (ctx) =>
+                        MovieDetailScreen(slug: movie['slug'], autoPlay: true),
                   ),
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        movie['name'] ?? '',
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
+                ).then((_) => _loadHistory());
+              },
+              borderRadius: BorderRadius.circular(12),
+              child: Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(8),
+                    child: CachedNetworkImage(
+                      imageUrl: movie['thumb_url'] ?? '',
+                      width: 100,
+                      height: 60,
+                      fit: BoxFit.cover,
+                      placeholder: (ctx, url) =>
+                          Container(color: TxaTheme.secondaryBg),
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          movie['name'] ?? '',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '${TxaLanguage.t('watching')}: ${item['episode_name'] ?? '...'}',
-                        style: const TextStyle(
-                          color: TxaTheme.textSecondary,
-                          fontSize: 12,
-                        ),
-                      ),
-                      if (item['current_time'] != null &&
-                          item['duration'] != null &&
-                          (item['duration'] as num) > 0) ...[
                         const SizedBox(height: 4),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(2),
-                                child: LinearProgressIndicator(
-                                  value:
-                                      ((item['current_time'] as num) /
-                                              (item['duration'] as num))
-                                          .clamp(0.0, 1.0),
-                                  backgroundColor: Colors.white10,
-                                  color: const Color(
-                                    0xFF3B82F6,
-                                  ), // Xanh dương tinh tế
-                                  minHeight: 3,
+                        Text(
+                          '${TxaLanguage.t('watching')}: ${item['episode_name'] ?? '...'}',
+                          style: const TextStyle(
+                            color: TxaTheme.textSecondary,
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (item['current_time'] != null &&
+                            item['duration'] != null &&
+                            (item['duration'] as num) > 0) ...[
+                          const SizedBox(height: 4),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(2),
+                                  child: LinearProgressIndicator(
+                                    value:
+                                        ((item['current_time'] as num) /
+                                                (item['duration'] as num))
+                                            .clamp(0.0, 1.0),
+                                    backgroundColor: Colors.white10,
+                                    color: const Color(0xFF3B82F6),
+                                    minHeight: 3,
+                                  ),
                                 ),
                               ),
-                            ),
-                            const SizedBox(width: 8),
-                            Text(
-                              '${TxaFormat.formatTime((item['current_time'] as num).toInt())} / ${TxaFormat.formatTime((item['duration'] as num).toInt())}',
-                              style: const TextStyle(
-                                color: TxaTheme.textMuted,
-                                fontSize: 10,
-                                fontWeight: FontWeight.w500,
+                              const SizedBox(width: 8),
+                              Text(
+                                '${TxaFormat.formatTime((item['current_time'] as num).toInt())} / ${TxaFormat.formatTime((item['duration'] as num).toInt())}',
+                                style: const TextStyle(
+                                  color: TxaTheme.textMuted,
+                                  fontSize: 10,
+                                  fontWeight: FontWeight.w500,
+                                ),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
+                        ],
+                        const SizedBox(height: 4),
+                        Text(
+                          TxaFormat.formatTimeAgo(item['updated_at'] ?? ''),
+                          style: const TextStyle(
+                            color: TxaTheme.textMuted,
+                            fontSize: 10,
+                          ),
                         ),
                       ],
-                      const SizedBox(height: 4),
-                      Text(
-                        TxaFormat.formatTimeAgo(item['updated_at'] ?? ''),
-                        style: const TextStyle(
-                          color: TxaTheme.textMuted,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ],
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }
