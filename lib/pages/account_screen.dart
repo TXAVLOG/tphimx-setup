@@ -8,6 +8,7 @@ import 'dart:io';
 import '../theme/txa_theme.dart';
 import '../services/txa_settings.dart';
 import '../services/txa_language.dart';
+import '../utils/txa_logger.dart';
 import '../services/txa_api.dart';
 import '../utils/txa_toast.dart';
 import 'legal_screen.dart';
@@ -379,23 +380,17 @@ class _AccountScreenState extends State<AccountScreen> {
                       }
                     } else {
                       final errStr = err.toString();
-                      if (errStr.contains('401') ||
+                      if (errStr.contains('401') &&
                           errStr.contains('Unauthorized')) {
                         isUnauthorized = true;
                       }
                     }
 
                     if (isUnauthorized) {
-                      // Token expired/invalid, logout silently
-                      WidgetsBinding.instance.addPostFrameCallback((_) {
-                        TxaSettings.authToken = '';
-                        TxaSettings.userData = '';
-                        Provider.of<TxaApi>(
-                          context,
-                          listen: false,
-                        ).setToken('');
-                        if (mounted) setState(() {});
-                      });
+                      TxaLogger.log(
+                        "API Auth/Me returned 401. Session may be expired but keeping token for now.",
+                        isError: true,
+                      );
                     }
                     return _buildErrorCard(snapshot.error?.toString());
                   }

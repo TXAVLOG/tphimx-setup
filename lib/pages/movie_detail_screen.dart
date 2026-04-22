@@ -1468,20 +1468,20 @@ class _BroadcastBannerState extends State<_BroadcastBanner>
 
     String msg = "";
     if (isFinal) {
-      msg = TxaLanguage.t('broadcast_final_msg')
-          .replaceAll(
-            '%prefix',
-            nextEp.isEmpty ? TxaLanguage.t('final_ep') : nextEp,
-          )
-          .replaceAll('%time', formattedTime);
+      msg = TxaLanguage.t(
+        'broadcast_final_msg',
+        replace: {
+          'prefix': nextEp.isEmpty ? TxaLanguage.t('final_ep') : nextEp,
+          'time': formattedTime,
+        },
+      );
     } else if (nextEp.isNotEmpty) {
       msg = TxaLanguage.t(
         'broadcast_msg',
-      ).replaceAll('%prefix', nextEp).replaceAll('%time', formattedTime);
+        replace: {'prefix': nextEp, 'time': formattedTime},
+      );
     } else {
-      msg = TxaLanguage.t(
-        'broadcast_suffix',
-      ).replaceAll('%time', formattedTime);
+      msg = TxaLanguage.t('broadcast_suffix', replace: {'time': formattedTime});
     }
 
     return Container(

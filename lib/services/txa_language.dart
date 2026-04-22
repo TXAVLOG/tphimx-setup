@@ -94,11 +94,11 @@ class TxaLanguage {
       'collapse': 'Thu gọn',
       'show_more': 'Xem thêm',
       'broadcast_msg':
-          '%prefix sẽ phát sóng vào %time. Các bạn nhớ đón xem nhé 😙',
+          '%prefix% sẽ phát sóng vào %time%. Các bạn nhớ đón xem nhé 😙',
       'broadcast_final_msg':
-          'Đừng bỏ lỡ %prefix (Hồi kết) sẽ phát sóng vào %time 🥹',
+          'Đừng bỏ lỡ %prefix% (Hồi kết) sẽ phát sóng vào %time% 🥹',
       'broadcast_suffix':
-          'Phim sẽ phát sóng tập tiếp theo vào %time. Các bạn nhớ đón xem nhé 😙',
+          'Phim sẽ phát sóng tập tiếp theo vào %time%. Các bạn nhớ đón xem nhé 😙',
       'final_ep': 'Tập cuối',
       'final_part': 'Hồi kết',
       'current_version': 'Phiên bản hiện tại: %version',
@@ -267,6 +267,7 @@ class TxaLanguage {
       'register_success': 'Đăng ký thành công',
       'logout_success': 'Đăng xuất thành công',
       'logout_confirm': 'Bạn có chắc chắn muốn đăng xuất?',
+      'account_title': 'Tài khoản',
       'email_verified': 'Đã xác minh email',
       'verified_email_success': 'Xác minh email thành công!',
       'verify_now': 'Xác minh ngay',
@@ -280,6 +281,8 @@ class TxaLanguage {
       'my_list': 'Danh sách của tôi',
       'notifications_cleared': 'Đã xóa tất cả thông báo',
       'notifications_read_all': 'Đã đánh dấu tất cả là đã đọc',
+      'no_notifications_desc':
+          'Khi có thông báo mới, chúng sẽ xuất hiện ở đây.',
       'appearance': 'Giao diện',
       'settings': 'Cài đặt',
       'font_size': 'Cỡ chữ',
@@ -394,10 +397,11 @@ class TxaLanguage {
       'favorite_list': 'Favorites',
       'collapse': 'Collapse',
       'show_more': 'Show more',
-      'broadcast_msg': '%prefix will broadcast at %time. Don\'t miss it 😙',
+      'broadcast_msg': '%prefix% will broadcast at %time%. Don\'t miss it 😙',
       'broadcast_final_msg':
-          'Don\'t miss %prefix (Final) broadcasting at %time 🥹',
-      'broadcast_suffix': 'Next episode will broadcast at %time. Stay tuned 😙',
+          'Don\'t miss %prefix% (Final) broadcasting at %time% 🥹',
+      'broadcast_suffix':
+          'Next episode will broadcast at %time%. Stay tuned 😙',
       'final_ep': 'Final Episode',
       'final_part': 'Final',
       'current_version': 'Current Version: %version',
@@ -545,6 +549,7 @@ class TxaLanguage {
       'gender_female': 'Female',
       'gender_other': 'Other',
       'no_notifications': 'No notifications found',
+      'no_notifications_desc': 'New notifications will appear here.',
       'error_login': 'Login failed',
       'error_register': 'Registration failed',
       'verify_email_msg': 'Please verify your email to login',

@@ -154,6 +154,16 @@ class _TxaPlayerState extends State<TxaPlayer>
     _toggleDND(true);
     _startHistorySync();
     WidgetsBinding.instance.addObserver(this);
+
+    // Listen for settings changes to reactively update PiP registration
+    TxaSettings.onSettingsChanged = () {
+      if (!mounted) return;
+      if (TxaSettings.autoPiP) {
+        _enableAutoPiP();
+      } else {
+        _floating.cancelOnLeavePiP();
+      }
+    };
   }
 
   void _startHistorySync() {
@@ -238,7 +248,9 @@ class _TxaPlayerState extends State<TxaPlayer>
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.inactive) {
-      if (!_isInitialized || _error || _isLocked || _isEmbed) return;
+      if (!_isInitialized || _error || _isLocked || _isEmbed || !mounted) {
+        return;
+      }
 
       final isPlaying =
           _betterPlayerController?.videoPlayerController?.value.isPlaying ??
@@ -251,7 +263,11 @@ class _TxaPlayerState extends State<TxaPlayer>
 
       if (TxaSettings.autoPiP && isPlaying) {
         // Enable native PiP via floating package
-        _floating.enable(ImmediatePiP(aspectRatio: const Rational(16, 9)));
+        try {
+          _floating.enable(ImmediatePiP(aspectRatio: const Rational(16, 9)));
+        } catch (e) {
+          debugPrint('PiP Error: $e');
+        }
       } else {
         // If autoPiP is off or video is already paused, we pause properly
         if (isPlaying) {
@@ -260,8 +276,8 @@ class _TxaPlayerState extends State<TxaPlayer>
       }
     } else if (state == AppLifecycleState.resumed) {
       _checkPiPReturn();
-      // Re-enable auto PiP for next leave ONLY if setting is ON
-      if (TxaSettings.autoPiP) {
+      // Re-enable auto PiP for next leave ONLY if setting is ON and not disposed
+      if (TxaSettings.autoPiP && mounted && _isInitialized) {
         _enableAutoPiP();
       }
     }

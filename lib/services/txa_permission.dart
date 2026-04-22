@@ -33,6 +33,12 @@ class TxaPermission {
         'desc': TxaLanguage.t('permission_dnd_desc'),
         'permission': Permission.accessNotificationPolicy,
       });
+      perms.add({
+        'id': 'exact_alarm',
+        'label': 'Báo thức chính xác',
+        'desc': 'Bắt buộc để gửi thông báo lịch chiếu đúng giờ.',
+        'permission': Permission.scheduleExactAlarm,
+      });
     }
     return perms;
   }
