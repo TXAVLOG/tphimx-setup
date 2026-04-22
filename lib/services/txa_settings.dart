@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../utils/txa_logger.dart';
 
 class TxaSettings {
   static late SharedPreferences _prefs;
@@ -131,6 +132,12 @@ class TxaSettings {
   // --- Auth ---
   static String get authToken => _prefs.getString('auth_token') ?? '';
   static set authToken(String value) {
+    if (value.isEmpty) {
+      TxaLogger.log(
+        '[AuthTrap] Token is being cleared. Stack: ${StackTrace.current}',
+        isError: true,
+      );
+    }
     _prefs.setString('auth_token', value);
     _notify();
   }

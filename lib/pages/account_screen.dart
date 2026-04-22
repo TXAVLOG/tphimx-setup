@@ -8,7 +8,6 @@ import 'dart:io';
 import '../theme/txa_theme.dart';
 import '../services/txa_settings.dart';
 import '../services/txa_language.dart';
-import '../utils/txa_logger.dart';
 import '../services/txa_api.dart';
 import '../utils/txa_toast.dart';
 import 'legal_screen.dart';
@@ -354,51 +353,47 @@ class _AccountScreenState extends State<AccountScreen> {
                 }
               } catch (_) {}
 
+              // Profile Header
+              // Always use cached data for immediate visual consistency
               return FutureBuilder<Map<String, dynamic>>(
                 future: Provider.of<TxaApi>(context, listen: false).getAuthMe(),
                 builder: (context, snapshot) {
-                  Map<String, dynamic>? userData;
-
+                  Map<String, dynamic>? updatedUser;
                   if (snapshot.hasData) {
-                    userData = snapshot.data?['data'];
-                    // Update cache silently
-                    if (userData != null) {
-                      TxaSettings.userData = jsonEncode(userData);
+                    updatedUser = snapshot.data?['data'];
+                    if (updatedUser != null) {
+                      TxaSettings.userData = jsonEncode(updatedUser);
                     }
-                  } else if (initialUser != null) {
-                    // Fallback to cache while loading or on error
-                    userData = initialUser['data'];
                   }
 
+                  // Priority: API result > Cache
+                  final user =
+                      updatedUser ??
+                      (initialUser != null ? initialUser['data'] : null);
+
+                  if (user == null) {
+                    if (snapshot.hasError) {
+                      return _buildErrorCard(snapshot.error?.toString());
+                    }
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  final name = user['name'] ?? 'TPhimX User';
+                  final email = user['email'] ?? '...';
+                  final isVerified = user['email_verified_at'] != null;
+                  final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
+
+                  // Check for session expiration quietly
+                  bool isExpired = false;
                   if (snapshot.hasError) {
                     final err = snapshot.error;
-                    bool isUnauthorized = false;
-
-                    if (err is DioException) {
-                      if (err.response?.statusCode == 401) {
-                        isUnauthorized = true;
-                      }
-                    } else {
-                      final errStr = err.toString();
-                      if (errStr.contains('401') &&
-                          errStr.contains('Unauthorized')) {
-                        isUnauthorized = true;
-                      }
+                    if (err is DioException &&
+                        err.response?.statusCode == 401) {
+                      isExpired = true;
+                    } else if (err.toString().contains('401')) {
+                      isExpired = true;
                     }
-
-                    if (isUnauthorized) {
-                      TxaLogger.log(
-                        "API Auth/Me returned 401. Session may be expired but keeping token for now.",
-                        isError: true,
-                      );
-                    }
-                    return _buildErrorCard(snapshot.error?.toString());
                   }
-
-                  final name = userData?['name'] ?? 'TPhimX User';
-                  final email = userData?['email'] ?? '...';
-                  final isVerified = userData?['email_verified_at'] != null;
-                  final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
 
                   return Container(
                     padding: const EdgeInsets.symmetric(
@@ -409,16 +404,20 @@ class _AccountScreenState extends State<AccountScreen> {
                     decoration: BoxDecoration(
                       color: TxaTheme.cardBg,
                       borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: TxaTheme.glassBorder),
+                      border: Border.all(
+                        color: isExpired
+                            ? Colors.red.withValues(alpha: 0.3)
+                            : TxaTheme.glassBorder,
+                      ),
                     ),
                     child: Row(
                       children: [
-                        userData?['avatar'] != null &&
-                                userData!['avatar'].toString().isNotEmpty
+                        user['avatar'] != null &&
+                                user['avatar'].toString().isNotEmpty
                             ? CircleAvatar(
                                 radius: 30,
                                 backgroundImage: CachedNetworkImageProvider(
-                                  userData['avatar'],
+                                  user['avatar'],
                                 ),
                               )
                             : CircleAvatar(
@@ -438,15 +437,47 @@ class _AccountScreenState extends State<AccountScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              Text(
-                                name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
+                              Row(
+                                children: [
+                                  Expanded(
+                                    child: Text(
+                                      name,
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                  if (isExpired)
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 6,
+                                        vertical: 2,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Colors.red.withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(4),
+                                        border: Border.all(
+                                          color: Colors.red.withValues(
+                                            alpha: 0.3,
+                                          ),
+                                        ),
+                                      ),
+                                      child: const Text(
+                                        'Hết hạn!',
+                                        style: TextStyle(
+                                          color: Colors.redAccent,
+                                          fontSize: 9,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ),
+                                ],
                               ),
                               const SizedBox(height: 2),
                               Text(
@@ -507,17 +538,7 @@ class _AccountScreenState extends State<AccountScreen> {
                         ),
                         IconButton(
                           onPressed: () {
-                            TxaSettings.authToken = '';
-                            TxaSettings.userData = '';
-                            Provider.of<TxaApi>(
-                              context,
-                              listen: false,
-                            ).setToken('');
-                            setState(() {});
-                            TxaToast.show(
-                              context,
-                              TxaLanguage.t('logout_success'),
-                            );
+                            _showLogoutConfirm(context);
                           },
                           icon: const Icon(
                             Icons.logout_rounded,
@@ -608,8 +629,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.2.9';
-                  final buildNumber = snapshot.data?.buildNumber ?? '329';
+                  final version = snapshot.data?.version ?? '3.3.0';
+                  final buildNumber = snapshot.data?.buildNumber ?? '330';
                   return Text(
                     TxaLanguage.t(
                       'current_version',
@@ -622,6 +643,43 @@ class _AccountScreenState extends State<AccountScreen> {
                   );
                 },
               ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showLogoutConfirm(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: TxaTheme.cardBg,
+        title: Text(
+          TxaLanguage.t('logout'),
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          TxaLanguage.t('logout_confirm'),
+          style: const TextStyle(color: TxaTheme.textSecondary),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(TxaLanguage.t('cancel')),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              TxaSettings.authToken = '';
+              TxaSettings.userData = '';
+              Provider.of<TxaApi>(context, listen: false).setToken('');
+              setState(() {});
+              TxaToast.show(context, TxaLanguage.t('logout_success'));
+            },
+            child: Text(
+              TxaLanguage.t('logout'),
+              style: const TextStyle(color: Colors.redAccent),
             ),
           ),
         ],

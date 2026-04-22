@@ -10,6 +10,7 @@ import '../theme/txa_theme.dart';
 import '../services/txa_language.dart';
 import '../utils/txa_toast.dart';
 import '../services/txa_settings.dart';
+import 'movie_detail_screen.dart';
 
 class ScheduleScreen extends StatefulWidget {
   const ScheduleScreen({super.key});
@@ -628,11 +629,23 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
         final movieId = movie['id']?.toString() ?? movie['slug'] ?? '';
         final isScheduled = TxaSettings.isMovieScheduled(movieId);
 
-        return _ScheduleMovieCard(
-          movie: movie,
-          episodeLabel: _formatEpisodeLabel(movie),
-          isScheduled: isScheduled,
-          onTapNotification: () => _toggleNotification(movie),
+        return GestureDetector(
+          onTap: () {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (ctx) => MovieDetailScreen(
+                  slug: movie['slug'] ?? movie['id']?.toString() ?? '',
+                ),
+              ),
+            );
+          },
+          child: _ScheduleMovieCard(
+            movie: movie,
+            episodeLabel: _formatEpisodeLabel(movie),
+            isScheduled: isScheduled,
+            onTapNotification: () => _toggleNotification(movie),
+          ),
         );
       },
     );

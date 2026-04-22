@@ -48,6 +48,7 @@ class _TxaPlayerState extends State<TxaPlayer>
   bool _isInitialized = false;
   bool _isRefreshing = false;
   bool _isEmbed = false;
+  double? _manualResumeTime;
   WebViewController? _webViewController;
   String? _detailedError;
 
@@ -587,10 +588,13 @@ class _TxaPlayerState extends State<TxaPlayer>
       await _betterPlayerController!.setupDataSource(dataSource);
 
       // Resume playback
-      if (widget.initialTime != null && widget.initialTime! > 0) {
+      final resumeTime = _manualResumeTime ?? widget.initialTime;
+      if (resumeTime != null && resumeTime > 0) {
         await _betterPlayerController!.seekTo(
-          Duration(seconds: widget.initialTime!.toInt()),
+          Duration(seconds: resumeTime.toInt()),
         );
+        // Clear manual resume time only after successful seek
+        _manualResumeTime = null;
       }
 
       _betterPlayerController!.addEventsListener(_onPlayerEvent);
@@ -756,6 +760,7 @@ class _TxaPlayerState extends State<TxaPlayer>
       _syncHistory(); // Sync current before switching
       setState(() {
         _currentEpisodeIndex--;
+        _manualResumeTime = null;
       });
       _initializePlayer();
     }
@@ -768,6 +773,7 @@ class _TxaPlayerState extends State<TxaPlayer>
       _syncHistory(); // Sync current before switching
       setState(() {
         _currentEpisodeIndex++;
+        _manualResumeTime = null;
       });
       _initializePlayer();
     } else {
@@ -892,10 +898,23 @@ class _TxaPlayerState extends State<TxaPlayer>
       return;
     }
 
+    // Capture current time for resumption
+    double? currentTime;
+    if (_betterPlayerController != null &&
+        _betterPlayerController!.videoPlayerController != null) {
+      currentTime = _betterPlayerController!
+          .videoPlayerController!
+          .value
+          .position
+          .inSeconds
+          .toDouble();
+    }
+
     // Switch server and reload
     setState(() {
       _currentServerIndex = newServerIndex;
       _showServerDrawer = false;
+      _manualResumeTime = currentTime;
     });
     _loadMarkers();
     _initializePlayer();

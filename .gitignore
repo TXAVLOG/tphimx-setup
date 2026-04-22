@@ -22,6 +22,7 @@ migrate_working_dir/
 
 # Visual Studio Code related
 .vscode/
+.grapuco/
 
 # Flutter/Dart/Pub related
 **/doc/api/
