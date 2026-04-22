@@ -13,6 +13,9 @@ import '../services/txa_settings.dart';
 import '../utils/txa_logger.dart';
 import '../services/txa_mini_player_provider.dart';
 import '../services/favorite_provider.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:timezone/timezone.dart' as tz;
+import 'package:permission_handler/permission_handler.dart';
 
 class MovieDetailScreen extends StatefulWidget {
   final String slug;
@@ -1422,6 +1425,9 @@ class _BroadcastBannerState extends State<_BroadcastBanner>
 
     if (targetDate.isBefore(DateTime.now())) return const SizedBox.shrink();
 
+    final movieId = movie['id']?.toString() ?? movie['slug'] ?? '';
+    final isScheduled = TxaSettings.isMovieScheduled(movieId);
+
     final formattedTime = DateFormat(
       'HH:mm [dd-MM-yyyy]',
       TxaLanguage.currentLang,
@@ -1538,8 +1544,142 @@ class _BroadcastBannerState extends State<_BroadcastBanner>
               ),
             ),
           ),
+          const SizedBox(width: 8),
+          Material(
+            color: Colors.transparent,
+            child: InkWell(
+              onTap: () => _toggleNotification(targetDate!, movieId),
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: isScheduled
+                      ? Colors.white
+                      : Colors.white.withValues(alpha: 0.2),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Icon(
+                  isScheduled
+                      ? Icons.notifications_off_rounded
+                      : Icons.notifications_rounded,
+                  color: isScheduled ? const Color(0xFF7C3AED) : Colors.white,
+                  size: 20,
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );
+  }
+
+  Future<void> _toggleNotification(DateTime targetTime, String movieId) async {
+    final isScheduled = TxaSettings.isMovieScheduled(movieId);
+    final String movieName = widget.movie['name'] ?? 'TPhimX';
+
+    // Use unique hashes for different notifications
+    final int reminderId = '${movieId}_reminder'.hashCode;
+    final int nowId = '${movieId}_now'.hashCode;
+
+    if (isScheduled) {
+      final notif = FlutterLocalNotificationsPlugin();
+      await notif.cancel(id: reminderId);
+      await notif.cancel(id: nowId);
+      TxaSettings.setMovieScheduled(movieId, false);
+      setState(() {});
+      if (!mounted) return;
+      TxaToast.show(context, TxaLanguage.t('notification_canceled'));
+      return;
+    }
+
+    if (await Permission.notification.isDenied) {
+      final res = await Permission.notification.request();
+      if (!res.isGranted) {
+        if (!mounted) return;
+        TxaToast.show(context, TxaLanguage.t('notification_permission_denied'));
+        return;
+      }
+    }
+
+    if (await Permission.scheduleExactAlarm.isDenied) {
+      final res = await Permission.scheduleExactAlarm.request();
+      if (!res.isGranted) {
+        if (!mounted) return;
+        TxaToast.show(
+          context,
+          TxaLanguage.t('exact_alarm_permission_denied'),
+          isError: true,
+        );
+        return;
+      }
+    }
+
+    try {
+      final DateTime reminderTime = targetTime.subtract(
+        const Duration(minutes: 10),
+      );
+
+      if (targetTime.isBefore(DateTime.now())) {
+        if (!mounted) return;
+        TxaToast.show(context, TxaLanguage.t('notification_time_passed'));
+        return;
+      }
+
+      final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+      const androidDetails = AndroidNotificationDetails(
+        'schedule_reminders',
+        'Schedule Reminders',
+        channelDescription: 'Notifications for upcoming movie broadcasts',
+        importance: Importance.max,
+        priority: Priority.high,
+        styleInformation: BigTextStyleInformation(''),
+      );
+      const platformDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: DarwinNotificationDetails(),
+      );
+
+      // 1. Schedule Reminder Notification (10 mins before)
+      if (reminderTime.isAfter(DateTime.now())) {
+        await flutterLocalNotificationsPlugin.zonedSchedule(
+          id: reminderId,
+          title: TxaLanguage.t(
+            'broadcast_reminder_title',
+            replace: {'name': movieName},
+          ),
+          body: TxaLanguage.t(
+            'broadcast_reminder_body',
+            replace: {'movie': movieName, 'minutes': '10'},
+          ),
+          scheduledDate: tz.TZDateTime.from(reminderTime, tz.local),
+          notificationDetails: platformDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        );
+      }
+
+      // 2. Schedule Now Notification (at exact time)
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        id: nowId,
+        title: TxaLanguage.t(
+          'broadcast_now_title',
+          replace: {'name': movieName},
+        ),
+        body: TxaLanguage.t(
+          'broadcast_now_body',
+          replace: {'movie': movieName},
+        ),
+        scheduledDate: tz.TZDateTime.from(targetTime, tz.local),
+        notificationDetails: platformDetails,
+        androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+      );
+
+      TxaSettings.setMovieScheduled(movieId, true);
+      setState(() {});
+      if (!mounted) return;
+      TxaToast.show(context, TxaLanguage.t('reminder_set'));
+    } catch (e) {
+      if (!mounted) return;
+      TxaToast.show(context, "${TxaLanguage.t('error')}: $e");
+    }
   }
 }

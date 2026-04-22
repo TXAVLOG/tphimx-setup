@@ -244,22 +244,26 @@ class _TxaPlayerState extends State<TxaPlayer>
           _betterPlayerController?.videoPlayerController?.value.isPlaying ??
           false;
 
+      // Ensure PiP is cancelled if setting is OFF
+      if (!TxaSettings.autoPiP) {
+        _floating.cancelOnLeavePiP();
+      }
+
       if (TxaSettings.autoPiP && isPlaying) {
         // Enable native PiP via floating package
-        // enableOnLeavePiP handles the transition automatically,
-        // but we also call enable() as immediate fallback
         _floating.enable(ImmediatePiP(aspectRatio: const Rational(16, 9)));
       } else {
         // If autoPiP is off or video is already paused, we pause properly
-        // since handleLifecycle: false is set.
         if (isPlaying) {
           _betterPlayerController?.pause();
         }
       }
     } else if (state == AppLifecycleState.resumed) {
       _checkPiPReturn();
-      // Re-enable auto PiP for next leave
-      _enableAutoPiP();
+      // Re-enable auto PiP for next leave ONLY if setting is ON
+      if (TxaSettings.autoPiP) {
+        _enableAutoPiP();
+      }
     }
   }
 

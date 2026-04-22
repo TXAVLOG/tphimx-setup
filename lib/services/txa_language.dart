@@ -145,6 +145,11 @@ class TxaLanguage {
       'notification_scheduled': 'Đã đặt nhắc nhở 🔔',
       'notification_cancelled': 'Đã hủy nhắc nhở',
       'notification_time_passed': 'Thời gian chiếu đã trôi qua',
+      'broadcast_reminder_title': 'Sắp công chiếu: %name%',
+      'broadcast_reminder_body':
+          '%movie% sẽ bắt đầu sau %minutes% phút nữa. Đừng bỏ lỡ nhé!',
+      'broadcast_now_title': 'Bắt đầu công chiếu: %name%',
+      'broadcast_now_body': 'Phim %movie% đang được công chiếu. Xem ngay thôi!',
       'save_changes': 'Lưu thay đổi',
       'not_open_link': 'Không thể mở liên kết',
       'close': 'Đóng',
@@ -576,6 +581,11 @@ class TxaLanguage {
       'cache_size': 'Cache size: %size%',
       'reminder_set': 'Reminder set 🔔',
       'reminder_canceled': 'Reminder canceled',
+      'broadcast_reminder_title': 'Upcoming: %name%',
+      'broadcast_reminder_body':
+          '%movie% starts in %minutes% minutes. Don\'t miss it!',
+      'broadcast_now_title': 'Now Broadcasting: %name%',
+      'broadcast_now_body': 'Movie %movie% is now broadcasting. Watch now!',
       'delete_all': 'Clear All',
       'read_all': 'Read All',
       'unread': 'Unread',

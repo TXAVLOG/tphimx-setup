@@ -3,7 +3,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
-import 'package:intl/intl.dart';
+
 import 'package:provider/provider.dart';
 import '../services/txa_api.dart';
 import '../theme/txa_theme.dart';
@@ -642,8 +642,14 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
     final movieId = movie['id']?.toString() ?? movie['slug'] ?? '';
     final isScheduled = TxaSettings.isMovieScheduled(movieId);
 
+    final String movieName = movie['name'] ?? 'TPhimX';
+    final int reminderId = '${movieId}_reminder'.hashCode;
+    final int nowId = '${movieId}_now'.hashCode;
+
     if (isScheduled) {
-      await FlutterLocalNotificationsPlugin().cancel(id: movieId.hashCode);
+      final notif = FlutterLocalNotificationsPlugin();
+      await notif.cancel(id: reminderId);
+      await notif.cancel(id: nowId);
       TxaSettings.setMovieScheduled(movieId, false);
       setState(() {});
       if (!mounted) return;
@@ -683,43 +689,69 @@ class _ScheduleScreenState extends State<ScheduleScreen> {
       final hour = int.parse(timeParts[0]);
       final minute = int.parse(timeParts[1]);
 
-      var scheduledDate = DateTime(
+      final DateTime targetTime = DateTime(
         _selectedDate.year,
         _selectedDate.month,
         _selectedDate.day,
         hour,
         minute,
       );
-      scheduledDate = scheduledDate.subtract(const Duration(minutes: 15));
 
-      if (scheduledDate.isBefore(DateTime.now())) {
+      final DateTime reminderTime = targetTime.subtract(
+        const Duration(minutes: 10),
+      );
+
+      if (targetTime.isBefore(DateTime.now())) {
         if (!mounted) return;
         TxaToast.show(context, TxaLanguage.t('notification_time_passed'));
         return;
       }
 
       final flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+      const androidDetails = AndroidNotificationDetails(
+        'schedule_reminders',
+        'Schedule Reminders',
+        channelDescription: 'Notifications for upcoming movie broadcasts',
+        importance: Importance.max,
+        priority: Priority.high,
+        styleInformation: BigTextStyleInformation(''),
+      );
+      const platformDetails = NotificationDetails(
+        android: androidDetails,
+        iOS: DarwinNotificationDetails(),
+      );
 
-      final String dayOfWeek = DateFormat('EEEE', 'vi').format(_selectedDate);
-      final String title = "Nhắc nhở: Phim ${movie['name']}";
-      final String body =
-          "Phim ${movie['name']} sẽ trình chiếu vào $broadcastTime ngày $dayOfWeek. Đừng bỏ lỡ nhé!";
-
-      await flutterLocalNotificationsPlugin.zonedSchedule(
-        id: movieId.hashCode,
-        title: title,
-        body: body,
-        scheduledDate: tz.TZDateTime.from(scheduledDate, tz.local),
-        notificationDetails: const NotificationDetails(
-          android: AndroidNotificationDetails(
-            'schedule_reminders',
-            'Schedule Reminders',
-            channelDescription: 'Notifications for upcoming movie broadcasts',
-            importance: Importance.max,
-            priority: Priority.high,
+      // 1. Schedule Reminder Notification (10 mins before)
+      if (reminderTime.isAfter(DateTime.now())) {
+        await flutterLocalNotificationsPlugin.zonedSchedule(
+          id: reminderId,
+          title: TxaLanguage.t(
+            'broadcast_reminder_title',
+            replace: {'name': movieName},
           ),
-          iOS: DarwinNotificationDetails(),
+          body: TxaLanguage.t(
+            'broadcast_reminder_body',
+            replace: {'movie': movieName, 'minutes': '10'},
+          ),
+          scheduledDate: tz.TZDateTime.from(reminderTime, tz.local),
+          notificationDetails: platformDetails,
+          androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
+        );
+      }
+
+      // 2. Schedule Now Notification (at exact time)
+      await flutterLocalNotificationsPlugin.zonedSchedule(
+        id: nowId,
+        title: TxaLanguage.t(
+          'broadcast_now_title',
+          replace: {'name': movieName},
         ),
+        body: TxaLanguage.t(
+          'broadcast_now_body',
+          replace: {'movie': movieName},
+        ),
+        scheduledDate: tz.TZDateTime.from(targetTime, tz.local),
+        notificationDetails: platformDetails,
         androidScheduleMode: AndroidScheduleMode.exactAllowWhileIdle,
       );
 

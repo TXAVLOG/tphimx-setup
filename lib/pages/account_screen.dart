@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'package:provider/provider.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:dio/dio.dart';
 import 'dart:io';
 import '../theme/txa_theme.dart';
 import '../services/txa_settings.dart';
@@ -369,8 +370,22 @@ class _AccountScreenState extends State<AccountScreen> {
                   }
 
                   if (snapshot.hasError) {
-                    final err = snapshot.error.toString();
-                    if (err.contains('401') || err.contains('Unauthorized')) {
+                    final err = snapshot.error;
+                    bool isUnauthorized = false;
+
+                    if (err is DioException) {
+                      if (err.response?.statusCode == 401) {
+                        isUnauthorized = true;
+                      }
+                    } else {
+                      final errStr = err.toString();
+                      if (errStr.contains('401') ||
+                          errStr.contains('Unauthorized')) {
+                        isUnauthorized = true;
+                      }
+                    }
+
+                    if (isUnauthorized) {
                       // Token expired/invalid, logout silently
                       WidgetsBinding.instance.addPostFrameCallback((_) {
                         TxaSettings.authToken = '';
