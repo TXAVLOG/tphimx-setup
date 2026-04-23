@@ -40,6 +40,9 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 
+import '../services/txa_speed_service.dart';
+import 'package:quick_actions/quick_actions.dart';
+
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
 
@@ -66,12 +69,148 @@ class _HomeScreenState extends State<HomeScreen> {
     super.didChangeDependencies();
   }
 
+  Timer? _updateTimer;
+
   @override
   void initState() {
     super.initState();
+    _initQuickActions();
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkUpdate();
+      _startUpdateTimer();
     });
+  }
+
+  void _startUpdateTimer() {
+    _updateTimer?.cancel();
+    _updateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+      _checkUpdate();
+    });
+  }
+
+  @override
+  void dispose() {
+    _updateTimer?.cancel();
+    super.dispose();
+  }
+
+  void _initQuickActions() {
+    const QuickActions quickActions = QuickActions();
+    quickActions.initialize((String shortcutType) {
+      if (shortcutType == 'update_app') {
+        _checkUpdate(manual: true);
+      }
+    });
+
+    quickActions.setShortcutItems(<ShortcutItem>[
+      const ShortcutItem(
+        type: 'update_app',
+        localizedTitle: 'Cập nhật App',
+        icon: 'ic_launcher', // Use default icon to ensure compatibility
+      ),
+    ]);
+  }
+
+  void _showSpeedTestDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: TxaTheme.secondaryBg,
+        title: Text(TxaLanguage.t('speed_test'), style: const TextStyle(color: Colors.white)),
+        content: StatefulBuilder(
+          builder: (context, setDialogState) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              _buildInfoRow(TxaLanguage.t('network'), TxaSpeedService.currentNetworkType),
+              const SizedBox(height: 12),
+              _buildSpeedIndicator("Download", TxaSpeedService.currentDownload),
+              const SizedBox(height: 12),
+              _buildSpeedIndicator("Upload", TxaSpeedService.currentUpload),
+              const SizedBox(height: 20),
+              if (TxaSpeedService.isTesting)
+                const CircularProgressIndicator(color: TxaTheme.accent)
+              else
+                ElevatedButton(
+                  onPressed: () {
+                    setDialogState(() {});
+                    TxaSpeedService.checkSpeed(onProgress: (d, u) {
+                      setDialogState(() {});
+                    });
+                  },
+                  style: ElevatedButton.styleFrom(backgroundColor: TxaTheme.accent),
+                  child: Text(TxaLanguage.t('start_test'), style: const TextStyle(color: Colors.black)),
+                ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(TxaLanguage.t('cancel')),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(color: TxaTheme.textMuted)),
+        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      ],
+    );
+  }
+
+  Widget _buildSpeedIndicator(String label, double value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label, style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12)),
+        const SizedBox(height: 4),
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.white.withValues(alpha: 0.05),
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Text(
+            TxaFormat.formatNetworkSpeed(value * 1000000, useGbps: TxaSettings.speedUnitGbps),
+            style: const TextStyle(color: TxaTheme.accent, fontSize: 18, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showBatteryOptimizationWarning() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: TxaTheme.secondaryBg,
+        title: Text(TxaLanguage.t('battery_optimization'), style: const TextStyle(color: Colors.white)),
+        content: Text(
+          TxaLanguage.t('ignore_battery_msg'),
+          style: const TextStyle(color: TxaTheme.textMuted),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: Text(TxaLanguage.t('cancel')),
+          ),
+          ElevatedButton(
+            onPressed: () {
+              Navigator.pop(context);
+              TxaPermission.requestIgnoreBatteryOptimizations();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: TxaTheme.accent),
+            child: Text(TxaLanguage.t('grant'), style: const TextStyle(color: Colors.black)),
+          ),
+        ],
+      ),
+    );
   }
 
   Future<void> _checkUpdate({bool manual = false}) async {
@@ -427,6 +566,31 @@ class _HomeScreenState extends State<HomeScreen> {
               Row(
                 children: [
                   _GlassIconBtn(
+                    icon: Icons.speed_rounded,
+                    tooltip: TxaLanguage.t('network_speed'),
+                    onTap: _showSpeedTestDialog,
+                  ),
+                  const SizedBox(width: 8),
+                  FutureBuilder<bool>(
+                    future: TxaPermission.isIgnoringBatteryOptimizations(),
+                    builder: (context, snapshot) {
+                      if (snapshot.data == false && Platform.isAndroid) {
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8),
+                          child: _GlassIconBtn(
+                            icon: Icons.battery_alert_rounded,
+                            color: Colors.orangeAccent,
+                            tooltip: TxaLanguage.t('battery_optimization'),
+                            onTap: () async {
+                              _showBatteryOptimizationWarning();
+                            },
+                          ),
+                        );
+                      }
+                      return const SizedBox.shrink();
+                    },
+                  ),
+                  _GlassIconBtn(
                     icon: Icons.search_rounded,
                     onTap: () => setState(() => _currentIndex = 1),
                   ),
@@ -660,8 +824,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.3.0';
-                  final build = snapshot.data?.buildNumber ?? '330';
+                  final version = snapshot.data?.version ?? '3.5.0';
+                  final build = snapshot.data?.buildNumber ?? '350';
                   return Text(
                     'Version $version (Build $build)',
                     style: const TextStyle(
@@ -1161,12 +1325,19 @@ class _HomeTabState extends State<_HomeTab> {
 class _GlassIconBtn extends StatelessWidget {
   final IconData icon;
   final VoidCallback onTap;
+  final String? tooltip;
+  final Color? color;
 
-  const _GlassIconBtn({required this.icon, required this.onTap});
+  const _GlassIconBtn({
+    required this.icon,
+    required this.onTap,
+    this.tooltip,
+    this.color,
+  });
 
   @override
   Widget build(BuildContext context) {
-    return GestureDetector(
+    Widget child = GestureDetector(
       onTap: onTap,
       child: Container(
         padding: const EdgeInsets.all(8),
@@ -1175,9 +1346,14 @@ class _GlassIconBtn extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: TxaTheme.glassBorder),
         ),
-        child: Icon(icon, color: TxaTheme.textPrimary, size: 20),
+        child: Icon(icon, color: color ?? TxaTheme.textPrimary, size: 20),
       ),
     );
+
+    if (tooltip != null) {
+      return Tooltip(message: tooltip!, child: child);
+    }
+    return child;
   }
 }
 

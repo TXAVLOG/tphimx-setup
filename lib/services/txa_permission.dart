@@ -35,12 +35,29 @@ class TxaPermission {
       });
       perms.add({
         'id': 'exact_alarm',
-        'label': 'Báo thức chính xác',
-        'desc': 'Bắt buộc để gửi thông báo lịch chiếu đúng giờ.',
+        'label': TxaLanguage.t('permission_alarm_label'),
+        'desc': TxaLanguage.t('permission_alarm_desc'),
         'permission': Permission.scheduleExactAlarm,
+      });
+      perms.add({
+        'id': 'battery',
+        'label': TxaLanguage.t('battery_optimization'),
+        'desc': TxaLanguage.t('ignore_battery_msg'),
+        'permission': Permission.ignoreBatteryOptimizations,
       });
     }
     return perms;
+  }
+
+  static Future<bool> isIgnoringBatteryOptimizations() async {
+    if (!Platform.isAndroid) return true;
+    return await Permission.ignoreBatteryOptimizations.isGranted;
+  }
+
+  static Future<void> requestIgnoreBatteryOptimizations() async {
+    if (Platform.isAndroid) {
+      await Permission.ignoreBatteryOptimizations.request();
+    }
   }
 
   static Future<bool> checkAllRequired() async {

@@ -26,11 +26,14 @@ import 'widgets/txa_mini_player.dart';
 import 'utils/txa_logger.dart';
 import 'pages/home_screen.dart';
 import 'services/txa_language.dart';
+import 'services/txa_background_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await TxaSettings.init();
   await TxaLanguage.init();
+  await TxaBackgroundService.init();
+  await TxaBackgroundService.registerUpdateTask();
   await initializeDateFormatting('vi', null);
 
   try {

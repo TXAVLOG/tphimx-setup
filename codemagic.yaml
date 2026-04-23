@@ -82,3 +82,75 @@ workflows:
           echo "✅ iOS Release and Upload completed successfully."
     artifacts:
       - build/ios/ipa/*.ipa
+
+  android-release-workflow:
+    name: "🤖 [TPhimX] Android Auto-Release"
+    instance_type: linux
+    max_build_duration: 30
+    environment:
+      groups:
+        - txa
+      vars:
+        PACKAGE_NAME: "TPHIMX-Android"
+        REPO_ID: "TXAVLOG/tphimx-setup"
+      flutter: stable
+    triggering:
+      events:
+        - push
+      branch_patterns:
+        - pattern: master
+          include: true
+    scripts:
+      - name: 🛠 Clean & Get Dependencies
+        script: |
+          flutter clean
+          flutter pub get
+      - name: 🏷 Prepare Version & Git Tag
+        script: |
+          VERSION=$(grep "^version: " pubspec.yaml | sed 's/version: //' | tr -d '\r')
+          TAG="v${VERSION//+/_}"
+          echo "VERSION=$VERSION" >> $CM_ENV
+          echo "TAG=$TAG" >> $CM_ENV
+          echo "Current version identified: $VERSION (Tag: $TAG)"
+      - name: 🤖 Build Android APK
+        script: |
+          echo "Building Android APK for v$VERSION..."
+          if flutter build apk --release; then
+            echo "✅ APK build successful."
+          else
+            echo "❌ APK build failed! Check logs above."
+            exit 1
+          fi
+          
+          # Rename for clarity
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/$PACKAGE_NAME-v$VERSION.apk
+      - name: 🚀 Upload to GitHub Release
+        script: |
+          export GITHUB_TOKEN=$GITHUB_TOKEN
+          
+          # Check if tag exists, create if not (handle race condition with iOS build)
+          git tag "$TAG" || echo "Tag already exists locally"
+          git push https://x-access-token:$GITHUB_TOKEN@github.com/$REPO_ID.git "$TAG" || echo "Tag already pushed"
+
+          APK_FILE="build/app/outputs/flutter-apk/$PACKAGE_NAME-v$VERSION.apk"
+
+          if [ ! -f "$APK_FILE" ]; then
+            echo "❌ Error: APK file $APK_FILE NOT FOUND."
+            exit 1
+          fi
+
+          echo "Ensuring Release $TAG exists..."
+          gh release create "$TAG" \
+            --repo "$REPO_ID" \
+            --title "TPhimX v$VERSION" \
+            --notes "Auto-generated release for Android and iOS" \
+            --latest || echo "Release $TAG already exists."
+
+          echo "Uploading Android APK: $APK_FILE"
+          gh release upload "$TAG" "$APK_FILE" \
+            --repo "$REPO_ID" \
+            --clobber
+          
+          echo "✅ Android Release and Upload completed."
+    artifacts:
+      - build/app/outputs/flutter-apk/*.apk

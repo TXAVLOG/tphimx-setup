@@ -79,6 +79,30 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
               color: TxaTheme.textMuted,
             ),
           ),
+          const Divider(color: Colors.white10, height: 32),
+          _buildSectionTitle(TxaLanguage.t('network_speed')),
+          SwitchListTile(
+            value: TxaSettings.autoQualityByNetwork,
+            onChanged: (v) => setState(() => TxaSettings.autoQualityByNetwork = v),
+            title: Text(TxaLanguage.t('auto_quality'), style: const TextStyle(color: Colors.white)),
+            subtitle: Text(TxaLanguage.t('auto_quality_desc'), style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12)),
+            activeThumbColor: TxaTheme.accent,
+          ),
+          SwitchListTile(
+            value: TxaSettings.showSpeedInNotification,
+            onChanged: (v) => setState(() => TxaSettings.showSpeedInNotification = v),
+            title: Text(TxaLanguage.t('show_speed_notif'), style: const TextStyle(color: Colors.white)),
+            subtitle: Text(TxaLanguage.t('show_speed_notif_desc'), style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12)),
+            activeThumbColor: TxaTheme.accent,
+          ),
+          ListTile(
+            title: Text(TxaLanguage.t('speed_unit'), style: const TextStyle(color: Colors.white)),
+            subtitle: Text(TxaSettings.speedUnitGbps ? 'Gbps' : 'Mbps', style: const TextStyle(color: TxaTheme.textMuted)),
+            trailing: const Icon(Icons.chevron_right_rounded, color: TxaTheme.textMuted),
+            onTap: () {
+              setState(() => TxaSettings.speedUnitGbps = !TxaSettings.speedUnitGbps);
+            },
+          ),
         ],
       ),
     );

@@ -69,6 +69,36 @@ class TxaSettings {
     _notify();
   }
 
+  static bool get miracastEnabled => _prefs.getBool('player_miracast_enabled') ?? false;
+  static set miracastEnabled(bool v) {
+    _prefs.setBool('player_miracast_enabled', v);
+    _notify();
+  }
+
+  static bool get autoQualityByNetwork => _prefs.getBool('app_auto_quality_network') ?? true;
+  static set autoQualityByNetwork(bool v) {
+    _prefs.setBool('app_auto_quality_network', v);
+    _notify();
+  }
+
+  static bool get showSpeedInNotification => _prefs.getBool('app_show_speed_notif') ?? false;
+  static set showSpeedInNotification(bool v) {
+    _prefs.setBool('app_show_speed_notif', v);
+    _notify();
+  }
+
+  static bool get speedUnitGbps => _prefs.getBool('app_speed_unit_gbps') ?? false;
+  static set speedUnitGbps(bool v) {
+    _prefs.setBool('app_speed_unit_gbps', v);
+    _notify();
+  }
+
+  static String get defaultQuality => _prefs.getString('app_default_quality') ?? '1080p';
+  static set defaultQuality(String v) {
+    _prefs.setString('app_default_quality', v);
+    _notify();
+  }
+
   static double get brightness => _prefs.getDouble('player_brightness') ?? 0.5;
   static set brightness(double v) {
     _prefs.setDouble('player_brightness', v);

@@ -41,6 +41,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.0.4"
+  app_settings:
+    dependency: "direct main"
+    description:
+      name: app_settings
+      sha256: "3e46c561441e5820d3a25339bf8b51b9e45a5f686873851a20c257a530917795"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.1.1"
   archive:
     dependency: transitive
     description:
@@ -89,6 +97,54 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.1.5"
+  bonsoir:
+    dependency: transitive
+    description:
+      name: bonsoir
+      sha256: "1ad01f0cab0b2e59b3b430bb9cca0997f20f2a5257f110325c03080c24e4d0cc"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.0.3"
+  bonsoir_android:
+    dependency: transitive
+    description:
+      name: bonsoir_android
+      sha256: e19728f94a0d9813abf9e2edf644fede008e58ef539865a1be86ac5d8994154e
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.0.1"
+  bonsoir_darwin:
+    dependency: transitive
+    description:
+      name: bonsoir_darwin
+      sha256: e242a03a019fd474be657715826cfc13e43d02c88e46ec5611a20b9d4f72854d
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.0.1"
+  bonsoir_linux:
+    dependency: transitive
+    description:
+      name: bonsoir_linux
+      sha256: "9c326c572c241c6a38ab7a8a5dba27c82917ec12504f84308ce3b5706619e8d3"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.0.2"
+  bonsoir_platform_interface:
+    dependency: transitive
+    description:
+      name: bonsoir_platform_interface
+      sha256: "3fa0c46b30eb2a2f48be6fa53591a5c0425bf00520be761b61763e58b51814ff"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.0.1"
+  bonsoir_windows:
+    dependency: transitive
+    description:
+      name: bonsoir_windows
+      sha256: "19bf0d4659f52b644961dfd34ca7260a0cc4f2277b660e10f9ad6401c4671353"
+      url: "https://pub.dev"
+    source: hosted
+    version: "6.0.2"
   boolean_selector:
     dependency: transitive
     description:
@@ -121,6 +177,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.3.1"
+  cast_plus:
+    dependency: "direct main"
+    description:
+      name: cast_plus
+      sha256: "132fe47a66997e4dce2b15ee312874e8e1c735aec34b3a093340f8b0e23b8e77"
+      url: "https://pub.dev"
+    source: hosted
+    version: "2.2.0"
   characters:
     dependency: transitive
     description:
@@ -613,6 +677,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.5.0"
+  no_screen_mirror:
+    dependency: "direct main"
+    description:
+      name: no_screen_mirror
+      sha256: af448377a25964d88eb45094f614152f194aae97d2e1b16fe548efca375ab4db
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.1.2"
   objective_c:
     dependency: transitive
     description:
@@ -693,6 +765,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "0.0.3"
+  optimize_battery:
+    dependency: "direct main"
+    description:
+      name: optimize_battery
+      sha256: "4f0f974addbe54d3a705c1da5bf3a4bdae39502b1b2d2a17f9da1e558a34a4f8"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.0.4"
   package_config:
     dependency: transitive
     description:
@@ -861,6 +941,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "6.5.0"
+  protobuf:
+    dependency: transitive
+    description:
+      name: protobuf
+      sha256: "68645b24e0716782e58948f8467fd42a880f255096a821f9e7d0ec625b00c84d"
+      url: "https://pub.dev"
+    source: hosted
+    version: "3.1.0"
   provider:
     dependency: "direct main"
     description:
@@ -1058,6 +1146,14 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "1.10.2"
+  speed_checker_plugin:
+    dependency: "direct main"
+    description:
+      name: speed_checker_plugin
+      sha256: e202a4170055440522515a6772a2dfa593bee4172ccf0039b98080fe216cb4ae
+      url: "https://pub.dev"
+    source: hosted
+    version: "1.0.27"
   sqflite:
     dependency: transitive
     description:
@@ -1418,6 +1514,38 @@ packages:
       url: "https://pub.dev"
     source: hosted
     version: "3.0.3"
+  workmanager:
+    dependency: "direct main"
+    description:
+      name: workmanager
+      sha256: "065673b2a465865183093806925419d311a9a5e0995aa74ccf8920fd695e2d10"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.9.0+3"
+  workmanager_android:
+    dependency: transitive
+    description:
+      name: workmanager_android
+      sha256: "9ae744db4ef891f5fcd2fb8671fccc712f4f96489a487a1411e0c8675e5e8cb7"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.9.0+2"
+  workmanager_apple:
+    dependency: transitive
+    description:
+      name: workmanager_apple
+      sha256: "1cc12ae3cbf5535e72f7ba4fde0c12dd11b757caf493a28e22d684052701f2ca"
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.9.1+2"
+  workmanager_platform_interface:
+    dependency: transitive
+    description:
+      name: workmanager_platform_interface
+      sha256: f40422f10b970c67abb84230b44da22b075147637532ac501729256fcea10a47
+      url: "https://pub.dev"
+    source: hosted
+    version: "0.9.1+1"
   xdg_directories:
     dependency: transitive
     description:

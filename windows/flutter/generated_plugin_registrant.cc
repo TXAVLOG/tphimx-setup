@@ -8,7 +8,9 @@
 
 #include <app_links/app_links_plugin_c_api.h>
 #include <battery_plus/battery_plus_windows_plugin.h>
+#include <bonsoir_windows/bonsoir_windows_plugin_c_api.h>
 #include <connectivity_plus/connectivity_plus_windows_plugin.h>
+#include <no_screen_mirror/no_screen_mirror_plugin.h>
 #include <permission_handler_windows/permission_handler_windows_plugin.h>
 #include <screen_brightness_windows/screen_brightness_windows_plugin.h>
 #include <share_plus/share_plus_windows_plugin_c_api.h>
@@ -20,8 +22,12 @@ void RegisterPlugins(flutter::PluginRegistry* registry) {
       registry->GetRegistrarForPlugin("AppLinksPluginCApi"));
   BatteryPlusWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("BatteryPlusWindowsPlugin"));
+  BonsoirWindowsPluginCApiRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("BonsoirWindowsPluginCApi"));
   ConnectivityPlusWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("ConnectivityPlusWindowsPlugin"));
+  NoScreenMirrorPluginRegisterWithRegistrar(
+      registry->GetRegistrarForPlugin("NoScreenMirrorPlugin"));
   PermissionHandlerWindowsPluginRegisterWithRegistrar(
       registry->GetRegistrarForPlugin("PermissionHandlerWindowsPlugin"));
   ScreenBrightnessWindowsPluginRegisterWithRegistrar(

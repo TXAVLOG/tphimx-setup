@@ -17,6 +17,14 @@ import '../widgets/txa_modal.dart';
 import 'package:floating/floating.dart';
 import '../utils/txa_logger.dart';
 import 'package:battery_plus/battery_plus.dart';
+import 'package:share_plus/share_plus.dart';
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
+import 'package:no_screen_mirror/no_screen_mirror.dart';
+import 'package:cast_plus/cast.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:app_settings/app_settings.dart' as app_settings_lib;
 
 class TxaPlayer extends StatefulWidget {
   final dynamic movie;
@@ -154,6 +162,7 @@ class _TxaPlayerState extends State<TxaPlayer>
     _startClock();
     _toggleDND(true);
     _startHistorySync();
+    _initMiracast();
     WidgetsBinding.instance.addObserver(this);
 
     // Listen for settings changes to reactively update PiP registration
@@ -753,6 +762,195 @@ class _TxaPlayerState extends State<TxaPlayer>
     });
     // Prevent re-triggering for this session unless explicitly reset (on seek back)
     _autoNextTriggered = !resetTrigger;
+  }
+
+  Future<void> _shareCurrentMovie() async {
+    try {
+      final m = widget.movie;
+      final serverData = widget.servers[_currentServerIndex]['server_data'] as List;
+      final ep = serverData[_currentEpisodeIndex];
+      final slug = m['slug'] ?? m['id']?.toString() ?? '';
+      
+      final shareText = '${m['name']} - Tập ${ep['name']}\nXem ngay tại: https://film.nrotxa.online/movie/$slug';
+      
+      final bannerUrl = m['poster_url'] ?? m['thumb_url'] ?? '';
+      if (bannerUrl.isNotEmpty) {
+        if (mounted) TxaToast.show(context, TxaLanguage.t('preparing'));
+        final dir = await getTemporaryDirectory();
+        final File imgFile = File('${dir.path}/share_movie_$slug.jpg');
+        
+        if (!await imgFile.exists()) {
+           final response = await http.get(Uri.parse(bannerUrl));
+           await imgFile.writeAsBytes(response.bodyBytes);
+        }
+        
+        await SharePlus.instance.share(
+          ShareParams(
+            text: shareText, 
+            subject: m['name'],
+            files: [XFile(imgFile.path)],
+          ),
+        );
+      } else {
+        await SharePlus.instance.share(
+          ShareParams(text: shareText, subject: m['name']),
+        );
+      }
+    } catch (e) {
+      TxaLogger.log('Share error: $e', isError: true);
+      if (mounted) TxaToast.show(context, '${TxaLanguage.t('error')}: $e', isError: true);
+    }
+  }
+
+  void _initMiracast() async {
+    if (Platform.isAndroid) {
+      if (TxaSettings.miracastEnabled) {
+        await NoScreenMirror.instance.startListening();
+        _setupMirrorListener();
+      }
+    }
+  }
+
+  StreamSubscription? _mirrorSubscription;
+  void _setupMirrorListener() {
+    _mirrorSubscription?.cancel();
+    _mirrorSubscription = NoScreenMirror.instance.mirrorStream.listen((snapshot) {
+      if (TxaSettings.miracastEnabled && snapshot.isScreenMirrored) {
+        if (_betterPlayerController?.isPlaying() ?? false) {
+          _betterPlayerController?.pause();
+          if (!mounted) return;
+          TxaToast.show(
+            context,
+            "Phát hiện phản chiếu màn hình. Vui lòng tắt Miracast để tiếp tục xem.",
+            isError: true,
+          );
+        }
+      }
+    });
+  }
+
+  Future<void> _toggleMiracastProtection() async {
+    final newState = !TxaSettings.miracastEnabled;
+    TxaSettings.miracastEnabled = newState;
+
+    if (Platform.isAndroid) {
+      if (newState) {
+        await NoScreenMirror.instance.startListening();
+        _setupMirrorListener();
+      } else {
+        await NoScreenMirror.instance.stopListening();
+        _mirrorSubscription?.cancel();
+      }
+    }
+
+    if (mounted) {
+      TxaToast.show(
+        context,
+        newState
+            ? TxaLanguage.t('protection_on')
+            : TxaLanguage.t('protection_off'),
+      );
+      setState(() {});
+    }
+  }
+
+  void _openCastDialog() async {
+    // 1. Pause player
+    _betterPlayerController?.pause();
+    
+    // 2. Show selection dialog: Miracast (System) vs Chromecast (In-app)
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: TxaTheme.secondaryBg,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(TxaLanguage.t('cast_to_tv'), style: TxaTheme.headingStyle),
+              const SizedBox(height: 20),
+              ListTile(
+                leading: const Icon(Icons.cast_rounded, color: Colors.white),
+                title: Text(TxaLanguage.t('miracast_mirror'), style: const TextStyle(color: Colors.white)),
+                subtitle: Text(TxaLanguage.t('miracast_mirror_desc'), style: const TextStyle(color: TxaTheme.textMuted)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openSystemCastSettings();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.cast_rounded, color: Colors.white),
+                title: const Text('Chromecast', style: TextStyle(color: Colors.white)),
+                subtitle: Text(TxaLanguage.t('chromecast_desc'), style: const TextStyle(color: TxaTheme.textMuted)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _startChromecastDiscovery();
+                },
+              ),
+              ListTile(
+                leading: const Icon(Icons.language_rounded, color: Colors.white),
+                title: Text(TxaLanguage.t('web_browser_cast'), style: const TextStyle(color: Colors.white)),
+                subtitle: Text(TxaLanguage.t('web_browser_cast_desc'), style: const TextStyle(color: TxaTheme.textMuted)),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _openInExternalBrowser();
+                },
+              ),
+              const Divider(color: Colors.white10),
+              SwitchListTile(
+                value: TxaSettings.miracastEnabled,
+                onChanged: (v) {
+                  Navigator.pop(ctx);
+                  _toggleMiracastProtection();
+                },
+                title: Text(TxaLanguage.t('block_mirroring'), style: const TextStyle(color: Colors.white)),
+                secondary: const Icon(Icons.security_rounded, color: Colors.white70),
+                activeThumbColor: TxaTheme.accent,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  void _openSystemCastSettings() async {
+    if (Platform.isAndroid) {
+      await app_settings_lib.AppSettings.openAppSettings(
+        type: app_settings_lib.AppSettingsType.settings,
+      );
+    }
+  }
+
+  void _openInExternalBrowser() async {
+    final serverData = widget.servers[_currentServerIndex]['server_data'] as List;
+    final ep = serverData[_currentEpisodeIndex];
+    final url = ep['link'] ?? '';
+    if (url.isNotEmpty) {
+      final uri = Uri.parse(url);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (!mounted) return;
+        TxaToast.show(context, TxaLanguage.t('not_open_link'), isError: true);
+      }
+    }
+  }
+
+  void _startChromecastDiscovery() async {
+    TxaToast.show(context, 'Đang tìm kiếm thiết bị Chromecast...');
+    try {
+      final devices = await CastDiscoveryService().search();
+      if (devices.isNotEmpty && mounted) {
+        TxaToast.show(context, 'Tìm thấy ${devices.length} thiết bị!');
+      } else if (mounted) {
+        TxaToast.show(context, 'Không tìm thấy thiết bị nào.');
+      }
+    } catch (e) {
+      TxaLogger.log('Chromecast discovery error: $e');
+    }
   }
 
   void _playPrevious() {
@@ -1413,17 +1611,12 @@ class _TxaPlayerState extends State<TxaPlayer>
                       // Save history BEFORE exiting
                       await _syncHistory();
 
-                      if (_betterPlayerController != null) {
-                        if (mounted) {
-                          context.read<TxaMiniPlayerProvider>().switchToMini(
-                            controller: _betterPlayerController!,
-                            movie: widget.movie,
-                            servers: widget.servers,
-                            serverIndex: _currentServerIndex,
-                            episodeIndex: _currentEpisodeIndex,
-                          );
-                        }
+                      // PiP handling if needed
+                      if (_betterPlayerController != null && TxaSettings.autoPiP) {
+                        // Optionally trigger native PiP here if desired, 
+                        // but user hates the "ugly" mini-player so we stop it.
                       }
+                      
                       if (mounted) Navigator.pop(context);
                     },
                   ),
@@ -1478,9 +1671,17 @@ class _TxaPlayerState extends State<TxaPlayer>
                     },
                   ),
                   _HeaderIcon(
-                    icon: Icons.cast_connected_rounded,
-                    onTap: () =>
-                        TxaToast.show(context, TxaLanguage.t('feature_dev')),
+                    icon: Icons.share_rounded,
+                    onTap: _shareCurrentMovie,
+                  ),
+                  _HeaderIcon(
+                    icon: TxaSettings.miracastEnabled
+                        ? Icons.cast_connected_rounded
+                        : Icons.cast_rounded,
+                    color: TxaSettings.miracastEnabled
+                        ? TxaTheme.accent
+                        : Colors.white,
+                    onTap: _openCastDialog,
                   ),
                   _HeaderIcon(
                     icon: Icons.settings_outlined,

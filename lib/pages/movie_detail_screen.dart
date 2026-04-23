@@ -16,6 +16,9 @@ import '../services/favorite_provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:permission_handler/permission_handler.dart';
+import 'dart:io';
+import 'package:http/http.dart' as http;
+import 'package:path_provider/path_provider.dart';
 
 class MovieDetailScreen extends StatefulWidget {
   final String slug;
@@ -157,13 +160,42 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
     }
   }
 
-  void _shareMovie() {
+  Future<void> _shareMovie() async {
     final movie = _data!['movie'];
+    final bannerUrl = movie['poster_url'] ?? movie['thumb_url'] ?? '';
     final shareText =
         '${movie['name']} - ${TxaLanguage.t('app_slogan')}\nXem ngay tại: https://film.nrotxa.online/movie/${widget.slug}';
-    SharePlus.instance.share(
-      ShareParams(text: shareText, subject: movie['name']),
-    );
+
+    if (bannerUrl.isEmpty) {
+      SharePlus.instance.share(
+        ShareParams(text: shareText, subject: movie['name']),
+      );
+      return;
+    }
+
+    try {
+      if (mounted) TxaToast.show(context, TxaLanguage.t('preparing'));
+      final dir = await getTemporaryDirectory();
+      final File imgFile = File('${dir.path}/share_movie_${widget.slug}.jpg');
+      
+      if (!await imgFile.exists()) {
+         final response = await http.get(Uri.parse(bannerUrl));
+         await imgFile.writeAsBytes(response.bodyBytes);
+      }
+      
+      await SharePlus.instance.share(
+        ShareParams(
+          text: shareText, 
+          subject: movie['name'],
+          files: [XFile(imgFile.path)],
+        ),
+      );
+    } catch (e) {
+      TxaLogger.log('Share movie error: $e', isError: true);
+      SharePlus.instance.share(
+        ShareParams(text: shareText, subject: movie['name']),
+      );
+    }
   }
 
   // Cleaned up
@@ -648,6 +680,28 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                 if (year.isNotEmpty) _SimpleBadge(text: year),
                 if (quality.isNotEmpty) _SimpleBadge(text: quality),
                 if (time.isNotEmpty) _SimpleBadge(text: time),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Row(
+              children: [
+                Consumer<FavoriteProvider>(
+                  builder: (context, fav, child) {
+                    final isFav = fav.isFavorite(movie['id']);
+                    return _IconBtn(
+                      icon: isFav ? Icons.favorite_rounded : Icons.add_rounded,
+                      color: isFav ? Colors.red : Colors.white,
+                      label: TxaLanguage.t('add_favorite'),
+                      onTap: _toggleFavorite,
+                    );
+                  },
+                ),
+                const SizedBox(width: 24),
+                _IconBtn(
+                  icon: Icons.share_rounded,
+                  label: TxaLanguage.t('share'),
+                  onTap: _shareMovie,
+                ),
               ],
             ),
             const SizedBox(height: 24),

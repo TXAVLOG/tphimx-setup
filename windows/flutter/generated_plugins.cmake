@@ -5,7 +5,9 @@
 list(APPEND FLUTTER_PLUGIN_LIST
   app_links
   battery_plus
+  bonsoir_windows
   connectivity_plus
+  no_screen_mirror
   permission_handler_windows
   screen_brightness_windows
   share_plus

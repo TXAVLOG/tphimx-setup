@@ -68,6 +68,22 @@ class TxaFormat {
     };
   }
 
+  /// Format network speed specifically for Mbps/Gbps as requested
+  static String formatNetworkSpeed(double bitsPerSec, {bool useGbps = false}) {
+    if (bitsPerSec <= 0) return '0 Mbps';
+    double mbps = bitsPerSec / 1000000.0;
+    if (useGbps && mbps >= 1000) {
+      return '${(mbps / 1000.0).toStringAsFixed(2)} Gbps';
+    }
+    return '${mbps.toStringAsFixed(2)} Mbps';
+  }
+
+  /// Format data size specifically for the update process
+  static String formatDataSize(int bytes) {
+    final info = formatSize(bytes);
+    return info['display'];
+  }
+
   /// Format duration to Vietnamese words
   static String formatDuration(int seconds) {
     if (seconds <= 0) return '0 giây';

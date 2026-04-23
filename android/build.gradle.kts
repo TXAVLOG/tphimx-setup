@@ -14,9 +14,12 @@ rootProject.layout.buildDirectory.value(newBuildDir)
 subprojects {
     val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
     project.layout.buildDirectory.value(newSubprojectBuildDir)
-}
+    
+    // Ensure subprojects depend on app evaluation if needed
+    if (project.name != "app") {
+        evaluationDependsOn(":app")
+    }
 
-subprojects {
     afterEvaluate {
         if (project.hasProperty("android")) {
             val android = project.extensions.getByName("android") as? com.android.build.gradle.BaseExtension
@@ -24,16 +27,16 @@ subprojects {
                 // Surgical fix for better_player and generic for others
                 if (project.name == "better_player") {
                     android.namespace = "com.jhomlala.better_player"
+                } else if (project.name == "optimize_battery") {
+                    android.namespace = "com.gb.optimize_battery"
+                } else if (project.name == "better_player_plus") {
+                    android.namespace = "com.jhomlala.better_player"
                 } else {
                     android.namespace = "com.tphimx.${project.name.replace("-", "_")}"
                 }
             }
         }
     }
-}
-
-subprojects {
-    project.evaluationDependsOn(":app")
 }
 
 tasks.register<Delete>("clean") {

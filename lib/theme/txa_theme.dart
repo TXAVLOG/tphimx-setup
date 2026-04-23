@@ -20,6 +20,15 @@ class TxaTheme {
   static const Color textSecondary = Color(0xFF94A3B8);
   static const Color textMuted = Color(0xFF64748B);
 
+  static const Color primaryColor = accent; // Alias for backward compatibility
+  static const Color secondaryColor = purple;
+
+  static const TextStyle headingStyle = TextStyle(
+    color: Colors.white,
+    fontSize: 18,
+    fontWeight: FontWeight.bold,
+  );
+
   // Glass Effect Config
   static const Color glassBg = Color(0x990F172A); // rgba(15, 23, 42, 0.6)
   static const double glassBlur = 24.0;
