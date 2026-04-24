@@ -48,7 +48,6 @@ class TxaBackgroundService {
   static Future<void> init() async {
     await Workmanager().initialize(
       callbackDispatcher,
-      isInDebugMode: false,
     );
   }
 

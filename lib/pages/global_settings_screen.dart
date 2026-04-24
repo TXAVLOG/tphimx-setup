@@ -4,6 +4,7 @@ import '../services/txa_language.dart';
 import '../theme/txa_theme.dart';
 import '../utils/txa_toast.dart';
 import '../utils/txa_format.dart';
+import '../services/txa_speed_service.dart';
 
 class GlobalSettingsScreen extends StatefulWidget {
   const GlobalSettingsScreen({super.key});
@@ -90,7 +91,11 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
           ),
           SwitchListTile(
             value: TxaSettings.showSpeedInNotification,
-            onChanged: (v) => setState(() => TxaSettings.showSpeedInNotification = v),
+            onChanged: (v) {
+              TxaSettings.showSpeedInNotification = v;
+              TxaSpeedService.toggleSpeedNotification(v);
+              setState(() {});
+            },
             title: Text(TxaLanguage.t('show_speed_notif'), style: const TextStyle(color: Colors.white)),
             subtitle: Text(TxaLanguage.t('show_speed_notif_desc'), style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12)),
             activeThumbColor: TxaTheme.accent,
@@ -100,7 +105,52 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
             subtitle: Text(TxaSettings.speedUnitGbps ? 'Gbps' : 'Mbps', style: const TextStyle(color: TxaTheme.textMuted)),
             trailing: const Icon(Icons.chevron_right_rounded, color: TxaTheme.textMuted),
             onTap: () {
-              setState(() => TxaSettings.speedUnitGbps = !TxaSettings.speedUnitGbps);
+              showModalBottomSheet(
+                context: context,
+                backgroundColor: TxaTheme.secondaryBg,
+                shape: const RoundedRectangleBorder(
+                  borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+                ),
+                builder: (ctx) {
+                  return SafeArea(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 20),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Padding(
+                            padding: const EdgeInsets.only(bottom: 16),
+                            child: Text(
+                              TxaLanguage.t('speed_unit'),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ),
+                          ListTile(
+                            onTap: () {
+                              setState(() => TxaSettings.speedUnitGbps = false);
+                              Navigator.pop(ctx);
+                            },
+                            title: const Text('Mbps', style: TextStyle(color: Colors.white)),
+                            trailing: !TxaSettings.speedUnitGbps ? const Icon(Icons.check_circle_rounded, color: TxaTheme.accent) : null,
+                          ),
+                          ListTile(
+                            onTap: () {
+                              setState(() => TxaSettings.speedUnitGbps = true);
+                              Navigator.pop(ctx);
+                            },
+                            title: const Text('Gbps', style: TextStyle(color: Colors.white)),
+                            trailing: TxaSettings.speedUnitGbps ? const Icon(Icons.check_circle_rounded, color: TxaTheme.accent) : null,
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
+              );
             },
           ),
         ],
@@ -166,6 +216,9 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
       {'name': 'Roboto', 'label': TxaLanguage.t('font_roboto')},
       {'name': 'Inter', 'label': TxaLanguage.t('font_inter')},
       {'name': 'Open Sans', 'label': TxaLanguage.t('font_open_sans')},
+      {'name': 'Montserrat', 'label': TxaLanguage.t('font_montserrat')},
+      {'name': 'Oswald', 'label': TxaLanguage.t('font_oswald')},
+      {'name': 'Playfair Display', 'label': TxaLanguage.t('font_playfair')},
     ];
 
     return ListTile(
@@ -207,30 +260,35 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
                         ),
                       ),
                     ),
-                    ...fonts.map((f) {
-                      final isSelected = TxaSettings.fontFamily == f['name'];
-                      return ListTile(
-                        onTap: () {
-                          setState(() => TxaSettings.fontFamily = f['name']!);
-                          Navigator.pop(ctx);
-                        },
-                        title: Text(
-                          f['label']!,
-                          style: TextStyle(
-                            color: isSelected ? TxaTheme.accent : Colors.white,
-                            fontWeight: isSelected
-                                ? FontWeight.bold
-                                : FontWeight.normal,
-                          ),
-                        ),
-                        trailing: isSelected
-                            ? const Icon(
-                                Icons.check_circle_rounded,
-                                color: TxaTheme.accent,
-                              )
-                            : null,
-                      );
-                    }),
+                    Flexible(
+                      child: ListView(
+                        shrinkWrap: true,
+                        children: fonts.map((f) {
+                          final isSelected = TxaSettings.fontFamily == f['name'];
+                          return ListTile(
+                            onTap: () {
+                              setState(() => TxaSettings.fontFamily = f['name']!);
+                              Navigator.pop(ctx);
+                            },
+                            title: Text(
+                              f['label']!,
+                              style: TextStyle(
+                                color: isSelected ? TxaTheme.accent : Colors.white,
+                                fontWeight: isSelected
+                                    ? FontWeight.bold
+                                    : FontWeight.normal,
+                              ),
+                            ),
+                            trailing: isSelected
+                                ? const Icon(
+                                    Icons.check_circle_rounded,
+                                    color: TxaTheme.accent,
+                                  )
+                                : null,
+                          );
+                        }).toList(),
+                      ),
+                    ),
                   ],
                 ),
               ),

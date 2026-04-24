@@ -771,7 +771,7 @@ class _TxaPlayerState extends State<TxaPlayer>
       final ep = serverData[_currentEpisodeIndex];
       final slug = m['slug'] ?? m['id']?.toString() ?? '';
       
-      final shareText = '${m['name']} - Tập ${ep['name']}\nXem ngay tại: https://film.nrotxa.online/movie/$slug';
+      final shareText = '${m['name']} - Tập ${ep['name']}\nXem ngay tại: https://film.nrotxa.online/phim/$slug';
       
       final bannerUrl = m['poster_url'] ?? m['thumb_url'] ?? '';
       if (bannerUrl.isNotEmpty) {
@@ -918,8 +918,9 @@ class _TxaPlayerState extends State<TxaPlayer>
 
   void _openSystemCastSettings() async {
     if (Platform.isAndroid) {
+      // Use "display" settings as a fallback for Miracast/Cast access
       await app_settings_lib.AppSettings.openAppSettings(
-        type: app_settings_lib.AppSettingsType.settings,
+        type: app_settings_lib.AppSettingsType.display,
       );
     }
   }

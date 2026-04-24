@@ -1,5 +1,6 @@
 import 'dart:io';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:optimize_battery/optimize_battery.dart';
 import 'txa_language.dart';
 
 class TxaPermission {
@@ -51,12 +52,12 @@ class TxaPermission {
 
   static Future<bool> isIgnoringBatteryOptimizations() async {
     if (!Platform.isAndroid) return true;
-    return await Permission.ignoreBatteryOptimizations.isGranted;
+    return await OptimizeBattery.isIgnoringBatteryOptimizations();
   }
 
   static Future<void> requestIgnoreBatteryOptimizations() async {
     if (Platform.isAndroid) {
-      await Permission.ignoreBatteryOptimizations.request();
+      await OptimizeBattery.stopOptimizingBatteryUsage();
     }
   }
 

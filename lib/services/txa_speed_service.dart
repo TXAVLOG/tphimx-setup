@@ -6,6 +6,8 @@ import '../utils/txa_logger.dart';
 import '../services/txa_settings.dart';
 import '../services/txa_language.dart';
 
+import '../utils/txa_format.dart';
+
 class TxaSpeedService {
   static final _speedChecker = SpeedCheckerPlugin();
   static final _notifications = FlutterLocalNotificationsPlugin();
@@ -93,7 +95,34 @@ class TxaSpeedService {
   }
 
   static void _updateSpeedNotification() async {
-    if (!TxaSettings.showSpeedInNotification) return;
-    // Implementation for ongoing notification update
+    if (!TxaSettings.showSpeedInNotification) {
+      await _notifications.cancel(id: 888); // Use fixed ID for speed notification
+      return;
+    }
+
+    // Format speed text
+    // Note: _currentDownload and _currentUpload are in Mbps based on UI usage
+    String speedText = "Down: ${TxaFormat.formatNetworkSpeed(_currentDownload * 1000000, useGbps: TxaSettings.speedUnitGbps)} | Up: ${TxaFormat.formatNetworkSpeed(_currentUpload * 1000000, useGbps: TxaSettings.speedUnitGbps)}";
+    
+    const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      'speed_channel',
+      'Network Speed',
+      channelDescription: 'Shows current network speed',
+      importance: Importance.low,
+      priority: Priority.low,
+      ongoing: true,
+      onlyAlertOnce: true,
+      showWhen: false,
+      icon: '@mipmap/ic_launcher',
+    );
+    
+    const NotificationDetails platformDetails = NotificationDetails(android: androidDetails);
+    
+    await _notifications.show(
+      id: 888,
+      title: 'TPhimX Speed Monitor',
+      body: speedText,
+      notificationDetails: platformDetails,
+    );
   }
 }

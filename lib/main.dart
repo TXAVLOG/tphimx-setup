@@ -27,6 +27,7 @@ import 'utils/txa_logger.dart';
 import 'pages/home_screen.dart';
 import 'services/txa_language.dart';
 import 'services/txa_background_service.dart';
+import 'services/txa_speed_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -34,6 +35,8 @@ void main() async {
   await TxaLanguage.init();
   await TxaBackgroundService.init();
   await TxaBackgroundService.registerUpdateTask();
+  await TxaSpeedService.init();
+  TxaSpeedService.toggleSpeedNotification(TxaSettings.showSpeedInNotification);
   await initializeDateFormatting('vi', null);
 
   try {
@@ -183,6 +186,15 @@ class _TPhimXAppState extends State<TPhimXApp> {
         break;
       case 'Open Sans':
         textTheme = GoogleFonts.openSansTextTheme(ThemeData.dark().textTheme);
+        break;
+      case 'Montserrat':
+        textTheme = GoogleFonts.montserratTextTheme(ThemeData.dark().textTheme);
+        break;
+      case 'Oswald':
+        textTheme = GoogleFonts.oswaldTextTheme(ThemeData.dark().textTheme);
+        break;
+      case 'Playfair Display':
+        textTheme = GoogleFonts.playfairDisplayTextTheme(ThemeData.dark().textTheme);
         break;
       default:
         textTheme = GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme);

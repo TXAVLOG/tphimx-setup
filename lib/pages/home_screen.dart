@@ -201,9 +201,12 @@ class _HomeScreenState extends State<HomeScreen> {
             child: Text(TxaLanguage.t('cancel')),
           ),
           ElevatedButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              TxaPermission.requestIgnoreBatteryOptimizations();
+              await TxaPermission.requestIgnoreBatteryOptimizations();
+              // Small delay to allow system to update status
+              await Future.delayed(const Duration(milliseconds: 500));
+              if (mounted) setState(() {});
             },
             style: ElevatedButton.styleFrom(backgroundColor: TxaTheme.accent),
             child: Text(TxaLanguage.t('grant'), style: const TextStyle(color: Colors.black)),

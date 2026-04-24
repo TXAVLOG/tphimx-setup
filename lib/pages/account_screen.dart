@@ -688,6 +688,9 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _buildErrorCard(dynamic message) {
+    final is401 = message.toString().contains('401') || 
+                  message.toString().toLowerCase().contains('unauthenticated');
+    
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(12),
@@ -698,26 +701,57 @@ class _AccountScreenState extends State<AccountScreen> {
       ),
       child: Row(
         children: [
-          const Icon(
-            Icons.error_outline_rounded,
+          Icon(
+            is401 ? Icons.vpn_key_rounded : Icons.error_outline_rounded,
             color: Colors.redAccent,
             size: 20,
           ),
           const SizedBox(width: 12),
           Expanded(
-            child: Text(
-              message?.toString() ?? 'Unknown Error',
-              style: const TextStyle(color: Colors.redAccent, fontSize: 13),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  is401 ? 'Phiên đăng nhập hết hạn' : 'Lỗi tải thông tin',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 13,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  is401 ? 'Vui lòng đăng nhập lại để tiếp tục' : (message?.toString() ?? 'Unknown Error'),
+                  style: const TextStyle(color: Colors.redAccent, fontSize: 11),
+                ),
+              ],
             ),
           ),
-          IconButton(
-            onPressed: () => setState(() {}),
-            icon: const Icon(
-              Icons.refresh_rounded,
-              color: Colors.redAccent,
-              size: 20,
+          if (is401)
+            TextButton(
+              onPressed: () {
+                TxaSettings.authToken = '';
+                TxaSettings.userData = '';
+                Provider.of<TxaApi>(context, listen: false).setToken('');
+                setState(() {});
+              },
+              style: TextButton.styleFrom(
+                backgroundColor: Colors.redAccent.withValues(alpha: 0.2),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+              ),
+              child: const Text(
+                'Đăng nhập',
+                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+              ),
+            )
+          else
+            IconButton(
+              onPressed: () => setState(() {}),
+              icon: const Icon(
+                Icons.refresh_rounded,
+                color: Colors.redAccent,
+                size: 20,
+              ),
             ),
-          ),
         ],
       ),
     );
