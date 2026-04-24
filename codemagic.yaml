@@ -1,7 +1,7 @@
 workflows:
   premium-release-workflow:
     name: "🚀 [TPhimX] iOS Premium Auto-Release"
-    instance_type: mac_mini_m1
+    instance_type: mac_mini_intel
     max_build_duration: 60
     environment:
       groups:
@@ -85,7 +85,7 @@ workflows:
 
   android-release-workflow:
     name: "🤖 [TPhimX] Android Auto-Release"
-    instance_type: linux
+    instance_type: linux_m
     max_build_duration: 30
     environment:
       groups:
