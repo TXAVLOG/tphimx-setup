@@ -361,15 +361,18 @@ class _AccountScreenState extends State<AccountScreen> {
                   Map<String, dynamic>? updatedUser;
                   if (snapshot.hasData) {
                     updatedUser = snapshot.data?['data'];
-                    if (updatedUser != null) {
-                      TxaSettings.userData = jsonEncode(updatedUser);
-                    }
                   }
 
                   // Priority: API result > Cache
                   final user =
                       updatedUser ??
                       (initialUser != null ? initialUser['data'] : null);
+
+                  if (updatedUser != null) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      TxaSettings.userData = jsonEncode(updatedUser);
+                    });
+                  }
 
                   if (user == null) {
                     if (snapshot.hasError) {

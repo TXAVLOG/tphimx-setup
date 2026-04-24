@@ -140,7 +140,7 @@ class TxaLanguage {
       'terms_of_service': 'Điều khoản dịch vụ',
       'privacy_policy': 'Chính sách bảo mật',
       'forgot_password': 'Quên mật khẩu?',
-      'exact_alarm_permission_denied': 'Thiếu quyền đặt báo thức chính xác.',
+      'exact_alarm_permission_denied': 'Thiếu quyền đặt báo thức.',
       'notification_permission_denied': 'Quyền thông báo bị từ chối.',
       'notification_scheduled': 'Đã đặt nhắc nhở 🔔',
       'notification_cancelled': 'Đã hủy nhắc nhở',
@@ -337,6 +337,11 @@ class TxaLanguage {
       'block_mirroring': 'Chặn phản chiếu (Bảo vệ)',
       'protection_on': 'Bảo vệ Miracast: BẬT (Chặn phản chiếu)',
       'protection_off': 'Bảo vệ Miracast: TẮT (Cho phép phản chiếu)',
+      'searching_chromecast': 'Đang tìm kiếm thiết bị Chromecast...',
+      'found_chromecast': 'Tìm thấy %n% thiết bị!',
+      'no_chromecast_found': 'Không tìm thấy thiết bị nào.',
+      'bg_new_episode_title': 'Tập mới: %n%',
+      'bg_new_episode_body': 'Phim bạn yêu thích vừa có tập mới!',
     },
     'en': {
       'app_name': 'TPhimX Premium',
@@ -655,6 +660,11 @@ class TxaLanguage {
       'block_mirroring': 'Block Mirroring (Protection)',
       'protection_on': 'Protection: ON (Block mirroring)',
       'protection_off': 'Protection: OFF (Allow mirroring)',
+      'searching_chromecast': 'Searching for Chromecast devices...',
+      'found_chromecast': 'Found %n% devices!',
+      'no_chromecast_found': 'No devices found.',
+      'bg_new_episode_title': 'New Episode: %n%',
+      'bg_new_episode_body': 'Your favorite movie just got a new episode!',
     },
   };
 

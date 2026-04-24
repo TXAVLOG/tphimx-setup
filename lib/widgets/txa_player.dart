@@ -861,55 +861,60 @@ class _TxaPlayerState extends State<TxaPlayer>
     // 2. Show selection dialog: Miracast (System) vs Chromecast (In-app)
     showModalBottomSheet(
       context: context,
-      backgroundColor: TxaTheme.secondaryBg,
+      backgroundColor: Colors.transparent, // Let Material handle bg
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
-      builder: (ctx) => SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(TxaLanguage.t('cast_to_tv'), style: TxaTheme.headingStyle),
-              const SizedBox(height: 20),
-              ListTile(
-                leading: const Icon(Icons.cast_rounded, color: Colors.white),
-                title: Text(TxaLanguage.t('miracast_mirror'), style: const TextStyle(color: Colors.white)),
-                subtitle: Text(TxaLanguage.t('miracast_mirror_desc'), style: const TextStyle(color: TxaTheme.textMuted)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _openSystemCastSettings();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.cast_rounded, color: Colors.white),
-                title: const Text('Chromecast', style: TextStyle(color: Colors.white)),
-                subtitle: Text(TxaLanguage.t('chromecast_desc'), style: const TextStyle(color: TxaTheme.textMuted)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _startChromecastDiscovery();
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.language_rounded, color: Colors.white),
-                title: Text(TxaLanguage.t('web_browser_cast'), style: const TextStyle(color: Colors.white)),
-                subtitle: Text(TxaLanguage.t('web_browser_cast_desc'), style: const TextStyle(color: TxaTheme.textMuted)),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _openInExternalBrowser();
-                },
-              ),
-              const Divider(color: Colors.white10),
-              SwitchListTile(
-                value: TxaSettings.miracastEnabled,
-                onChanged: (v) {
-                  Navigator.pop(ctx);
-                  _toggleMiracastProtection();
-                },
-                title: Text(TxaLanguage.t('block_mirroring'), style: const TextStyle(color: Colors.white)),
-                secondary: const Icon(Icons.security_rounded, color: Colors.white70),
-                activeThumbColor: TxaTheme.accent,
-              ),
-            ],
+      builder: (ctx) => Material(
+        color: TxaTheme.secondaryBg,
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(TxaLanguage.t('cast_to_tv'), style: TxaTheme.headingStyle),
+                const SizedBox(height: 20),
+                ListTile(
+                  leading: const Icon(Icons.cast_rounded, color: Colors.white),
+                  title: Text(TxaLanguage.t('miracast_mirror'), style: const TextStyle(color: Colors.white)),
+                  subtitle: Text(TxaLanguage.t('miracast_mirror_desc'), style: const TextStyle(color: TxaTheme.textMuted)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _openSystemCastSettings();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.cast_rounded, color: Colors.white),
+                  title: const Text('Chromecast', style: TextStyle(color: Colors.white)),
+                  subtitle: Text(TxaLanguage.t('chromecast_desc'), style: const TextStyle(color: TxaTheme.textMuted)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _startChromecastDiscovery();
+                  },
+                ),
+                ListTile(
+                  leading: const Icon(Icons.language_rounded, color: Colors.white),
+                  title: Text(TxaLanguage.t('web_browser_cast'), style: const TextStyle(color: Colors.white)),
+                  subtitle: Text(TxaLanguage.t('web_browser_cast_desc'), style: const TextStyle(color: TxaTheme.textMuted)),
+                  onTap: () {
+                    Navigator.pop(ctx);
+                    _openInExternalBrowser();
+                  },
+                ),
+                const Divider(color: Colors.white10),
+                SwitchListTile(
+                  value: TxaSettings.miracastEnabled,
+                  onChanged: (v) {
+                    Navigator.pop(ctx);
+                    _toggleMiracastProtection();
+                  },
+                  title: Text(TxaLanguage.t('block_mirroring'), style: const TextStyle(color: Colors.white)),
+                  secondary: const Icon(Icons.security_rounded, color: Colors.white70),
+                  activeThumbColor: TxaTheme.accent,
+                ),
+              ],
+            ),
           ),
         ),
       ),
@@ -918,10 +923,15 @@ class _TxaPlayerState extends State<TxaPlayer>
 
   void _openSystemCastSettings() async {
     if (Platform.isAndroid) {
-      // Use "display" settings as a fallback for Miracast/Cast access
-      await app_settings_lib.AppSettings.openAppSettings(
-        type: app_settings_lib.AppSettingsType.display,
-      );
+      // Trying to open Display/Cast settings specifically
+      try {
+        await app_settings_lib.AppSettings.openAppSettings(
+          type: app_settings_lib.AppSettingsType.display,
+        );
+      } catch (e) {
+        // Fallback to general settings if specific one fails or still opens App Info
+        await app_settings_lib.AppSettings.openAppSettings();
+      }
     }
   }
 
@@ -941,13 +951,19 @@ class _TxaPlayerState extends State<TxaPlayer>
   }
 
   void _startChromecastDiscovery() async {
-    TxaToast.show(context, 'Đang tìm kiếm thiết bị Chromecast...');
+    TxaToast.show(context, TxaLanguage.t('searching_chromecast'));
     try {
       final devices = await CastDiscoveryService().search();
       if (devices.isNotEmpty && mounted) {
-        TxaToast.show(context, 'Tìm thấy ${devices.length} thiết bị!');
+        TxaToast.show(
+          context,
+          TxaLanguage.t(
+            'found_chromecast',
+            replace: {'n': devices.length.toString()},
+          ),
+        );
       } else if (mounted) {
-        TxaToast.show(context, 'Không tìm thấy thiết bị nào.');
+        TxaToast.show(context, TxaLanguage.t('no_chromecast_found'));
       }
     } catch (e) {
       TxaLogger.log('Chromecast discovery error: $e');
