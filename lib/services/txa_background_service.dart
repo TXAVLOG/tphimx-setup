@@ -47,20 +47,42 @@ void callbackDispatcher() {
           final String lastNotifId = prefs.getString('last_bg_notif_id') ?? '';
           
           if (notifs.isNotEmpty) {
-            final firstNotif = notifs.first;
-            final String currentId = firstNotif['id']?.toString() ?? '';
+            // Process up to 5 newest unread notifications
+            int count = 0;
+            String? latestId;
             
-            if (currentId != lastNotifId && firstNotif['is_read'] == false) {
+            for (var notif in notifs) {
+              final String currentId = notif['id']?.toString() ?? '';
+              if (currentId == lastNotifId) break; // Reached old notifications
+              if (notif['is_read'] == true) continue;
+              
+              latestId ??= currentId;
+              
+              final String slug = notif['movie_slug'] ?? '';
+              
               await _showNotification(
                 notificationsPlugin,
-                100,
+                100 + count,
                 TxaLanguage.t(
-                  'bg_new_episode_title',
-                  replace: {'n': firstNotif['movie_name'] ?? ''},
+                  'bg_new_episode_title_simple',
+                  replace: {'n': notif['movie_name'] ?? ''},
                 ),
-                firstNotif['message'] ?? TxaLanguage.t('bg_new_episode_body'),
+                notif['message'] ?? '',
+                payload: slug.isNotEmpty ? 'movie_detail:$slug' : null,
+                groupKey: 'txa_episodes_group',
               );
-              await prefs.setString('last_bg_notif_id', currentId);
+              
+              count++;
+              if (count >= 5) break; 
+            }
+            
+            if (latestId != null) {
+              await prefs.setString('last_bg_notif_id', latestId);
+              
+              // If multiple notifications, show a summary (Android only)
+              if (count > 1) {
+                await _showSummaryNotification(notificationsPlugin, 'txa_episodes_group');
+              }
             }
           }
         } catch (e) {
@@ -123,9 +145,22 @@ Future<void> _showNotification(
   FlutterLocalNotificationsPlugin plugin,
   int id,
   String title,
-  String body,
-) async {
-  const androidDetails = AndroidNotificationDetails(
+  String body, {
+  String? payload,
+  String? groupKey,
+}) async {
+  final List<AndroidNotificationAction> actions = [];
+  if (payload != null && payload.startsWith('movie_detail:')) {
+    actions.add(
+      AndroidNotificationAction(
+        'view_detail',
+        TxaLanguage.t('view_movie_detail'),
+        showsUserInterface: true,
+      ),
+    );
+  }
+
+  final androidDetails = AndroidNotificationDetails(
     'txa_background_channel',
     'TPhimX Background Service',
     channelDescription: 'System notifications for updates and schedules',
@@ -133,12 +168,45 @@ Future<void> _showNotification(
     priority: Priority.high,
     playSound: true,
     enableVibration: true,
+    groupKey: groupKey,
+    setAsGroupSummary: false,
+    actions: actions,
   );
-  const details = NotificationDetails(android: androidDetails);
+  
+  final details = NotificationDetails(
+    android: androidDetails,
+    iOS: const DarwinNotificationDetails(),
+  );
+  
   await plugin.show(
     id: id,
     title: title,
     body: body,
+    notificationDetails: details,
+    payload: payload,
+  );
+}
+
+Future<void> _showSummaryNotification(
+  FlutterLocalNotificationsPlugin plugin,
+  String groupKey,
+) async {
+  final androidDetails = AndroidNotificationDetails(
+    'txa_background_channel',
+    'TPhimX Background Service',
+    channelDescription: 'System notifications for updates and schedules',
+    importance: Importance.high,
+    priority: Priority.high,
+    groupKey: groupKey,
+    setAsGroupSummary: true,
+    styleInformation: const InboxStyleInformation([], contentTitle: 'TPhimX', summaryText: 'Nhiều cập nhật mới'),
+  );
+  
+  final details = NotificationDetails(android: androidDetails);
+  await plugin.show(
+    id: groupKey.hashCode,
+    title: null,
+    body: null,
     notificationDetails: details,
   );
 }

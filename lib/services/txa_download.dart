@@ -200,7 +200,7 @@ class TxaDownload {
         'downloaded': TxaFormat.formatSize(downloadedBytes)['display'],
         'total': TxaFormat.formatSize(totalBytes)['display'],
         'speed': TxaFormat.formatSpeed(speed, decimals: 2)['display'],
-        'eta': TxaFormat.formatTime(etaSeconds),
+        'eta': TxaFormat.formatDuration(etaSeconds),
       },
     };
   }
@@ -221,9 +221,9 @@ class TxaDownload {
       ongoing: true,
       onlyAlertOnce: true,
       actions: [
-        const AndroidNotificationAction(
+        AndroidNotificationAction(
           'cancel_download',
-          'Hủy',
+          TxaLanguage.t('cancel'),
           showsUserInterface: true,
         ),
       ],

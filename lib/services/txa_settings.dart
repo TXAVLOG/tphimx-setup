@@ -87,9 +87,9 @@ class TxaSettings {
     _notify();
   }
 
-  static bool get speedUnitGbps => _prefs.getBool('app_speed_unit_gbps') ?? false;
-  static set speedUnitGbps(bool v) {
-    _prefs.setBool('app_speed_unit_gbps', v);
+  static String get speedUnit => _prefs.getString('app_speed_unit') ?? 'Auto';
+  static set speedUnit(String v) {
+    _prefs.setString('app_speed_unit', v);
     _notify();
   }
 

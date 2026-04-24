@@ -102,9 +102,10 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
           ),
           ListTile(
             title: Text(TxaLanguage.t('speed_unit'), style: const TextStyle(color: Colors.white)),
-            subtitle: Text(TxaSettings.speedUnitGbps ? 'Gbps' : 'Mbps', style: const TextStyle(color: TxaTheme.textMuted)),
+            subtitle: Text(TxaSettings.speedUnit, style: const TextStyle(color: TxaTheme.textMuted)),
             trailing: const Icon(Icons.chevron_right_rounded, color: TxaTheme.textMuted),
             onTap: () {
+              final units = ['Auto', 'Mbps', 'Gbps', 'B/s', 'KB/s', 'MB/s', 'GB/s', 'TB/s'];
               showModalBottomSheet(
                 context: context,
                 backgroundColor: TxaTheme.secondaryBg,
@@ -129,21 +130,24 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
                               ),
                             ),
                           ),
-                          ListTile(
-                            onTap: () {
-                              setState(() => TxaSettings.speedUnitGbps = false);
-                              Navigator.pop(ctx);
-                            },
-                            title: const Text('Mbps', style: TextStyle(color: Colors.white)),
-                            trailing: !TxaSettings.speedUnitGbps ? const Icon(Icons.check_circle_rounded, color: TxaTheme.accent) : null,
-                          ),
-                          ListTile(
-                            onTap: () {
-                              setState(() => TxaSettings.speedUnitGbps = true);
-                              Navigator.pop(ctx);
-                            },
-                            title: const Text('Gbps', style: TextStyle(color: Colors.white)),
-                            trailing: TxaSettings.speedUnitGbps ? const Icon(Icons.check_circle_rounded, color: TxaTheme.accent) : null,
+                          Flexible(
+                            child: ListView(
+                              shrinkWrap: true,
+                              children: units.map((u) {
+                                final isSelected = TxaSettings.speedUnit == u;
+                                return ListTile(
+                                  onTap: () {
+                                    setState(() => TxaSettings.speedUnit = u);
+                                    if (TxaSettings.showSpeedInNotification) {
+                                      TxaSpeedService.startService(); // Restart with new unit
+                                    }
+                                    Navigator.pop(ctx);
+                                  },
+                                  title: Text(u, style: TextStyle(color: isSelected ? TxaTheme.accent : Colors.white)),
+                                  trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: TxaTheme.accent) : null,
+                                );
+                              }).toList(),
+                            ),
                           ),
                         ],
                       ),

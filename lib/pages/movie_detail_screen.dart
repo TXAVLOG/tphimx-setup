@@ -19,6 +19,8 @@ import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
+import '../services/txa_download_manager.dart';
+import '../services/txa_permission.dart';
 
 class MovieDetailScreen extends StatefulWidget {
   final String slug;
@@ -177,15 +179,15 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
       if (mounted) TxaToast.show(context, TxaLanguage.t('preparing'));
       final dir = await getTemporaryDirectory();
       final File imgFile = File('${dir.path}/share_movie_${widget.slug}.jpg');
-      
+
       if (!await imgFile.exists()) {
-         final response = await http.get(Uri.parse(bannerUrl));
-         await imgFile.writeAsBytes(response.bodyBytes);
+        final response = await http.get(Uri.parse(bannerUrl));
+        await imgFile.writeAsBytes(response.bodyBytes);
       }
-      
+
       await SharePlus.instance.share(
         ShareParams(
-          text: shareText, 
+          text: shareText,
           subject: movie['name'],
           files: [XFile(imgFile.path)],
         ),
@@ -448,7 +450,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                           _IconBtn(
                             icon: Icons.download_rounded,
                             label: TxaLanguage.t('download'),
-                            onTap: () => _showComingSoon(context),
+                            onTap: _showDownloadSelection,
                           ),
                           _IconBtn(
                             icon: Icons.share_rounded,
@@ -1012,50 +1014,141 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
       ),
     );
   }
-}
 
-void _showComingSoon(BuildContext context) {
-  showDialog(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      backgroundColor: TxaTheme.secondaryBg,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          const Icon(
-            Icons.auto_awesome_rounded,
-            color: TxaTheme.accent,
-            size: 64,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            TxaLanguage.t('coming_soon'),
-            style: const TextStyle(
-              color: Colors.white,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
+  void _showDownloadSelection() async {
+    final status = await Permission.manageExternalStorage.status;
+    if (!status.isGranted) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (ctx) => AlertDialog(
+            backgroundColor: TxaTheme.cardBg,
+            title: Text(
+              TxaLanguage.t('permissions_required'),
+              style: const TextStyle(color: Colors.white),
             ),
+            content: Text(
+              TxaLanguage.t('storage_permission_msg'),
+              style: const TextStyle(color: TxaTheme.textSecondary),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(TxaLanguage.t('cancel')),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  TxaPermission.requestInitial();
+                },
+                child: Text(TxaLanguage.t('grant')),
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-          Text(
-            TxaLanguage.t('coming_soon_msg'),
-            textAlign: TextAlign.center,
-            style: const TextStyle(color: TxaTheme.textSecondary, fontSize: 13),
-          ),
-        ],
+        );
+      }
+      return;
+    }
+
+    if (!mounted) return;
+    final movieData = _data;
+    final currentIdx = _selectedServerIndex;
+    if (movieData == null) return;
+
+    final servers = movieData['servers'] as List? ?? [];
+    if (servers.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: TxaTheme.primaryBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(ctx),
-          child: Text(
-            TxaLanguage.t('ok'),
-            style: const TextStyle(color: TxaTheme.accent),
-          ),
-        ),
-      ],
-    ),
-  );
+      builder: (ctx) {
+        return StatefulBuilder(
+          builder: (ctx, setModalState) {
+            final currentServer = servers[currentIdx];
+            final episodes = currentServer['server_data'] as List? ?? [];
+
+            return Container(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(
+                        TxaLanguage.t('download'),
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(ctx),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 10),
+                  // ... logic continues ...
+                  Expanded(
+                    child: ListView.builder(
+                      shrinkWrap: true,
+                      itemCount: episodes.length,
+                      itemBuilder: (ctx, i) {
+                        final ep = episodes[i];
+                        return ListTile(
+                          title: Text(
+                            ep['name'],
+                            style: const TextStyle(color: Colors.white),
+                          ),
+                          trailing: const Icon(
+                            Icons.download_rounded,
+                            color: TxaTheme.accent,
+                          ),
+                          onTap: () async {
+                            Navigator.pop(ctx);
+                            final linkData = await TxaApi().getEpisodeLink(
+                              ep['link'],
+                            );
+                            final downloadUrl =
+                                (linkData != null && linkData['data'] != null)
+                                ? linkData['data']['link'] ?? ''
+                                : '';
+                            if (downloadUrl.isNotEmpty) {
+                              TxaDownloadManager().addTask(
+                                movieId: movieData['movie']['id'].toString(),
+                                movieTitle: movieData['movie']['name'],
+                                episodeTitle: ep['name'],
+                                url: downloadUrl,
+                                poster: movieData['movie']['thumb_url'],
+                                format: downloadUrl.contains('.m3u8')
+                                    ? 'm3u8'
+                                    : 'mp4',
+                              );
+                              if (mounted) {
+                                TxaToast.show(
+                                  context,
+                                  TxaLanguage.t('added_to_download'),
+                                );
+                              }
+                            }
+                          },
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
 }
 
 class _HeroActionButton extends StatelessWidget {

@@ -103,10 +103,10 @@ class _HomeScreenState extends State<HomeScreen> {
     });
 
     quickActions.setShortcutItems(<ShortcutItem>[
-      const ShortcutItem(
+      ShortcutItem(
         type: 'update_app',
-        localizedTitle: 'Cập nhật App',
-        icon: 'ic_launcher', // Use default icon to ensure compatibility
+        localizedTitle: TxaLanguage.t('check_update'),
+        icon: 'ic_launcher',
       ),
     ]);
   }
@@ -177,7 +177,7 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
-            TxaFormat.formatNetworkSpeed(value * 1000000, useGbps: TxaSettings.speedUnitGbps),
+            TxaFormat.formatNetworkSpeed(value * 1000000, unit: TxaSettings.speedUnit),
             style: const TextStyle(color: TxaTheme.accent, fontSize: 18, fontWeight: FontWeight.bold),
           ),
         ),
@@ -262,7 +262,7 @@ class _HomeScreenState extends State<HomeScreen> {
           minVersion.isNotEmpty && isNewer(minVersion, currentVersion);
       final bool shouldForce = forceUpdate || belowMinVersion;
 
-      if (latestVersion.isNotEmpty && isNewer(latestVersion, currentVersion)) {
+      if ((latestVersion.isNotEmpty && isNewer(latestVersion, currentVersion)) || shouldForce) {
         if (!mounted) return;
 
         final String rawDate = appData?['release_date'] ?? '';
@@ -319,7 +319,7 @@ class _HomeScreenState extends State<HomeScreen> {
         if (!mounted) return;
         TxaToast.show(
           context,
-          TxaLanguage.t('up_to_date').replaceAll('%version', currentVersion),
+          TxaLanguage.t('up_to_date', replace: {'version': currentVersion}),
         );
       }
     } catch (e) {
@@ -510,10 +510,6 @@ class _HomeScreenState extends State<HomeScreen> {
                   unreadNotifications: notif.unreadCount,
                   onTap: (index) {
                     setState(() => _currentIndex = index);
-                    if (index == 3) {
-                      notif
-                          .markAllRead(); // Or keep as is depending on business logic
-                    }
                   },
                 );
               },
@@ -668,7 +664,8 @@ class _HomeScreenState extends State<HomeScreen> {
                       return Text(
                         TxaLanguage.t(
                           'current_version',
-                        ).replaceAll('%version', version),
+                          replace: {'version': version},
+                        ),
                         style: const TextStyle(
                           color: TxaTheme.textMuted,
                           fontSize: 13,
@@ -827,8 +824,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.5.0';
-                  final build = snapshot.data?.buildNumber ?? '350';
+                  final version = snapshot.data?.version ?? '4.0.0';
+                  final build = snapshot.data?.buildNumber ?? '400';
                   return Text(
                     'Version $version (Build $build)',
                     style: const TextStyle(

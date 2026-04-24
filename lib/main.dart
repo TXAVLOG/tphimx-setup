@@ -25,9 +25,11 @@ import 'services/notification_provider.dart';
 import 'widgets/txa_mini_player.dart';
 import 'utils/txa_logger.dart';
 import 'pages/home_screen.dart';
+import 'pages/movie_detail_screen.dart';
 import 'services/txa_language.dart';
 import 'services/txa_background_service.dart';
 import 'services/txa_speed_service.dart';
+import 'services/txa_download_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -37,6 +39,7 @@ void main() async {
   await TxaBackgroundService.registerUpdateTask();
   await TxaSpeedService.init();
   TxaSpeedService.toggleSpeedNotification(TxaSettings.showSpeedInNotification);
+  await TxaDownloadManager().init();
   await initializeDateFormatting('vi', null);
 
   try {
@@ -56,40 +59,7 @@ void main() async {
 
   TxaLogger.log('TPhimX Premium: Application startup sequence completed.');
 
-  // Initialize Local Notifications (Android & iOS only, skip Web)
-  if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
-    try {
-      final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin =
-          FlutterLocalNotificationsPlugin();
-      const AndroidInitializationSettings initializationSettingsAndroid =
-          AndroidInitializationSettings('@mipmap/ic_launcher');
-      const DarwinInitializationSettings initializationSettingsIOS =
-          DarwinInitializationSettings(
-            requestAlertPermission: false,
-            requestBadgePermission: false,
-            requestSoundPermission: false,
-          );
-      const InitializationSettings initializationSettings =
-          InitializationSettings(
-            android: initializationSettingsAndroid,
-            iOS: initializationSettingsIOS,
-          );
-      await flutterLocalNotificationsPlugin.initialize(
-        settings: initializationSettings,
-      );
-
-      // Request permissions explicitly for iOS
-      if (Platform.isIOS) {
-        await flutterLocalNotificationsPlugin
-            .resolvePlatformSpecificImplementation<
-              IOSFlutterLocalNotificationsPlugin
-            >()
-            ?.requestPermissions(alert: true, badge: true, sound: true);
-      }
-    } catch (e) {
-      TxaLogger.log('[Notification] Init failed: $e');
-    }
-  }
+  // Initialize Local Notifications (handled in _TPhimXAppState for navigation)
 
   // Handle Deep Links
   final appLinks = AppLinks();
@@ -108,6 +78,9 @@ void main() async {
         ),
         ChangeNotifierProvider<TxaMiniPlayerProvider>(
           create: (_) => TxaMiniPlayerProvider(),
+        ),
+        ChangeNotifierProvider<TxaDownloadManager>.value(
+          value: TxaDownloadManager(),
         ),
         Provider<AppLinks>.value(value: appLinks),
       ],
@@ -133,12 +106,53 @@ class _TPhimXAppState extends State<TPhimXApp> {
   void initState() {
     super.initState();
     _initDeepLinks();
+    _initNotifications();
     TxaSettings.onSettingsChanged = () {
       if (mounted) setState(() {});
     };
     TxaLanguage.onLanguageChanged = () {
       if (mounted) setState(() {});
     };
+  }
+
+  void _initNotifications() async {
+    if (kIsWeb || (!Platform.isAndroid && !Platform.isIOS)) return;
+
+    try {
+      final plugin = FlutterLocalNotificationsPlugin();
+      const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+      const darwinInit = DarwinInitializationSettings(
+        requestAlertPermission: false,
+        requestBadgePermission: false,
+        requestSoundPermission: false,
+      );
+
+      await plugin.initialize(
+        settings: const InitializationSettings(
+          android: androidInit,
+          iOS: darwinInit,
+        ),
+        onDidReceiveNotificationResponse: (response) {
+          final payload = response.payload;
+          if (payload != null && payload.startsWith('movie_detail:')) {
+            final slug = payload.split(':')[1];
+            _navigatorKey.currentState?.push(
+              MaterialPageRoute(
+                builder: (ctx) => MovieDetailScreen(slug: slug),
+              ),
+            );
+          }
+        },
+      );
+
+      if (Platform.isIOS) {
+        await plugin
+            .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+            ?.requestPermissions(alert: true, badge: true, sound: true);
+      }
+    } catch (e) {
+      TxaLogger.log('[Notification] Init failed in AppState: $e');
+    }
   }
 
   void _initDeepLinks() async {

@@ -103,6 +103,13 @@ class _TxaPlayerState extends State<TxaPlayer>
   Timer? _historySyncTimer;
 
   static const _dndChannel = MethodChannel('com.tphimx.tphimx/dnd');
+  static const _settingsChannel = MethodChannel('com.tphimx/settings');
+
+  // Cast state
+  bool _isCasting = false;
+  CastDevice? _castDevice;
+  CastSession? _castSession;
+  StreamSubscription<CastSession?>? _castSubscription;
 
   // Clock settings
   late Timer _clockTimer;
@@ -251,6 +258,11 @@ class _TxaPlayerState extends State<TxaPlayer>
     _floating.cancelOnLeavePiP();
 
     _batterySubscription?.cancel();
+    _mirrorSubscription?.cancel();
+    _castSubscription?.cancel();
+    if (Platform.isAndroid) {
+      NoScreenMirror.instance.stopListening();
+    }
     super.dispose();
   }
 
@@ -767,26 +779,28 @@ class _TxaPlayerState extends State<TxaPlayer>
   Future<void> _shareCurrentMovie() async {
     try {
       final m = widget.movie;
-      final serverData = widget.servers[_currentServerIndex]['server_data'] as List;
+      final serverData =
+          widget.servers[_currentServerIndex]['server_data'] as List;
       final ep = serverData[_currentEpisodeIndex];
       final slug = m['slug'] ?? m['id']?.toString() ?? '';
-      
-      final shareText = '${m['name']} - Tập ${ep['name']}\nXem ngay tại: https://film.nrotxa.online/phim/$slug';
-      
+
+      final shareText =
+          '${m['name']} - Tập ${ep['name']}\nXem ngay tại: https://film.nrotxa.online/phim/$slug';
+
       final bannerUrl = m['poster_url'] ?? m['thumb_url'] ?? '';
       if (bannerUrl.isNotEmpty) {
         if (mounted) TxaToast.show(context, TxaLanguage.t('preparing'));
         final dir = await getTemporaryDirectory();
         final File imgFile = File('${dir.path}/share_movie_$slug.jpg');
-        
+
         if (!await imgFile.exists()) {
-           final response = await http.get(Uri.parse(bannerUrl));
-           await imgFile.writeAsBytes(response.bodyBytes);
+          final response = await http.get(Uri.parse(bannerUrl));
+          await imgFile.writeAsBytes(response.bodyBytes);
         }
-        
+
         await SharePlus.instance.share(
           ShareParams(
-            text: shareText, 
+            text: shareText,
             subject: m['name'],
             files: [XFile(imgFile.path)],
           ),
@@ -798,7 +812,9 @@ class _TxaPlayerState extends State<TxaPlayer>
       }
     } catch (e) {
       TxaLogger.log('Share error: $e', isError: true);
-      if (mounted) TxaToast.show(context, '${TxaLanguage.t('error')}: $e', isError: true);
+      if (mounted) {
+        TxaToast.show(context, '${TxaLanguage.t('error')}: $e', isError: true);
+      }
     }
   }
 
@@ -814,7 +830,9 @@ class _TxaPlayerState extends State<TxaPlayer>
   StreamSubscription? _mirrorSubscription;
   void _setupMirrorListener() {
     _mirrorSubscription?.cancel();
-    _mirrorSubscription = NoScreenMirror.instance.mirrorStream.listen((snapshot) {
+    _mirrorSubscription = NoScreenMirror.instance.mirrorStream.listen((
+      snapshot,
+    ) {
       if (TxaSettings.miracastEnabled && snapshot.isScreenMirrored) {
         if (_betterPlayerController?.isPlaying() ?? false) {
           _betterPlayerController?.pause();
@@ -857,13 +875,15 @@ class _TxaPlayerState extends State<TxaPlayer>
   void _openCastDialog() async {
     // 1. Pause player
     _betterPlayerController?.pause();
-    
+
     // 2. Show selection dialog: Miracast (System) vs Chromecast (In-app)
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent, // Let Material handle bg
       isScrollControlled: true,
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(20))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
       builder: (ctx) => Material(
         color: TxaTheme.secondaryBg,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
@@ -875,10 +895,39 @@ class _TxaPlayerState extends State<TxaPlayer>
               children: [
                 Text(TxaLanguage.t('cast_to_tv'), style: TxaTheme.headingStyle),
                 const SizedBox(height: 20),
+                if (_isCasting)
+                  ListTile(
+                    leading: const Icon(
+                      Icons.cast_connected_rounded,
+                      color: TxaTheme.accent,
+                    ),
+                    title: Text(
+                      TxaLanguage.t('disconnect_cast'),
+                      style: const TextStyle(
+                        color: TxaTheme.accent,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    subtitle: Text(
+                      "${TxaLanguage.t('casting_to')} ${_castDevice?.name}",
+                      style: const TextStyle(color: TxaTheme.textMuted),
+                    ),
+                    onTap: () {
+                      Navigator.pop(ctx);
+                      _stopCasting();
+                    },
+                  ),
+                if (_isCasting) const Divider(color: Colors.white10),
                 ListTile(
                   leading: const Icon(Icons.cast_rounded, color: Colors.white),
-                  title: Text(TxaLanguage.t('miracast_mirror'), style: const TextStyle(color: Colors.white)),
-                  subtitle: Text(TxaLanguage.t('miracast_mirror_desc'), style: const TextStyle(color: TxaTheme.textMuted)),
+                  title: Text(
+                    TxaLanguage.t('miracast_mirror'),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  subtitle: Text(
+                    TxaLanguage.t('miracast_mirror_desc'),
+                    style: const TextStyle(color: TxaTheme.textMuted),
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     _openSystemCastSettings();
@@ -886,17 +935,32 @@ class _TxaPlayerState extends State<TxaPlayer>
                 ),
                 ListTile(
                   leading: const Icon(Icons.cast_rounded, color: Colors.white),
-                  title: const Text('Chromecast', style: TextStyle(color: Colors.white)),
-                  subtitle: Text(TxaLanguage.t('chromecast_desc'), style: const TextStyle(color: TxaTheme.textMuted)),
+                  title: const Text(
+                    'Chromecast',
+                    style: TextStyle(color: Colors.white),
+                  ),
+                  subtitle: Text(
+                    TxaLanguage.t('chromecast_desc'),
+                    style: const TextStyle(color: TxaTheme.textMuted),
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     _startChromecastDiscovery();
                   },
                 ),
                 ListTile(
-                  leading: const Icon(Icons.language_rounded, color: Colors.white),
-                  title: Text(TxaLanguage.t('web_browser_cast'), style: const TextStyle(color: Colors.white)),
-                  subtitle: Text(TxaLanguage.t('web_browser_cast_desc'), style: const TextStyle(color: TxaTheme.textMuted)),
+                  leading: const Icon(
+                    Icons.language_rounded,
+                    color: Colors.white,
+                  ),
+                  title: Text(
+                    TxaLanguage.t('web_browser_cast'),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  subtitle: Text(
+                    TxaLanguage.t('web_browser_cast_desc'),
+                    style: const TextStyle(color: TxaTheme.textMuted),
+                  ),
                   onTap: () {
                     Navigator.pop(ctx);
                     _openInExternalBrowser();
@@ -909,8 +973,14 @@ class _TxaPlayerState extends State<TxaPlayer>
                     Navigator.pop(ctx);
                     _toggleMiracastProtection();
                   },
-                  title: Text(TxaLanguage.t('block_mirroring'), style: const TextStyle(color: Colors.white)),
-                  secondary: const Icon(Icons.security_rounded, color: Colors.white70),
+                  title: Text(
+                    TxaLanguage.t('block_mirroring'),
+                    style: const TextStyle(color: Colors.white),
+                  ),
+                  secondary: const Icon(
+                    Icons.security_rounded,
+                    color: Colors.white70,
+                  ),
                   activeThumbColor: TxaTheme.accent,
                 ),
               ],
@@ -923,29 +993,67 @@ class _TxaPlayerState extends State<TxaPlayer>
 
   void _openSystemCastSettings() async {
     if (Platform.isAndroid) {
-      // Trying to open Display/Cast settings specifically
       try {
-        await app_settings_lib.AppSettings.openAppSettings(
-          type: app_settings_lib.AppSettingsType.display,
-        );
+        await _settingsChannel.invokeMethod('openCastSettings');
       } catch (e) {
-        // Fallback to general settings if specific one fails or still opens App Info
+        TxaLogger.log('Error opening cast settings: $e', isError: true);
+        // Last resort fallback
         await app_settings_lib.AppSettings.openAppSettings();
       }
     }
   }
 
   void _openInExternalBrowser() async {
-    final serverData = widget.servers[_currentServerIndex]['server_data'] as List;
-    final ep = serverData[_currentEpisodeIndex];
-    final url = ep['link'] ?? '';
-    if (url.isNotEmpty) {
-      final uri = Uri.parse(url);
-      if (await canLaunchUrl(uri)) {
+    try {
+      final serverData =
+          widget.servers[_currentServerIndex]['server_data'] as List;
+      final ep = serverData[_currentEpisodeIndex];
+      String videoUrl =
+          ep['stream_m3u8'] ?? ep['link_m3u8'] ?? ep['stream_v6'] ?? '';
+
+      if (videoUrl.isEmpty) {
+        TxaToast.show(
+          context,
+          TxaLanguage.t('no_streamable_url'),
+          isError: true,
+        );
+        return;
+      }
+
+      // Professional way: Open a cast web helper page or use Web Video Caster intent
+      // Web Video Caster is the industry standard for casting web videos
+      final String encodedUrl = Uri.encodeComponent(videoUrl);
+      final String encodedTitle = Uri.encodeComponent(widget.movie['name'] ?? '');
+      final String encodedPoster = Uri.encodeComponent(widget.movie['thumb_url'] ?? widget.movie['thumb'] ?? '');
+
+      // Using the new professional web cast receiver page
+      final castWebUrl =
+          'https://film.nrotxa.online/cast?url=$encodedUrl&title=$encodedTitle&poster=$encodedPoster';
+      final uri = Uri.parse(castWebUrl);
+
+      TxaToast.show(context, TxaLanguage.t('opening_external_browser'));
+
+      try {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (!mounted) return;
-        TxaToast.show(context, TxaLanguage.t('not_open_link'), isError: true);
+      } catch (e) {
+        // Fallback to direct video URL
+        final videoUri = Uri.parse(videoUrl);
+        try {
+          await launchUrl(videoUri, mode: LaunchMode.externalApplication);
+        } catch (e2) {
+          if (mounted) {
+            TxaToast.show(
+              context,
+              TxaLanguage.t('not_open_link'),
+              isError: true,
+            );
+          }
+        }
+      }
+    } catch (e) {
+      TxaLogger.log('External browser error: $e', isError: true);
+      if (mounted) {
+        TxaToast.show(context, TxaLanguage.t('error_unknown'), isError: true);
       }
     }
   }
@@ -955,11 +1063,58 @@ class _TxaPlayerState extends State<TxaPlayer>
     try {
       final devices = await CastDiscoveryService().search();
       if (devices.isNotEmpty && mounted) {
-        TxaToast.show(
-          context,
-          TxaLanguage.t(
-            'found_chromecast',
-            replace: {'n': devices.length.toString()},
+        // Show device selection dialog
+        if (!mounted) return;
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: TxaTheme.secondaryBg,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          builder: (ctx) => SafeArea(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Text(
+                    TxaLanguage.t(
+                      'select_device',
+                      replace: {'count': devices.length.toString()},
+                    ),
+                    style: TxaTheme.headingStyle,
+                  ),
+                ),
+                const Divider(color: Colors.white10),
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    itemCount: devices.length,
+                    itemBuilder: (c, i) {
+                      final d = devices[i];
+                      return ListTile(
+                        leading: const Icon(
+                          Icons.cast_rounded,
+                          color: Colors.white70,
+                        ),
+                        title: Text(
+                          d.name,
+                          style: const TextStyle(color: Colors.white),
+                        ),
+                        subtitle: Text(
+                          d.host,
+                          style: const TextStyle(color: TxaTheme.textMuted),
+                        ),
+                        onTap: () {
+                          Navigator.pop(ctx);
+                          _connectAndCast(d);
+                        },
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       } else if (mounted) {
@@ -967,6 +1122,84 @@ class _TxaPlayerState extends State<TxaPlayer>
       }
     } catch (e) {
       TxaLogger.log('Chromecast discovery error: $e');
+      if (mounted) TxaToast.show(context, 'Discovery Error: $e', isError: true);
+    }
+  }
+
+  Future<void> _connectAndCast(CastDevice device) async {
+    try {
+      TxaToast.show(context, "${TxaLanguage.t('connecting')} ${device.name}");
+
+      final session = await CastSessionManager().startSession(device);
+      _castSubscription?.cancel();
+      // Using dynamic to bypass the missing getter error in analyzer
+      _castSubscription = (CastSessionManager() as dynamic).sessionStream
+          .listen((s) {
+            if (s == null && _isCasting) {
+              _stopCasting();
+            }
+          });
+
+      final serverData =
+          widget.servers[_currentServerIndex]['server_data'] as List;
+      final ep = serverData[_currentEpisodeIndex];
+
+      // Get URL
+      String videoUrl =
+          ep['stream_m3u8'] ?? ep['link_m3u8'] ?? ep['stream_v6'] ?? '';
+
+      if (videoUrl.isEmpty) {
+        if (mounted) {
+          TxaToast.show(
+            context,
+            TxaLanguage.t('no_streamable_url'),
+            isError: true,
+          );
+        }
+        return;
+      }
+
+      // cast_plus 2.0 uses sendMessage with a specific format or loadMedia
+      // Using dynamic to avoid compile-time errors if the type definition is slightly off
+      await (session as dynamic).load(
+        url: videoUrl,
+        title: widget.movie['name'] ?? 'TPhimX Video',
+        subtitle: "Tập ${ep['name']}",
+        image: widget.movie['poster_url'] ?? widget.movie['thumb_url'],
+      );
+
+      setState(() {
+        _isCasting = true;
+        _castDevice = device;
+        _castSession = session;
+      });
+
+      // Pause local player
+      _betterPlayerController?.pause();
+
+      if (mounted) {
+        TxaToast.show(context, "${TxaLanguage.t('casting_to')} ${device.name}");
+      }
+    } catch (e) {
+      TxaLogger.log('Cast error: $e', isError: true);
+      if (mounted) TxaToast.show(context, "Cast Error: $e", isError: true);
+    }
+  }
+
+  void _stopCasting() async {
+    try {
+      await (_castSession as dynamic).stop();
+    } catch (_) {}
+
+    if (mounted) {
+      setState(() {
+        _isCasting = false;
+        _castDevice = null;
+        _castSession = null;
+      });
+      // Resume local player
+      _betterPlayerController?.play();
+      TxaToast.show(context, TxaLanguage.t('stopped_casting'));
     }
   }
 
@@ -1375,6 +1608,46 @@ class _TxaPlayerState extends State<TxaPlayer>
                   ),
                 ),
 
+              // 2.6 MOVIE INFO (Top-Center)
+              if (_showControls && !_isLocked)
+                Positioned(
+                  top: 40,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.black38,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.white10),
+                      ),
+                      child: Builder(builder: (ctx) {
+                        final episodes = widget.servers[_currentServerIndex]['server_data'] as List;
+                        String episodeName = episodes[_currentEpisodeIndex]['name']?.toString() ?? '';
+                        
+                        // Check if episodeName is just a number, then add "Tập" prefix
+                        final isNumeric = RegExp(r'^\d+$').hasMatch(episodeName);
+                        if (isNumeric) {
+                          episodeName = TxaLanguage.t('episode_label', replace: {'n': episodeName});
+                        }
+
+                        final serverName = widget.servers[_currentServerIndex]['name'];
+                        final movieName = widget.movie['name'];
+                        return Text(
+                          "$movieName - $episodeName ($serverName) - TPHIMX",
+                          style: const TextStyle(
+                            color: Colors.white60,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w500,
+                            letterSpacing: 0.5,
+                          ),
+                        );
+                      }),
+                    ),
+                  ),
+                ),
+
               // 3. GESTURE FEEDBACK OVERLAY
               if (_overlayLabel != null || _overlayIcon != null)
                 Center(
@@ -1629,11 +1902,12 @@ class _TxaPlayerState extends State<TxaPlayer>
                       await _syncHistory();
 
                       // PiP handling if needed
-                      if (_betterPlayerController != null && TxaSettings.autoPiP) {
-                        // Optionally trigger native PiP here if desired, 
+                      if (_betterPlayerController != null &&
+                          TxaSettings.autoPiP) {
+                        // Optionally trigger native PiP here if desired,
                         // but user hates the "ugly" mini-player so we stop it.
                       }
-                      
+
                       if (mounted) Navigator.pop(context);
                     },
                   ),
@@ -1692,12 +1966,10 @@ class _TxaPlayerState extends State<TxaPlayer>
                     onTap: _shareCurrentMovie,
                   ),
                   _HeaderIcon(
-                    icon: TxaSettings.miracastEnabled
+                    icon: _isCasting
                         ? Icons.cast_connected_rounded
                         : Icons.cast_rounded,
-                    color: TxaSettings.miracastEnabled
-                        ? TxaTheme.accent
-                        : Colors.white,
+                    color: _isCasting ? TxaTheme.accent : Colors.white,
                     onTap: _openCastDialog,
                   ),
                   _HeaderIcon(

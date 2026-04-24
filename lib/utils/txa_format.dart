@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:intl/intl.dart';
+import '../services/txa_language.dart';
 
 class TxaFormat {
   /// Pad number to 2 digits
@@ -55,7 +56,7 @@ class TxaFormat {
     return {'value': unitValue, 'unit': units[i], 'display': display};
   }
 
-  /// Format speed (bytes/s to human readable)
+  /// Format speed (bytes/s to human readable) - For Download/Update
   static Map<String, dynamic> formatSpeed(
     double bytesPerSec, {
     int decimals = 2,
@@ -68,14 +69,36 @@ class TxaFormat {
     };
   }
 
-  /// Format network speed specifically for Mbps/Gbps as requested
-  static String formatNetworkSpeed(double bitsPerSec, {bool useGbps = false}) {
-    if (bitsPerSec <= 0) return '0 Mbps';
+  /// Format network speed specifically for App Settings/Status - Support custom Units
+  static String formatNetworkSpeed(double bitsPerSec, {String unit = 'Auto'}) {
+    if (bitsPerSec <= 0) return '0 ${unit == 'Auto' ? 'Mb/s' : unit}';
     double mbps = bitsPerSec / 1000000.0;
-    if (useGbps && mbps >= 1000) {
-      return '${(mbps / 1000.0).toStringAsFixed(2)} Gbps';
+    double bytesPerSec = bitsPerSec / 8.0;
+
+    switch (unit) {
+      case 'Mbps':
+      case 'Mb/s':
+        return '${mbps.toStringAsFixed(2)} Mb/s';
+      case 'Gbps':
+      case 'Gb/s':
+        return '${(mbps / 1000.0).toStringAsFixed(2)} Gb/s';
+      case 'B/s':
+        return '${bytesPerSec.toStringAsFixed(0)} B/s';
+      case 'KB/s':
+        return '${(bytesPerSec / 1024.0).toStringAsFixed(2)} KB/s';
+      case 'MB/s':
+        return '${(bytesPerSec / (1024.0 * 1024.0)).toStringAsFixed(2)} MB/s';
+      case 'GB/s':
+        return '${(bytesPerSec / (1024.0 * 1024.0 * 1024.0)).toStringAsFixed(2)} GB/s';
+      case 'TB/s':
+        return '${(bytesPerSec / (1024.0 * 1024.0 * 1024.0 * 1024.0)).toStringAsFixed(2)} TB/s';
+      case 'Auto':
+      default:
+        if (mbps >= 1000) {
+          return '${(mbps / 1000.0).toStringAsFixed(2)} Gb/s';
+        }
+        return '${mbps.toStringAsFixed(2)} Mb/s';
     }
-    return '${mbps.toStringAsFixed(2)} Mbps';
   }
 
   /// Format data size specifically for the update process
@@ -84,17 +107,21 @@ class TxaFormat {
     return info['display'];
   }
 
-  /// Format duration to Vietnamese words
+  /// Format duration to localized words (ETA)
   static String formatDuration(int seconds) {
-    if (seconds <= 0) return '0 giây';
+    if (seconds <= 0) return TxaLanguage.t('time_second', replace: {'n': '0'});
     final h = seconds ~/ 3600;
     final m = (seconds % 3600) ~/ 60;
     final s = seconds % 60;
     List<String> parts = [];
-    if (h > 0) parts.add('$h giờ');
-    if (m > 0) parts.add('$m phút');
-    if (s > 0 && h == 0) parts.add('$s giây');
-    return parts.isEmpty ? '0 giây' : parts.join(' ');
+    if (h > 0) parts.add(TxaLanguage.t('time_hour', replace: {'n': '$h'}));
+    if (m > 0) parts.add(TxaLanguage.t('time_minute', replace: {'n': '$m'}));
+    if (s > 0 && h == 0) {
+      parts.add(TxaLanguage.t('time_second', replace: {'n': '$s'}));
+    }
+    return parts.isEmpty
+        ? TxaLanguage.t('time_second', replace: {'n': '0'})
+        : parts.join(' ');
   }
 
   /// Relative time (ago) from String
@@ -108,20 +135,32 @@ class TxaFormat {
     }
   }
 
-  /// Relative time (ago)
+  /// Relative time (ago) - Localized
   static String formatAgo(DateTime date) {
     final now = DateTime.now();
     final diff = now.difference(date);
-    if (diff.inSeconds < 30) return 'Vừa xong';
-    if (diff.inSeconds < 60) return '${diff.inSeconds} giây trước';
-    if (diff.inMinutes < 60) return '${diff.inMinutes} phút trước';
-    if (diff.inHours < 24) return '${diff.inHours} giờ trước';
-    if (diff.inDays < 30) return '${diff.inDays} ngày trước';
-    if (diff.inDays < 365) return '${(diff.inDays / 30).floor()} tháng trước';
-    return '${(diff.inDays / 365).floor()} năm trước';
+    if (diff.inSeconds < 30) return TxaLanguage.t('time_just_now');
+    if (diff.inSeconds < 60) {
+      return TxaLanguage.t('time_seconds_ago', replace: {'n': '${diff.inSeconds}'});
+    }
+    if (diff.inMinutes < 60) {
+      return TxaLanguage.t('time_minutes_ago', replace: {'n': '${diff.inMinutes}'});
+    }
+    if (diff.inHours < 24) {
+      return TxaLanguage.t('time_hours_ago', replace: {'n': '${diff.inHours}'});
+    }
+    if (diff.inDays < 30) {
+      return TxaLanguage.t('time_days_ago', replace: {'n': '${diff.inDays}'});
+    }
+    if (diff.inDays < 365) {
+      final months = (diff.inDays / 30).floor();
+      return TxaLanguage.t('time_months_ago', replace: {'n': '$months'});
+    }
+    final years = (diff.inDays / 365).floor();
+    return TxaLanguage.t('time_years_ago', replace: {'n': '$years'});
   }
 
-  /// Format number
+  /// Format number - Localized suffixes
   static String formatNumber(dynamic numVal, {bool compact = false}) {
     if (numVal == null) return '0';
     num val = numVal is num ? numVal : double.tryParse(numVal.toString()) ?? 0;
@@ -132,17 +171,17 @@ class TxaFormat {
       if (absVal >= 1e9) {
         String s = (val / 1e9).toStringAsFixed(1);
         if (s.endsWith('.0')) s = s.substring(0, s.length - 2);
-        return '${s}B';
+        return '$s${TxaLanguage.t('num_b')}';
       }
       if (absVal >= 1e6) {
         String s = (val / 1e6).toStringAsFixed(1);
         if (s.endsWith('.0')) s = s.substring(0, s.length - 2);
-        return '${s}M';
+        return '$s${TxaLanguage.t('num_m')}';
       }
       if (absVal >= 1e3) {
         String s = (val / 1e3).toStringAsFixed(1);
         if (s.endsWith('.0')) s = s.substring(0, s.length - 2);
-        return '${s}K';
+        return '$s${TxaLanguage.t('num_k')}';
       }
     }
 
@@ -150,7 +189,7 @@ class TxaFormat {
     return formatter.format(val);
   }
 
-  /// Format date to H:i:s d/M/yy
+  /// Format date to HH:mm:ss dd/MM/yy
   static String formatDateTime(String dateStr) {
     if (dateStr.isEmpty) return '';
     try {

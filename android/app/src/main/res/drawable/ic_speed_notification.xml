@@ -1,0 +1,18 @@
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="24dp"
+    android:height="24dp"
+    android:viewportWidth="24"
+    android:viewportHeight="24">
+    <!-- TXA Style X Shape -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M18.3,5.71a1,1 0,0 0,-1.41 0L12,10.59 7.11,5.7a1,1 0,0 0,-1.41 1.41L10.59,12 5.7,16.89a1,1 0,1 0,1.41 1.41L12,13.41l4.89,4.89a1,1 0,0 0,1.41,-1.41L13.41,12l4.89,-4.89A1,1 0,0 0,18.3,5.71Z" />
+    <!-- Down Arrow inside the X -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,16l-4,-4h3V8h2v4h3l-4,4z" />
+    <!-- Small dots or accents to make it look "premium" -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:pathData="M12,2L12,2A1,1 0,0 1,13 3L13,5A1,1 0,0 1,12 6L12,6A1,1 0,0 1,11 5L11,3A1,1 0,0 1,12 2z" />
+</vector>

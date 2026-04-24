@@ -19,6 +19,7 @@ import 'global_settings_screen.dart';
 import 'movie_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../utils/txa_format.dart';
+import 'download_manager_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -64,6 +65,15 @@ class _AccountScreenState extends State<AccountScreen> {
         'action': () => Navigator.push(
           context,
           MaterialPageRoute(builder: (ctx) => const FavoriteListScreen()),
+        ),
+      },
+      {
+        'id': 'downloads',
+        'label': TxaLanguage.t('download_manager'),
+        'icon': Icons.download_for_offline_rounded,
+        'action': () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (ctx) => const DownloadManagerScreen()),
         ),
       },
       {
@@ -632,12 +642,13 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '3.3.0';
-                  final buildNumber = snapshot.data?.buildNumber ?? '330';
+                  final version = snapshot.data?.version ?? '4.0.0';
+                  final buildNumber = snapshot.data?.buildNumber ?? '400';
                   return Text(
                     TxaLanguage.t(
                       'current_version',
-                    ).replaceAll('%version', '$version (Build $buildNumber)'),
+                      replace: {'version': '$version (Build $buildNumber)'},
+                    ),
                     style: const TextStyle(
                       color: TxaTheme.textMuted,
                       fontSize: 11,

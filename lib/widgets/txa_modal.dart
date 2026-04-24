@@ -22,6 +22,7 @@ class TxaModal extends StatelessWidget {
     Widget? content,
     List<Widget>? actions,
     bool barrierDismissible = true,
+    bool showClose = true,
   }) {
     return showDialog<T>(
       context: context,
@@ -30,6 +31,7 @@ class TxaModal extends StatelessWidget {
         title: title,
         content: content,
         actions: actions,
+        showClose: showClose,
         onClose: () => Navigator.of(context).pop(),
       ),
     );

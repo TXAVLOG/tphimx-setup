@@ -19,7 +19,8 @@
     <application
         android:label="TPhimX Premium"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:requestLegacyExternalStorage="true">
         <activity
             android:name=".MainActivity"
             android:exported="true"
@@ -66,7 +67,24 @@
                 android:name="android.support.FILE_PROVIDER_PATHS"
                 android:resource="@xml/file_paths" />
         </provider>
+
+        <service
+            android:name=".SpeedNotificationService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="dataSync" />
+
+        <receiver
+            android:name=".SpeedServiceRestarter"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.tphimx.speed_service.RESTART" />
+            </intent-filter>
+        </receiver>
     </application>
+
+
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and
          https://developer.android.com/reference/android/content/Intent#ACTION_PROCESS_TEXT.

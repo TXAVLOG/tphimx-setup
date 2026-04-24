@@ -10,38 +10,93 @@ import io.flutter.embedding.engine.FlutterEngine
 import io.flutter.plugin.common.MethodChannel
 
 class MainActivity : FlutterFragmentActivity() {
-    private val CHANNEL = "com.tphimx.tphimx/dnd"
+    private val CHANNEL_DND = "com.tphimx.tphimx/dnd"
+    private val CHANNEL_SPEED = "com.tphimx/speed_service"
 
     override fun configureFlutterEngine(flutterEngine: FlutterEngine) {
         super.configureFlutterEngine(flutterEngine)
-        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL).setMethodCallHandler { call, result ->
+        
+        // Existing DND Channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_DND).setMethodCallHandler { call, result ->
             val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-
             when (call.method) {
                 "setDND" -> {
                     val enable = call.argument<Boolean>("enable") ?: false
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        if (notificationManager.isNotificationPolicyAccessGranted) {
-                            if (enable) {
-                                notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
-                            } else {
-                                notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
-                            }
-                            result.success(true)
+                    if (notificationManager.isNotificationPolicyAccessGranted) {
+                        if (enable) {
+                            notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_PRIORITY)
                         } else {
-                            val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
-                            startActivity(intent)
-                            result.error("PERMISSION_DENIED", "Notification Policy Access not granted", null)
+                            notificationManager.setInterruptionFilter(NotificationManager.INTERRUPTION_FILTER_ALL)
                         }
+                        result.success(true)
                     } else {
-                        result.error("NOT_SUPPORTED", "DND toggle not supported on this version", null)
+                        val intent = Intent(Settings.ACTION_NOTIFICATION_POLICY_ACCESS_SETTINGS)
+                        startActivity(intent)
+                        result.error("PERMISSION_DENIED", "Notification Policy Access not granted", null)
                     }
                 }
                 "checkPermission" -> {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-                        result.success(notificationManager.isNotificationPolicyAccessGranted)
+                    result.success(notificationManager.isNotificationPolicyAccessGranted)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        // New Speed Service Channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, CHANNEL_SPEED).setMethodCallHandler { call, result ->
+            when (call.method) {
+                "startSpeedService" -> {
+                    val speedUnit = call.argument<String>("speedUnit") ?: "Auto"
+                    val intent = Intent(this, SpeedNotificationService::class.java).apply {
+                        putExtra("speedUnit", speedUnit)
+                        putExtra("txtTitle", call.argument<String>("txtTitle"))
+                        putExtra("txtInit", call.argument<String>("txtInit"))
+                        putExtra("txtNetwork", call.argument<String>("txtNetwork"))
+                        putExtra("txtOffline", call.argument<String>("txtOffline"))
+                        putExtra("txtWiFi", call.argument<String>("txtWiFi"))
+                        putExtra("txtMobile", call.argument<String>("txtMobile"))
+                        putExtra("txtEthernet", call.argument<String>("txtEthernet"))
+                        putExtra("txtUnknown", call.argument<String>("txtUnknown"))
+                    }
+                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                        startForegroundService(intent)
                     } else {
+                        startService(intent)
+                    }
+                    result.success(true)
+                }
+
+
+                "stopSpeedService" -> {
+                    val intent = Intent(this, SpeedNotificationService::class.java)
+                    stopService(intent)
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+
+        // Settings Channel
+        MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "com.tphimx/settings").setMethodCallHandler { call, result ->
+            when (call.method) {
+                "openCastSettings" -> {
+                    try {
+                        val intent = Intent("android.settings.CAST_SETTINGS")
+                        intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                        startActivity(intent)
                         result.success(true)
+                    } catch (e: Exception) {
+                        try {
+                            val intent = Intent("android.settings.WIFI_DISPLAY_SETTINGS")
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(true)
+                        } catch (e2: Exception) {
+                            val intent = Intent(android.provider.Settings.ACTION_DISPLAY_SETTINGS)
+                            intent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                            startActivity(intent)
+                            result.success(true)
+                        }
                     }
                 }
                 else -> result.notImplemented()
@@ -49,3 +104,5 @@ class MainActivity : FlutterFragmentActivity() {
         }
     }
 }
+
+

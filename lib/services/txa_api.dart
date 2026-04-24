@@ -7,8 +7,8 @@ class TxaApi {
   static const String baseUrl = 'https://film.nrotxa.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '3.5.0';
-  static const String buildNumber = '350';
+  static const String apiVersion = '4.0.0';
+  static const String buildNumber = '400';
 
   // Community Links
   static const String facebookFanpage =
@@ -142,6 +142,17 @@ class TxaApi {
   Future<Map<String, dynamic>> getMovie(String slug) async {
     final response = await get(movieDetail(slug));
     return response.data;
+  }
+
+  /// Lấy link tập phim
+  Future<Map<String, dynamic>?> getEpisodeLink(String episodeId) async {
+    try {
+      final response = await get('$apiPrefix/episode/$episodeId/link');
+      return response.data['data'];
+    } catch (e) {
+      TxaLogger.log('Get Episode Link Error: $e', isError: true);
+      return null;
+    }
   }
 
   /// Tìm kiếm phim
@@ -326,7 +337,7 @@ class TxaApi {
           'type': type,
           'message': message,
           'extra': extra,
-          'device_info': 'TPhimX-App-V3.5',
+          'device_info': 'TPhimX-App-V4.0',
           'timestamp': DateTime.now().toIso8601String(),
         },
       );
