@@ -71,15 +71,13 @@ class TxaFormat {
 
   /// Format network speed specifically for App Settings/Status - Support custom Units
   static String formatNetworkSpeed(double bitsPerSec, {String unit = 'Auto'}) {
-    if (bitsPerSec <= 0) return '0 ${unit == 'Auto' ? 'Mb/s' : unit}';
+    if (bitsPerSec <= 0) return '0 ${unit == 'Auto' ? 'KB/s' : unit}';
     double mbps = bitsPerSec / 1000000.0;
     double bytesPerSec = bitsPerSec / 8.0;
 
     switch (unit) {
-      case 'Mbps':
       case 'Mb/s':
         return '${mbps.toStringAsFixed(2)} Mb/s';
-      case 'Gbps':
       case 'Gb/s':
         return '${(mbps / 1000.0).toStringAsFixed(2)} Gb/s';
       case 'B/s':
@@ -94,10 +92,17 @@ class TxaFormat {
         return '${(bytesPerSec / (1024.0 * 1024.0 * 1024.0 * 1024.0)).toStringAsFixed(2)} TB/s';
       case 'Auto':
       default:
-        if (mbps >= 1000) {
-          return '${(mbps / 1000.0).toStringAsFixed(2)} Gb/s';
+        // Use Bytes-based units for Auto as it's more common for downloads
+        if (bytesPerSec >= 1024 * 1024 * 1024) {
+          return '${(bytesPerSec / (1024.0 * 1024.0 * 1024.0)).toStringAsFixed(2)} GB/s';
         }
-        return '${mbps.toStringAsFixed(2)} Mb/s';
+        if (bytesPerSec >= 1024 * 1024) {
+          return '${(bytesPerSec / (1024.0 * 1024.0)).toStringAsFixed(2)} MB/s';
+        }
+        if (bytesPerSec >= 1024) {
+          return '${(bytesPerSec / 1024.0).toStringAsFixed(2)} KB/s';
+        }
+        return '${bytesPerSec.toStringAsFixed(0)} B/s';
     }
   }
 

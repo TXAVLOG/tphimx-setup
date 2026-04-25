@@ -1121,6 +1121,73 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                       ),
                     ],
                   ),
+                  const SizedBox(height: 12),
+                  // Download All Button
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton.icon(
+                      onPressed: () async {
+                        final currentServer = servers[tempServerIndex];
+                        final episodes = currentServer['server_data'] as List? ?? [];
+                        
+                        TxaToast.show(context, TxaLanguage.t('adding_all_to_download'));
+                        
+                        for (var ep in episodes) {
+                          final epId = ep['id'].toString();
+                          
+                          // Check if already in queue
+                          final existing = TxaDownloadManager().tasks.firstWhere(
+                            (t) => t.movieId == movieData['movie']['id'].toString() && t.episodeId == epId,
+                            orElse: () => DownloadTask(id: '', movieId: '', episodeId: '', movieTitle: '', episodeTitle: '', url: '', poster: '', format: ''),
+                          );
+                          
+                          if (existing.id.isNotEmpty) {
+                            if (existing.status == DownloadStatus.completed || existing.status == DownloadStatus.downloading) {
+                              continue;
+                            }
+                            // If paused or error, it will be picked up by _processQueue later
+                          } else {
+                            // Standardize episode name
+                            String epName = ep['name'].toString().trim();
+                            final isNumeric = RegExp(r'^\d+$').hasMatch(epName);
+                            if (isNumeric || epName.length <= 3) {
+                              epName = "${TxaLanguage.t('episode')} $epName";
+                            }
+
+                            final linkData = await TxaApi().getEpisodeLink(epId);
+                            final downloadUrl = (linkData != null) ? linkData['link'] ?? '' : '';
+
+                            if (downloadUrl.isNotEmpty) {
+                              TxaDownloadManager().addTask(
+                                movieId: movieData['movie']['id'].toString(),
+                                movieTitle: movieData['movie']['name'],
+                                episodeId: epId,
+                                episodeTitle: epName,
+                                url: downloadUrl,
+                                poster: movieData['movie']['thumb_url'],
+                                format: downloadUrl.contains('.m3u8') ? 'm3u8' : 'mp4',
+                              );
+                            }
+                            // Small delay to not spam API
+                            await Future.delayed(const Duration(milliseconds: 100));
+                          }
+                        }
+                        // Ensure manager processes the queue (including paused tasks)
+                        TxaDownloadManager().prioritizeMovie(movieData['movie']['id'].toString());
+                        setModalState(() {});
+                      },
+                      icon: const Icon(Icons.download_for_offline_rounded, size: 18),
+                      label: Text(
+                        "${TxaLanguage.t('download')} ${TxaLanguage.t('all_episodes')}",
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: TxaTheme.accent,
+                        side: const BorderSide(color: TxaTheme.accent),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 20),
                   Expanded(
                     child: ListView.separated(
@@ -1204,11 +1271,10 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                   setModalState(() {}); // Trigger rebuild to show "Adding..." if we had that state
                                   
                                   final linkData = await TxaApi().getEpisodeLink(
-                                    ep['link'],
+                                    ep['id'].toString(),
                                   );
-                                  final downloadUrl = (linkData != null &&
-                                          linkData['data'] != null)
-                                      ? linkData['data']['link'] ?? ''
+                                  final downloadUrl = (linkData != null)
+                                      ? linkData['link'] ?? ''
                                       : '';
 
                                   if (downloadUrl.isNotEmpty) {

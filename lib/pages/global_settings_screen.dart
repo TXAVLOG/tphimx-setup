@@ -105,7 +105,7 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
             subtitle: Text(TxaSettings.speedUnit, style: const TextStyle(color: TxaTheme.textMuted)),
             trailing: const Icon(Icons.chevron_right_rounded, color: TxaTheme.textMuted),
             onTap: () {
-              final units = ['Auto', 'Mbps', 'Gbps', 'B/s', 'KB/s', 'MB/s', 'GB/s', 'TB/s'];
+              final units = ['Auto', 'KB/s', 'MB/s', 'GB/s', 'B/s', 'Mb/s', 'Gb/s'];
               showModalBottomSheet(
                 context: context,
                 backgroundColor: TxaTheme.secondaryBg,

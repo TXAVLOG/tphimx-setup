@@ -389,6 +389,8 @@ class TxaLanguage {
       'cancel_download': 'Hủy tải',
       'pause_download': 'Tạm dừng',
       'resume_download': 'Tiếp tục',
+      'all_episodes': 'tất cả tập',
+      'adding_all_to_download': 'Đang thêm tất cả tập vào hàng chờ tải...',
     },
     'en': {
       'app_name': 'TPhimX Premium',
@@ -759,6 +761,8 @@ class TxaLanguage {
       'cancel_download': 'Cancel',
       'pause_download': 'Pause',
       'resume_download': 'Resume',
+      'all_episodes': 'all episodes',
+      'adding_all_to_download': 'Adding all episodes to download queue...',
     },
   };
 
