@@ -33,6 +33,11 @@ class SpeedNotificationService : Service() {
     private var lastTxBytes: Long = 0
     private var lastUpdateTime: Long = 0
     
+    // Daily Usage
+    private var totalDailyRx: Long = 0
+    private var totalDailyTx: Long = 0
+    private var lastResetDate: String = ""
+    
     // Config
     private var speedUnit: String = "Auto"
     
@@ -45,6 +50,8 @@ class SpeedNotificationService : Service() {
     private var txtMobile = "Dữ liệu di động"
     private var txtEthernet = "Ethernet"
     private var txtUnknown = "Không rõ"
+    private var txtUsage = "Sử dụng"
+    private var txtTotal = "Tổng"
 
     private val updateRunnable = object : Runnable {
         override fun run() {
@@ -56,6 +63,7 @@ class SpeedNotificationService : Service() {
     override fun onCreate() {
         super.onCreate()
         createNotificationChannel()
+        loadUsageData()
         lastRxBytes = TrafficStats.getTotalRxBytes()
         lastTxBytes = TrafficStats.getTotalTxBytes()
         lastUpdateTime = System.currentTimeMillis()
@@ -81,6 +89,8 @@ class SpeedNotificationService : Service() {
             txtMobile = it.getStringExtra("txtMobile") ?: txtMobile
             txtEthernet = it.getStringExtra("txtEthernet") ?: txtEthernet
             txtUnknown = it.getStringExtra("txtUnknown") ?: txtUnknown
+            txtUsage = it.getStringExtra("txtUsage") ?: "Dùng"
+            txtTotal = it.getStringExtra("txtTotal") ?: "Tổng"
         }
         
         val notification = buildNotification(txtTitle, txtInit)
@@ -92,6 +102,35 @@ class SpeedNotificationService : Service() {
         handler.post(updateRunnable)
         
         return START_STICKY
+    }
+
+    private fun loadUsageData() {
+        val prefs = getSharedPreferences("speed_service_prefs", Context.MODE_PRIVATE)
+        totalDailyRx = prefs.getLong("totalDailyRx", 0)
+        totalDailyTx = prefs.getLong("totalDailyTx", 0)
+        lastResetDate = prefs.getString("lastResetDate", "") ?: ""
+        
+        checkResetNeeded()
+    }
+
+    private fun saveUsageData() {
+        val prefs = getSharedPreferences("speed_service_prefs", Context.MODE_PRIVATE)
+        prefs.edit().apply {
+            putLong("totalDailyRx", totalDailyRx)
+            putLong("totalDailyTx", totalDailyTx)
+            putString("lastResetDate", lastResetDate)
+            apply()
+        }
+    }
+
+    private fun checkResetNeeded() {
+        val currentDate = java.text.SimpleDateFormat("yyyy-MM-dd", Locale.US).format(java.util.Date())
+        if (lastResetDate != currentDate) {
+            totalDailyRx = 0
+            totalDailyTx = 0
+            lastResetDate = currentDate
+            saveUsageData()
+        }
     }
 
     override fun onTaskRemoved(rootIntent: Intent?) {
@@ -112,12 +151,15 @@ class SpeedNotificationService : Service() {
 
     override fun onDestroy() {
         handler.removeCallbacks(updateRunnable)
+        saveUsageData()
         super.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
 
     private fun updateNotification() {
+        checkResetNeeded()
+        
         val currentRxBytes = TrafficStats.getTotalRxBytes()
         val currentTxBytes = TrafficStats.getTotalTxBytes()
         val currentTime = System.currentTimeMillis()
@@ -125,8 +167,15 @@ class SpeedNotificationService : Service() {
         val timeDiff = (currentTime - lastUpdateTime) / 1000.0
         if (timeDiff <= 0) return
 
-        val rxSpeed = (currentRxBytes - lastRxBytes) / timeDiff
-        val txSpeed = (currentTxBytes - lastTxBytes) / timeDiff
+        val diffRx = if (lastRxBytes > 0) currentRxBytes - lastRxBytes else 0
+        val diffTx = if (lastTxBytes > 0) currentTxBytes - lastTxBytes else 0
+        
+        val rxSpeed = diffRx / timeDiff
+        val txSpeed = diffTx / timeDiff
+
+        // Accumulate daily usage
+        if (diffRx > 0) totalDailyRx += diffRx
+        if (diffTx > 0) totalDailyTx += diffTx
 
         lastRxBytes = currentRxBytes
         lastTxBytes = currentTxBytes
@@ -135,30 +184,44 @@ class SpeedNotificationService : Service() {
         val downSpeedStr = formatWithUnit(rxSpeed, speedUnit)
         val upSpeedStr = formatWithUnit(txSpeed, speedUnit)
         val networkInfo = getNetworkType()
+        
+        // Format daily usage
+        val totalUsageStr = formatWithUnit((totalDailyRx + totalDailyTx).toDouble(), "Auto", false)
 
-        val contentTitle = "Down: $downSpeedStr  Up: $upSpeedStr"
-        val contentText = "$txtNetwork: $networkInfo"
+        val contentTitle = "▼ $downSpeedStr  ▲ $upSpeedStr"
+        val contentText = "$txtNetwork: $networkInfo | $txtTotal: $totalUsageStr"
 
         val notification = buildNotification(contentTitle, contentText)
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID, notification)
+        
+        // Save every few updates to avoid heavy I/O
+        if (currentTime % 5000 < 1000) {
+            saveUsageData()
+        }
     }
 
-    private fun formatWithUnit(bytesPerSec: Double, unit: String): String {
-        val bitsPerSec = bytesPerSec * 8.0
-        val mbps = bitsPerSec / 1000000.0
-
+    private fun formatWithUnit(bytes: Double, unit: String, isSpeed: Boolean = true): String {
+        val suffix = if (isSpeed) "/s" else ""
+        val KB = 1024.0
+        val MB = KB * KB
+        val GB = MB * KB
+        val TB = GB * KB
+        
         return when (unit) {
-            "Mbps", "Mb/s" -> String.format(Locale.US, "%.2f Mb/s", mbps)
-            "Gbps", "Gb/s" -> String.format(Locale.US, "%.2f Gb/s", mbps / 1000.0)
-            "B/s" -> String.format(Locale.US, "%.0f B/s", bytesPerSec)
-            "KB/s" -> String.format(Locale.US, "%.2f KB/s", bytesPerSec / 1024.0)
-            "MB/s" -> String.format(Locale.US, "%.2f MB/s", bytesPerSec / (1024.0 * 1024.0))
-            "GB/s" -> String.format(Locale.US, "%.2f GB/s", bytesPerSec / (1024.0 * 1024.0 * 1024.0))
-            "TB/s" -> String.format(Locale.US, "%.2f TB/s", bytesPerSec / (1024.0 * 1024.0 * 1024.0 * 1024.0))
+            "B/s", "B" -> String.format(Locale.US, "%.0f B%s", bytes, suffix)
+            "KB/s", "KB" -> String.format(Locale.US, "%.2f KB%s", bytes / KB, suffix)
+            "MB/s", "MB" -> String.format(Locale.US, "%.2f MB%s", bytes / MB, suffix)
+            "GB/s", "GB" -> String.format(Locale.US, "%.2f GB%s", bytes / GB, suffix)
+            "TB/s", "TB" -> String.format(Locale.US, "%.2f TB%s", bytes / TB, suffix)
             else -> { // Auto
-                if (mbps >= 1000) String.format(Locale.US, "%.2f Gb/s", mbps / 1000.0)
-                else String.format(Locale.US, "%.2f Mb/s", mbps)
+                when {
+                    bytes < KB -> String.format(Locale.US, "%.0f B%s", bytes, suffix)
+                    bytes < MB -> String.format(Locale.US, "%.2f KB%s", bytes / KB, suffix)
+                    bytes < GB -> String.format(Locale.US, "%.2f MB%s", bytes / MB, suffix)
+                    bytes < TB -> String.format(Locale.US, "%.2f GB%s", bytes / GB, suffix)
+                    else -> String.format(Locale.US, "%.2f TB%s", bytes / TB, suffix)
+                }
             }
         }
     }
@@ -177,12 +240,10 @@ class SpeedNotificationService : Service() {
     }
 
     private fun buildNotification(title: String, text: String): Notification {
-        // Intent to handle deletion (though ongoing=true usually prevents it)
-        val deleteIntent = Intent(this, SpeedServiceRestarter::class.java).apply {
-            action = ACTION_RESTART_SERVICE
-        }
-        val deletePendingIntent = PendingIntent.getBroadcast(
-            this, 0, deleteIntent, 
+        // Intent to open app
+        val openAppIntent = packageManager.getLaunchIntentForPackage(packageName)
+        val openAppPendingIntent = PendingIntent.getActivity(
+            this, 0, openAppIntent, 
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
@@ -190,49 +251,51 @@ class SpeedNotificationService : Service() {
             .setContentTitle(title)
             .setContentText(text)
             .setSmallIcon(R.drawable.ic_speed_notification)
+            .setContentIntent(openAppPendingIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
-            .setSilent(true) // Ensures no sound/vibrate on update
+            .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_SERVICE)
-            .setDeleteIntent(deletePendingIntent)
+            .setCategory(NotificationCompat.CATEGORY_STATUS) // System status category
+            .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setGroup("com.tphimx.speed_status") // Unique group to avoid stacking with other notifications
+            .setGroupSummary(false)
+            .setShowWhen(false)
             .build()
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val manager = getSystemService(NotificationManager::class.java)
+            
+            // Delete old channel if exists to apply new settings
+            // manager.deleteNotificationChannel(CHANNEL_ID)
+
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
                 txtTitle,
-                NotificationManager.IMPORTANCE_HIGH // High importance to stay at top
+                NotificationManager.IMPORTANCE_HIGH
             ).apply {
-                description = txtTitle
+                description = "Hiển thị tốc độ mạng thời gian thực"
                 setShowBadge(false)
                 enableLights(false)
-                enableVibration(false) // No vibration
-                setSound(null, null) // No sound
+                enableVibration(false)
+                setSound(null, null)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
-            val manager = getSystemService(NotificationManager::class.java)
             manager.createNotificationChannel(serviceChannel)
         }
     }
 }
 
-/**
- * BroadcastReceiver to restart the service if it's cleared or killed
- */
 class SpeedServiceRestarter : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
-        val handler = Handler(Looper.getMainLooper())
-        handler.postDelayed({
-            val serviceIntent = Intent(context, SpeedNotificationService::class.java)
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                context.startForegroundService(serviceIntent)
-            } else {
-                context.startService(serviceIntent)
-            }
-        }, 1000)
+        val serviceIntent = Intent(context, SpeedNotificationService::class.java)
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            context.startForegroundService(serviceIntent)
+        } else {
+            context.startService(serviceIntent)
+        }
     }
 }

@@ -14,6 +14,7 @@ enum DownloadStatus { pending, downloading, paused, completed, error }
 class DownloadTask {
   final String id;
   final String movieId;
+  final String episodeId; // Added explicitly
   final String movieTitle;
   final String episodeTitle;
   final String url;
@@ -33,6 +34,7 @@ class DownloadTask {
   DownloadTask({
     required this.id,
     required this.movieId,
+    required this.episodeId,
     required this.movieTitle,
     required this.episodeTitle,
     required this.url,
@@ -53,6 +55,7 @@ class DownloadTask {
   Map<String, dynamic> toJson() => {
     'id': id,
     'movieId': movieId,
+    'episodeId': episodeId,
     'movieTitle': movieTitle,
     'episodeTitle': episodeTitle,
     'url': url,
@@ -73,6 +76,7 @@ class DownloadTask {
   factory DownloadTask.fromJson(Map<String, dynamic> json) => DownloadTask(
     id: json['id'],
     movieId: json['movieId'],
+    episodeId: json['episodeId'] ?? '',
     movieTitle: json['movieTitle'],
     episodeTitle: json['episodeTitle'],
     url: json['url'],
@@ -139,15 +143,24 @@ class TxaDownloadManager extends ChangeNotifier {
     await prefs.setString('txa_download_tasks', data);
   }
 
+  bool isTaskActive(String movieId, String episodeId) {
+    return _tasks.any((t) =>
+        t.movieId == movieId &&
+        t.episodeId == episodeId &&
+        t.status != DownloadStatus.completed &&
+        t.status != DownloadStatus.error);
+  }
+
   Future<void> addTask({
     required String movieId,
+    required String episodeId,
     required String movieTitle,
     required String episodeTitle,
     required String url,
     required String poster,
     required String format,
   }) async {
-    final id = _generateTaskId("$movieId-$episodeTitle");
+    final id = _generateTaskId("$movieId-$episodeId");
     if (_tasks.any((t) => t.id == id)) {
       TxaLogger.log("Task already exists: $id");
       return;
@@ -157,6 +170,7 @@ class TxaDownloadManager extends ChangeNotifier {
     final task = DownloadTask(
       id: id,
       movieId: movieId,
+      episodeId: episodeId,
       movieTitle: movieTitle,
       episodeTitle: episodeTitle,
       url: url,

@@ -1052,91 +1052,196 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
 
     if (!mounted) return;
     final movieData = _data;
-    final currentIdx = _selectedServerIndex;
     if (movieData == null) return;
 
     final servers = movieData['servers'] as List? ?? [];
     if (servers.isEmpty) return;
 
+    int tempServerIndex = _selectedServerIndex;
+
     showModalBottomSheet(
       context: context,
       backgroundColor: TxaTheme.primaryBg,
+      isScrollControlled: true,
       shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        borderRadius: BorderRadius.vertical(top: Radius.circular(25)),
       ),
       builder: (ctx) {
         return StatefulBuilder(
           builder: (ctx, setModalState) {
-            final currentServer = servers[currentIdx];
+            final currentServer = servers[tempServerIndex];
             final episodes = currentServer['server_data'] as List? ?? [];
 
             return Container(
-              padding: const EdgeInsets.all(20),
+              constraints: BoxConstraints(
+                maxHeight: MediaQuery.of(context).size.height * 0.8,
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 20),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 20),
+                    decoration: BoxDecoration(
+                      color: Colors.white24,
+                      borderRadius: BorderRadius.circular(2),
+                    ),
+                  ),
                   Row(
                     mainAxisAlignment: MainAxisAlignment.spaceBetween,
                     children: [
-                      Text(
-                        TxaLanguage.t('download'),
-                        style: const TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
-                        ),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            TxaLanguage.t('download'),
+                            style: const TextStyle(
+                              fontSize: 20,
+                              fontWeight: FontWeight.w900,
+                              color: Colors.white,
+                            ),
+                          ),
+                          Text(
+                            movieData['movie']['name'],
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: TxaTheme.textMuted,
+                            ),
+                          ),
+                        ],
                       ),
-                      IconButton(
-                        onPressed: () => Navigator.pop(ctx),
-                        icon: const Icon(Icons.close, color: Colors.white),
+                      _ServerPicker(
+                        servers: servers,
+                        selectedIndex: tempServerIndex,
+                        onChanged: (idx) {
+                          setModalState(() => tempServerIndex = idx);
+                        },
                       ),
                     ],
                   ),
-                  const SizedBox(height: 10),
-                  // ... logic continues ...
+                  const SizedBox(height: 20),
                   Expanded(
-                    child: ListView.builder(
-                      shrinkWrap: true,
+                    child: ListView.separated(
                       itemCount: episodes.length,
+                      separatorBuilder: (ctx, i) =>
+                          const Divider(color: Colors.white10, height: 1),
                       itemBuilder: (ctx, i) {
                         final ep = episodes[i];
+                        
+                        // Standardize episode name
+                        String epName = ep['name'].toString().trim();
+                        final isNumeric = RegExp(r'^\d+$').hasMatch(epName);
+                        final hasEpisodePrefix =
+                            epName.toLowerCase().contains('tập');
+                        if (!hasEpisodePrefix &&
+                            (isNumeric || epName.length <= 3)) {
+                          epName = "${TxaLanguage.t('episode')} $epName";
+                        }
+
+                        // Check if already downloading in manager
+                        final isDownloading = TxaDownloadManager().isTaskActive(
+                          movieData['movie']['id'].toString(),
+                          ep['id'].toString(),
+                        );
+
                         return ListTile(
+                          contentPadding: EdgeInsets.zero,
                           title: Text(
-                            ep['name'],
-                            style: const TextStyle(color: Colors.white),
+                            epName,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
-                          trailing: const Icon(
-                            Icons.download_rounded,
-                            color: TxaTheme.accent,
+                          subtitle: Text(
+                            currentServer['server_name'],
+                            style: const TextStyle(
+                              color: TxaTheme.textMuted,
+                              fontSize: 11,
+                            ),
                           ),
-                          onTap: () async {
-                            Navigator.pop(ctx);
-                            final linkData = await TxaApi().getEpisodeLink(
-                              ep['link'],
-                            );
-                            final downloadUrl =
-                                (linkData != null && linkData['data'] != null)
-                                ? linkData['data']['link'] ?? ''
-                                : '';
-                            if (downloadUrl.isNotEmpty) {
-                              TxaDownloadManager().addTask(
-                                movieId: movieData['movie']['id'].toString(),
-                                movieTitle: movieData['movie']['name'],
-                                episodeTitle: ep['name'],
-                                url: downloadUrl,
-                                poster: movieData['movie']['thumb_url'],
-                                format: downloadUrl.contains('.m3u8')
-                                    ? 'm3u8'
-                                    : 'mp4',
-                              );
-                              if (mounted) {
-                                TxaToast.show(
-                                  context,
-                                  TxaLanguage.t('added_to_download'),
-                                );
-                              }
-                            }
-                          },
+                          trailing: isDownloading
+                              ? Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 4,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: TxaTheme.accent.withValues(
+                                      alpha: 0.1,
+                                    ),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: const Text(
+                                    'Downloading...',
+                                    style: TextStyle(
+                                      color: TxaTheme.accent,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                )
+                              : Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: Colors.white.withValues(alpha: 0.05),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: const Icon(
+                                    Icons.download_rounded,
+                                    color: TxaTheme.accent,
+                                    size: 18,
+                                  ),
+                                ),
+                          onTap: isDownloading
+                              ? null
+                              : () async {
+                                  // Show small loading on the list item? 
+                                  // For simplicity, just close or update state
+                                  setModalState(() {}); // Trigger rebuild to show "Adding..." if we had that state
+                                  
+                                  final linkData = await TxaApi().getEpisodeLink(
+                                    ep['link'],
+                                  );
+                                  final downloadUrl = (linkData != null &&
+                                          linkData['data'] != null)
+                                      ? linkData['data']['link'] ?? ''
+                                      : '';
+
+                                  if (downloadUrl.isNotEmpty) {
+                                    TxaDownloadManager().addTask(
+                                      movieId: movieData['movie']['id']
+                                          .toString(),
+                                      movieTitle: movieData['movie']['name'],
+                                      episodeId: ep['id'].toString(),
+                                      episodeTitle: epName,
+                                      url: downloadUrl,
+                                      poster: movieData['movie']['thumb_url'],
+                                      format: downloadUrl.contains('.m3u8')
+                                          ? 'm3u8'
+                                          : 'mp4',
+                                    );
+                                    
+                                    if (mounted) {
+                                      TxaToast.show(
+                                        context,
+                                        TxaLanguage.t('added_to_download'),
+                                      );
+                                    }
+                                    setModalState(() {}); // Update list to show "Downloading"
+                                  } else {
+                                    if (mounted) {
+                                      TxaToast.show(
+                                        context,
+                                        TxaLanguage.t('cannot_download_update'),
+                                        isError: true,
+                                      );
+                                    }
+                                  }
+                                },
                         );
                       },
                     ),

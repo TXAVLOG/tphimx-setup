@@ -11,6 +11,7 @@ import '../theme/txa_theme.dart';
 import '../widgets/txa_nav.dart';
 import '../pages/search_screen.dart';
 import '../pages/schedule_screen.dart';
+import '../pages/update_history_screen.dart';
 import '../pages/account_screen.dart';
 import '../pages/notification_screen.dart';
 import '../pages/premium_screen.dart';
@@ -824,13 +825,25 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.0.0';
-                  final build = snapshot.data?.buildNumber ?? '400';
-                  return Text(
-                    'Version $version (Build $build)',
-                    style: const TextStyle(
-                      color: TxaTheme.textMuted,
-                      fontSize: 12,
+                  final version = snapshot.data?.version ?? '4.0.1';
+                  final build = snapshot.data?.buildNumber ?? '401';
+                  return InkWell(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (ctx) => const UpdateHistoryScreen(),
+                      ),
+                    ),
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Text(
+                        'Version $version (Build $build)',
+                        style: const TextStyle(
+                          color: TxaTheme.textMuted,
+                          fontSize: 12,
+                        ),
+                      ),
                     ),
                   );
                 },

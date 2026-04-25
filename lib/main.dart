@@ -133,17 +133,15 @@ class _TPhimXAppState extends State<TPhimXApp> {
           iOS: darwinInit,
         ),
         onDidReceiveNotificationResponse: (response) {
-          final payload = response.payload;
-          if (payload != null && payload.startsWith('movie_detail:')) {
-            final slug = payload.split(':')[1];
-            _navigatorKey.currentState?.push(
-              MaterialPageRoute(
-                builder: (ctx) => MovieDetailScreen(slug: slug),
-              ),
-            );
-          }
+          _handleNotificationPayload(response.payload);
         },
       );
+
+      // Handle notification if app was launched from it
+      final launchDetails = await plugin.getNotificationAppLaunchDetails();
+      if (launchDetails?.didNotificationLaunchApp ?? false) {
+        _handleNotificationPayload(launchDetails?.notificationResponse?.payload);
+      }
 
       if (Platform.isIOS) {
         await plugin
@@ -153,6 +151,32 @@ class _TPhimXAppState extends State<TPhimXApp> {
     } catch (e) {
       TxaLogger.log('[Notification] Init failed in AppState: $e');
     }
+  }
+
+  void _handleNotificationPayload(String? payload) {
+    if (payload == null || !payload.startsWith('movie_detail:')) return;
+
+    final parts = payload.split(':');
+    if (parts.length < 2) return;
+    final slug = parts[1];
+    if (slug.isEmpty) return;
+
+    TxaLogger.log('[Notification] Deep linking to movie: $slug');
+
+    // Polling until navigator is ready (max 5 seconds)
+    int attempts = 0;
+    Timer.periodic(const Duration(milliseconds: 300), (timer) {
+      attempts++;
+      if (_navigatorKey.currentState != null) {
+        timer.cancel();
+        _navigatorKey.currentState?.push(
+          MaterialPageRoute(builder: (ctx) => MovieDetailScreen(slug: slug)),
+        );
+      } else if (attempts > 15) {
+        timer.cancel();
+        TxaLogger.log('[Notification] Navigator state timeout', isError: true);
+      }
+    });
   }
 
   void _initDeepLinks() async {

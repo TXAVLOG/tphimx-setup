@@ -69,21 +69,30 @@ class TxaSpeedService {
     _currentDownload = 0;
     _currentUpload = 0;
     
+    StreamSubscription? subscription;
+    
     try {
+      subscription = _speedChecker.speedTestResultStream.listen((result) {
+        // Use dynamic to access properties safely across different plugin versions
+        final res = result as dynamic;
+        _currentDownload = (res.download as num?)?.toDouble() ?? 0;
+        _currentUpload = (res.upload as num?)?.toDouble() ?? 0;
+        
+        if (onProgress != null) onProgress(_currentDownload, _currentUpload);
+      }, onError: (e) {
+        TxaLogger.log('Speed test stream error: $e');
+      }, onDone: () {
+        _isTesting = false;
+      });
+
       _speedChecker.startSpeedTest();
       
-      Timer.periodic(const Duration(milliseconds: 500), (timer) {
-        if (!_isTesting) {
-          timer.cancel();
-          return;
-        }
-        if (onProgress != null) onProgress(_currentDownload, _currentUpload);
-      });
-      
-      await Future.delayed(const Duration(seconds: 5));
+      // Wait for a reasonable time or until done
+      await Future.delayed(const Duration(seconds: 30));
     } catch (e) {
       TxaLogger.log('Speed test error: $e');
     } finally {
+      subscription?.cancel();
       _isTesting = false;
     }
   }
@@ -106,6 +115,9 @@ class TxaSpeedService {
         'txtMobile': TxaLanguage.t('network_mobile'),
         'txtEthernet': TxaLanguage.t('network_ethernet'),
         'txtUnknown': TxaLanguage.t('error_unknown'),
+        'txtUsage': TxaLanguage.t('network_usage'),
+        'txtTotal': TxaLanguage.t('total'),
+        'fontWeight': 900,
       };
       
       final bool? result = await _channel.invokeMethod('startSpeedService', translations);

@@ -20,6 +20,7 @@ import 'movie_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
 import '../utils/txa_format.dart';
 import 'download_manager_screen.dart';
+import 'update_history_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -165,6 +166,15 @@ class _AccountScreenState extends State<AccountScreen> {
               ],
             ),
           ),
+        ),
+      },
+      {
+        'id': 'update_history',
+        'label': TxaLanguage.t('update_history'),
+        'icon': Icons.history_rounded,
+        'action': () => Navigator.push(
+          context,
+          MaterialPageRoute(builder: (ctx) => const UpdateHistoryScreen()),
         ),
       },
     ];
@@ -642,17 +652,29 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.0.0';
-                  final buildNumber = snapshot.data?.buildNumber ?? '400';
-                  return Text(
-                    TxaLanguage.t(
-                      'current_version',
-                      replace: {'version': '$version (Build $buildNumber)'},
+                  final version = snapshot.data?.version ?? '4.0.1';
+                  final buildNumber = snapshot.data?.buildNumber ?? '401';
+                  return InkWell(
+                    onTap: () => Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (ctx) => const UpdateHistoryScreen(),
+                      ),
                     ),
-                    style: const TextStyle(
-                      color: TxaTheme.textMuted,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w400,
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.all(4.0),
+                      child: Text(
+                        TxaLanguage.t(
+                          'current_version',
+                          replace: {'version': '$version (Build $buildNumber)'},
+                        ),
+                        style: const TextStyle(
+                          color: TxaTheme.textMuted,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
                     ),
                   );
                 },

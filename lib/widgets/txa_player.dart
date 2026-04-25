@@ -783,9 +783,10 @@ class _TxaPlayerState extends State<TxaPlayer>
           widget.servers[_currentServerIndex]['server_data'] as List;
       final ep = serverData[_currentEpisodeIndex];
       final slug = m['slug'] ?? m['id']?.toString() ?? '';
+      final epSlug = ep['slug']?.toString() ?? ep['id']?.toString() ?? '';
 
       final shareText =
-          '${m['name']} - Tập ${ep['name']}\nXem ngay tại: https://film.nrotxa.online/phim/$slug';
+          '${m['name']} - Tập ${ep['name']}\nXem ngay tại: https://film.nrotxa.online/xem-phim/$slug/$epSlug';
 
       final bannerUrl = m['poster_url'] ?? m['thumb_url'] ?? '';
       if (bannerUrl.isNotEmpty) {

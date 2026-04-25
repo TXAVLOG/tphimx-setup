@@ -7,8 +7,8 @@ class TxaApi {
   static const String baseUrl = 'https://film.nrotxa.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '4.0.0';
-  static const String buildNumber = '400';
+  static const String apiVersion = '4.0.1';
+  static const String buildNumber = '401';
 
   // Community Links
   static const String facebookFanpage =
@@ -210,6 +210,12 @@ class TxaApi {
   Future<Map<String, dynamic>> getCheckUpdate() async {
     final response = await get(checkUpdate);
     return response.data;
+  }
+
+  /// Lấy lịch sử cập nhật
+  Future<List<dynamic>> getChangelog() async {
+    final response = await get(changelog);
+    return response.data as List<dynamic>;
   }
 
   /// Track search click
