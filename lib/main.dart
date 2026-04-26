@@ -97,7 +97,7 @@ class TPhimXApp extends StatefulWidget {
   State<TPhimXApp> createState() => _TPhimXAppState();
 }
 
-class _TPhimXAppState extends State<TPhimXApp> {
+class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
   final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
@@ -105,6 +105,8 @@ class _TPhimXAppState extends State<TPhimXApp> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
+    TxaSettings.isAppForeground = true;
     _initDeepLinks();
     _initNotifications();
     TxaSettings.onSettingsChanged = () {
@@ -113,6 +115,15 @@ class _TPhimXAppState extends State<TPhimXApp> {
     TxaLanguage.onLanguageChanged = () {
       if (mounted) setState(() {});
     };
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      TxaSettings.isAppForeground = true;
+    } else {
+      TxaSettings.isAppForeground = false;
+    }
   }
 
   void _initNotifications() async {
@@ -206,6 +217,7 @@ class _TPhimXAppState extends State<TPhimXApp> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _linkSubscription?.cancel();
     super.dispose();
   }

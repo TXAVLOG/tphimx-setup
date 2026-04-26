@@ -7,12 +7,14 @@ class TxaDownloadDialog extends StatefulWidget {
   final String url;
   final String filename;
   final Function(String path)? onFinished;
+  final Function()? onCancel;
 
   const TxaDownloadDialog({
     super.key,
     required this.url,
     required this.filename,
     this.onFinished,
+    this.onCancel,
   });
 
   @override
@@ -24,6 +26,7 @@ class TxaDownloadDialog extends StatefulWidget {
     String url,
     String filename, {
     Function(String path)? onFinished,
+    Function()? onCancel,
   }) {
     return showDialog(
       context: context,
@@ -32,6 +35,7 @@ class TxaDownloadDialog extends StatefulWidget {
         url: url,
         filename: filename,
         onFinished: onFinished,
+        onCancel: onCancel,
       ),
     );
   }
@@ -179,6 +183,7 @@ class _TxaDownloadDialogState extends State<TxaDownloadDialog> {
                     child: OutlinedButton(
                       onPressed: () {
                         _downloader.cancelDownload();
+                        if (widget.onCancel != null) widget.onCancel!();
                         Navigator.pop(context);
                       },
                       style: OutlinedButton.styleFrom(

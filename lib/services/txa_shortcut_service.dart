@@ -51,6 +51,13 @@ class TxaShortcutService {
       ));
     }
 
+    // 3. App Version Info
+    items.add(ShortcutItem(
+      type: 'action_app_version',
+      localizedTitle: "v${TxaLanguage.t('app_name')}: 4.0.1",
+      icon: 'ic_info_shortcut',
+    ));
+
     _quickActions.setShortcutItems(items);
   }
 }

@@ -109,6 +109,11 @@ class _HomeScreenState extends State<HomeScreen> {
         localizedTitle: TxaLanguage.t('check_update'),
         icon: 'ic_launcher',
       ),
+      ShortcutItem(
+        type: 'action_app_version',
+        localizedTitle: "v${TxaLanguage.t('app_name')}: 4.0.1",
+        icon: 'ic_info_shortcut',
+      ),
     ]);
   }
 
@@ -427,11 +432,13 @@ class _HomeScreenState extends State<HomeScreen> {
     final resolved = await TxaUrlResolve.resolve(rawUrl);
     if (resolved['success']) {
       if (!mounted) return;
+      TxaSettings.isUpdateDownloading = true;
       TxaDownloadDialog.show(
         context,
         resolved['url'],
         filename,
         onFinished: (path) async {
+          TxaSettings.isUpdateDownloading = false;
           TxaLogger.log('Download finished, opening installer: $path');
           final result = await OpenFile.open(path);
           if (!mounted) return;
@@ -439,8 +446,12 @@ class _HomeScreenState extends State<HomeScreen> {
             TxaToast.show(context, "Error: ${result.message}", isError: true);
           }
         },
+        onCancel: () {
+          TxaSettings.isUpdateDownloading = false;
+        },
       );
     } else {
+      TxaSettings.isUpdateDownloading = false;
       if (!mounted) return;
       TxaToast.show(
         context,

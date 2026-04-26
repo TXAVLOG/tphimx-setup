@@ -194,4 +194,14 @@ class TxaSettings {
   // --- iOS Specific ---
   static String get udid => _prefs.getString('ios_device_udid') ?? '';
   static set udid(String v) => _prefs.setString('ios_device_udid', v);
+
+  // --- App State flags for Background Tasks ---
+  static bool get isUpdateDownloading => _prefs.getBool('is_update_downloading') ?? false;
+  static set isUpdateDownloading(bool v) => _prefs.setBool('is_update_downloading', v);
+
+  static bool get isAppForeground => _prefs.getBool('is_app_foreground') ?? false;
+  static set isAppForeground(bool v) => _prefs.setBool('is_app_foreground', v);
+
+  static String get lastNotifiedUpdateVersion => _prefs.getString('last_notified_update_version') ?? '';
+  static set lastNotifiedUpdateVersion(String v) => _prefs.setString('last_notified_update_version', v);
 }

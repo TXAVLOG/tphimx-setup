@@ -22,21 +22,32 @@ void callbackDispatcher() {
       const initSettings = InitializationSettings(android: androidInit);
       await notificationsPlugin.initialize(settings: initSettings);
 
-      // 2. Check for App Updates
-      final updateData = await api.getCheckUpdate();
-      final Map<String, dynamic>? appData = updateData['data'];
-      final String latestVersion = appData?['latest_version'] ?? '';
-      
-      final packageInfo = await PackageInfo.fromPlatform();
-      final String currentVersion = packageInfo.version;
-      
-      if (latestVersion.isNotEmpty && _isNewer(latestVersion, currentVersion)) {
-        await _showNotification(
-          notificationsPlugin,
-          999,
-          TxaLanguage.t('update_available'),
-          '${TxaLanguage.t('version_label', replace: {'version': latestVersion})}. ${TxaLanguage.t('update_now')}!',
-        );
+      // 2. Check for App Updates (Skip if app is open or already downloading)
+      if (!TxaSettings.isAppForeground && !TxaSettings.isUpdateDownloading) {
+        final updateData = await api.getCheckUpdate();
+        final Map<String, dynamic>? appData = updateData['data'];
+        final String latestVersion = appData?['latest_version'] ?? '';
+        
+        final packageInfo = await PackageInfo.fromPlatform();
+        final String currentVersion = packageInfo.version;
+        
+        if (latestVersion.isNotEmpty && _isNewer(latestVersion, currentVersion)) {
+          final lastNotified = TxaSettings.lastNotifiedUpdateVersion;
+          
+          // Only show notification if it's a new version we haven't notified about yet
+          if (lastNotified != latestVersion) {
+            await _showNotification(
+              notificationsPlugin,
+              999,
+              TxaLanguage.t('update_available'),
+              '${TxaLanguage.t('version_label', replace: {'version': latestVersion})}. ${TxaLanguage.t('update_now')}!',
+              silent: true, // Always silent as per user request
+              channelId: 'txa_update_channel',
+              channelName: 'App Updates',
+            );
+            TxaSettings.lastNotifiedUpdateVersion = latestVersion;
+          }
+        }
       }
 
       // 3. Check for New Episode Notifications (Favorites)
@@ -148,6 +159,9 @@ Future<void> _showNotification(
   String body, {
   String? payload,
   String? groupKey,
+  bool silent = false,
+  String channelId = 'txa_background_channel',
+  String channelName = 'TPhimX Background Service',
 }) async {
   final List<AndroidNotificationAction> actions = [];
   if (payload != null && payload.startsWith('movie_detail:')) {
@@ -161,13 +175,13 @@ Future<void> _showNotification(
   }
 
   final androidDetails = AndroidNotificationDetails(
-    'txa_background_channel',
-    'TPhimX Background Service',
+    channelId,
+    channelName,
     channelDescription: 'System notifications for updates and schedules',
-    importance: Importance.high,
-    priority: Priority.high,
-    playSound: true,
-    enableVibration: true,
+    importance: silent ? Importance.low : Importance.high,
+    priority: silent ? Priority.low : Priority.high,
+    playSound: !silent,
+    enableVibration: !silent,
     groupKey: groupKey,
     setAsGroupSummary: false,
     actions: actions,
