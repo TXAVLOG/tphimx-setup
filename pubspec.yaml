@@ -73,6 +73,7 @@ dependencies:
   cast_plus: ^2.0.0
   screenshot: 3.0.0
   flutter_screenshot_detect: 0.1.7
+  fluttertoast: ^8.2.10
 dev_dependencies:
   flutter_test:
     sdk: flutter

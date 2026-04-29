@@ -51,11 +51,11 @@ class TxaShortcutService {
       ));
     }
 
-    // 3. App Version Info
+    // 3. Check for Updates
     items.add(ShortcutItem(
-      type: 'action_app_version',
-      localizedTitle: "v${TxaLanguage.t('app_name')}: 4.0.1",
-      icon: 'ic_info_shortcut',
+      type: 'action_check_update',
+      localizedTitle: TxaLanguage.t('check_update'),
+      icon: 'ic_update_shortcut',
     ));
 
     _quickActions.setShortcutItems(items);

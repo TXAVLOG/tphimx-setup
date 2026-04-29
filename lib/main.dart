@@ -374,6 +374,9 @@ class _MainEntryState extends State<MainEntry> {
         case 'action_player_close':
           miniProvider.close();
           break;
+        case 'action_check_update':
+          TxaBackgroundService.manualCheckUpdate();
+          break;
       }
     });
 

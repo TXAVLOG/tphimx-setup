@@ -6,6 +6,8 @@ import '../services/txa_api.dart';
 import '../services/txa_settings.dart';
 import '../services/txa_language.dart';
 import '../utils/txa_logger.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter/material.dart';
 
 @pragma('vm:entry-point')
 void callbackDispatcher() {
@@ -253,5 +255,68 @@ class TxaBackgroundService {
       ),
       existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
     );
+  }
+
+  static Future<void> manualCheckUpdate() async {
+    try {
+      Fluttertoast.showToast(
+        msg: TxaLanguage.t('checking_update'),
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.black87,
+        textColor: Colors.white,
+      );
+
+      final api = TxaApi();
+      final updateData = await api.getCheckUpdate();
+      final Map<String, dynamic>? appData = updateData['data'];
+      final String latestVersion = appData?['latest_version'] ?? '';
+
+      final packageInfo = await PackageInfo.fromPlatform();
+      final String currentVersion = packageInfo.version;
+
+      if (latestVersion.isNotEmpty && _isNewer(latestVersion, currentVersion)) {
+        // New update found
+        final notificationsPlugin = FlutterLocalNotificationsPlugin();
+        const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+        const initSettings = InitializationSettings(android: androidInit);
+        await notificationsPlugin.initialize(settings: initSettings);
+
+        await _showNotification(
+          notificationsPlugin,
+          999,
+          TxaLanguage.t('update_available'),
+          '${TxaLanguage.t('version_label', replace: {'version': latestVersion})}. ${TxaLanguage.t('update_now')}!',
+          channelId: 'txa_update_channel',
+          channelName: 'App Updates',
+        );
+
+        Fluttertoast.showToast(
+          msg: "${TxaLanguage.t('update_available')}: v$latestVersion",
+          toastLength: Toast.LENGTH_LONG,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.green,
+          textColor: Colors.white,
+        );
+      } else {
+        // Up to date
+        Fluttertoast.showToast(
+          msg: TxaLanguage.t('up_to_date', replace: {'version': currentVersion}),
+          toastLength: Toast.LENGTH_SHORT,
+          gravity: ToastGravity.BOTTOM,
+          backgroundColor: Colors.blueAccent,
+          textColor: Colors.white,
+        );
+      }
+    } catch (e) {
+      TxaLogger.log('[Manual Update] Error: $e', isError: true);
+      Fluttertoast.showToast(
+        msg: TxaLanguage.t('update_error'),
+        toastLength: Toast.LENGTH_SHORT,
+        gravity: ToastGravity.BOTTOM,
+        backgroundColor: Colors.redAccent,
+        textColor: Colors.white,
+      );
+    }
   }
 }
