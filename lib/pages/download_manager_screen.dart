@@ -4,9 +4,11 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../services/txa_download_manager.dart';
 import '../services/txa_language.dart';
 import '../theme/txa_theme.dart';
+import '../widgets/txa_player.dart';
 
 class DownloadManagerScreen extends StatefulWidget {
-  const DownloadManagerScreen({super.key});
+  final bool isOfflineMode;
+  const DownloadManagerScreen({super.key, this.isOfflineMode = false});
 
   @override
   State<DownloadManagerScreen> createState() => _DownloadManagerScreenState();
@@ -15,6 +17,7 @@ class DownloadManagerScreen extends StatefulWidget {
 class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
   bool _isSelectionMode = false;
   final Set<String> _selectedMovies = {};
+  String? _expandedMovieId;
 
   @override
   Widget build(BuildContext context) {
@@ -23,6 +26,7 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
+        automaticallyImplyLeading: !widget.isOfflineMode,
         title: Text(
           TxaLanguage.t('download_manager'),
           style: const TextStyle(
@@ -97,7 +101,6 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
               final totalCount = movieTasks.length;
               final isAllDone = completedCount == totalCount;
 
-              // Calculate overall progress for overlay fill effect
               double overallProgress = 0;
               if (totalCount > 0) {
                 overallProgress =
@@ -105,190 +108,206 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
                     (totalCount * 100);
               }
 
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: InkWell(
-                  onTap: () {
-                    if (_isSelectionMode) {
-                      setState(() {
-                        if (_selectedMovies.contains(mid)) {
-                          _selectedMovies.remove(mid);
+              return Column(
+                children: [
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: InkWell(
+                      onTap: () {
+                        if (_isSelectionMode) {
+                          setState(() {
+                            if (_selectedMovies.contains(mid)) {
+                              _selectedMovies.remove(mid);
+                            } else {
+                              _selectedMovies.add(mid);
+                            }
+                          });
                         } else {
-                          _selectedMovies.add(mid);
+                          setState(() {
+                            if (_expandedMovieId == mid) {
+                              _expandedMovieId = null;
+                            } else {
+                              _expandedMovieId = mid;
+                            }
+                          });
                         }
-                      });
-                    } else {
-                      // Show detailed episode list for this movie
-                    }
-                  },
-                  borderRadius: BorderRadius.circular(12),
-                  child: Container(
-                    height: 100,
-                    decoration: BoxDecoration(
-                      color: TxaTheme.cardBg,
+                      },
                       borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: _selectedMovies.contains(mid)
-                            ? TxaTheme.accent
-                            : TxaTheme.glassBorder,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        // Movie Poster with Fill-up Overlay
-                        Stack(
+                      child: Container(
+                        height: 100,
+                        decoration: BoxDecoration(
+                          color: TxaTheme.cardBg,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: _selectedMovies.contains(mid)
+                                ? TxaTheme.accent
+                                : TxaTheme.glassBorder,
+                          ),
+                        ),
+                        child: Row(
                           children: [
-                            ClipRRect(
-                              borderRadius: const BorderRadius.horizontal(
-                                left: Radius.circular(12),
-                              ),
-                              child: CachedNetworkImage(
-                                imageUrl: firstTask.poster,
-                                width: 70,
-                                height: 100,
-                                fit: BoxFit.cover,
+                            Stack(
+                              children: [
+                                ClipRRect(
+                                  borderRadius: const BorderRadius.horizontal(
+                                    left: Radius.circular(12),
+                                  ),
+                                  child: CachedNetworkImage(
+                                    imageUrl: firstTask.poster,
+                                    width: 70,
+                                    height: 100,
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                                if (!isAllDone)
+                                  ClipRRect(
+                                    borderRadius: const BorderRadius.horizontal(
+                                      left: Radius.circular(12),
+                                    ),
+                                    child: Container(
+                                      width: 70,
+                                      height: 100,
+                                      alignment: Alignment.bottomCenter,
+                                      child: Container(
+                                        height: 100 * (1 - overallProgress),
+                                        color: Colors.black.withValues(
+                                          alpha: 0.6,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                if (!isAllDone)
+                                  const Positioned.fill(
+                                    child: Center(
+                                      child: SizedBox(
+                                        width: 24,
+                                        height: 24,
+                                        child: CircularProgressIndicator(
+                                          strokeWidth: 2,
+                                          color: TxaTheme.accent,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                if (_isSelectionMode)
+                                  Positioned(
+                                    top: 4,
+                                    left: 4,
+                                    child: Icon(
+                                      _selectedMovies.contains(mid)
+                                          ? Icons.check_circle_rounded
+                                          : Icons.radio_button_unchecked_rounded,
+                                      color: TxaTheme.accent,
+                                      size: 20,
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    firstTask.movieTitle,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 15,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  const SizedBox(height: 4),
+                                  Text(
+                                    TxaLanguage.t(
+                                      'downloaded_series_progress',
+                                      replace: {
+                                        'p': (overallProgress * 100)
+                                            .toInt()
+                                            .toString(),
+                                        'c': completedCount.toString(),
+                                        't': totalCount.toString(),
+                                      },
+                                    ),
+                                    style: const TextStyle(
+                                      color: TxaTheme.textMuted,
+                                      fontSize: 12,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (!isAllDone)
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: LinearProgressIndicator(
+                                            value: overallProgress,
+                                            backgroundColor: Colors.white10,
+                                            valueColor:
+                                                const AlwaysStoppedAnimation<
+                                                  Color
+                                                >(TxaTheme.accent),
+                                            minHeight: 4,
+                                            borderRadius: BorderRadius.circular(
+                                              2,
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        GestureDetector(
+                                          onTap:
+                                              () => manager.prioritizeMovie(
+                                                mid,
+                                              ),
+                                          child: Container(
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 4,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: TxaTheme.accent.withValues(
+                                                alpha: 0.1,
+                                              ),
+                                              borderRadius:
+                                                  BorderRadius.circular(4),
+                                              border: Border.all(
+                                                color: TxaTheme.accent
+                                                    .withValues(alpha: 0.5),
+                                              ),
+                                            ),
+                                            child: Text(
+                                              TxaLanguage.t(
+                                                'priority_download',
+                                              ),
+                                              style: const TextStyle(
+                                                color: TxaTheme.accent,
+                                                fontSize: 9,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                ],
                               ),
                             ),
-                            // FILL-UP OVERLAY EFFECT
-                            if (!isAllDone)
-                              ClipRRect(
-                                borderRadius: const BorderRadius.horizontal(
-                                  left: Radius.circular(12),
-                                ),
-                                child: Container(
-                                  width: 70,
-                                  height: 100,
-                                  alignment: Alignment.bottomCenter,
-                                  child: Container(
-                                    height: 100 * (1 - overallProgress),
-                                    color: Colors.black.withValues(alpha: 0.6),
-                                  ),
-                                ),
+                            IconButton(
+                              onPressed: () => _showMovieActions(mid),
+                              icon: const Icon(
+                                Icons.more_vert_rounded,
+                                color: TxaTheme.textMuted,
                               ),
-                            if (!isAllDone)
-                              const Positioned.fill(
-                                child: Center(
-                                  child: SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: TxaTheme.accent,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                            if (_isSelectionMode)
-                              Positioned(
-                                top: 4,
-                                left: 4,
-                                child: Icon(
-                                  _selectedMovies.contains(mid)
-                                      ? Icons.check_circle_rounded
-                                      : Icons.radio_button_unchecked_rounded,
-                                  color: TxaTheme.accent,
-                                  size: 20,
-                                ),
-                              ),
+                            ),
                           ],
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                firstTask.movieTitle,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                TxaLanguage.t(
-                                  'downloaded_series_progress',
-                                  replace: {
-                                    'p': (overallProgress * 100)
-                                        .toInt()
-                                        .toString(),
-                                    'c': completedCount.toString(),
-                                    't': totalCount.toString(),
-                                  },
-                                ),
-                                style: const TextStyle(
-                                  color: TxaTheme.textMuted,
-                                  fontSize: 12,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              if (!isAllDone)
-                                Row(
-                                  children: [
-                                    Expanded(
-                                      child: LinearProgressIndicator(
-                                        value: overallProgress,
-                                        backgroundColor: Colors.white10,
-                                        valueColor:
-                                            const AlwaysStoppedAnimation<Color>(
-                                              TxaTheme.accent,
-                                            ),
-                                        minHeight: 4,
-                                        borderRadius: BorderRadius.circular(2),
-                                      ),
-                                    ),
-                                    const SizedBox(width: 12),
-                                    // Priority button
-                                    GestureDetector(
-                                      onTap: () => manager.prioritizeMovie(mid),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 4,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: TxaTheme.accent.withValues(
-                                            alpha: 0.1,
-                                          ),
-                                          borderRadius: BorderRadius.circular(
-                                            4,
-                                          ),
-                                          border: Border.all(
-                                            color: TxaTheme.accent.withValues(
-                                              alpha: 0.5,
-                                            ),
-                                          ),
-                                        ),
-                                        child: Text(
-                                          TxaLanguage.t('priority_download'),
-                                          style: const TextStyle(
-                                            color: TxaTheme.accent,
-                                            fontSize: 9,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () => _showMovieActions(mid),
-                          icon: const Icon(
-                            Icons.more_vert_rounded,
-                            color: TxaTheme.textMuted,
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
-                ),
+                  if (_expandedMovieId == mid)
+                    ...movieTasks.map((task) => _buildEpisodeItem(task)),
+                ],
               );
             },
           );
@@ -304,22 +323,124 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) => Column(
-        mainAxisSize: MainAxisSize.min,
+      builder:
+          (ctx) => Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              ListTile(
+                leading: const Icon(
+                  Icons.delete_outline_rounded,
+                  color: Colors.redAccent,
+                ),
+                title: Text(
+                  TxaLanguage.t('delete_movie_confirm'),
+                  style: const TextStyle(color: Colors.white),
+                ),
+                onTap: () {
+                  Navigator.pop(ctx);
+                  TxaDownloadManager().removeMovie(movieId);
+                },
+              ),
+            ],
+          ),
+    );
+  }
+
+  Widget _buildEpisodeItem(DownloadTask task) {
+    final manager = TxaDownloadManager();
+    final isDone = task.status == DownloadStatus.completed;
+    final isError = task.status == DownloadStatus.error;
+    final isDownloading = task.status == DownloadStatus.downloading;
+    final isPaused = task.status == DownloadStatus.paused;
+
+    return Container(
+      margin: const EdgeInsets.only(left: 24, right: 0, bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: TxaTheme.cardBg.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: TxaTheme.glassBorder),
+      ),
+      child: Row(
         children: [
-          ListTile(
-            leading: const Icon(
-              Icons.delete_outline_rounded,
-              color: Colors.redAccent,
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  task.episodeTitle,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                if (!isDone) ...[
+                  const SizedBox(height: 8),
+                  LinearProgressIndicator(
+                    value: task.progress / 100,
+                    backgroundColor: Colors.white10,
+                    color: isError ? Colors.redAccent : TxaTheme.accent,
+                    minHeight: 2,
+                    borderRadius: BorderRadius.circular(1),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isError
+                        ? (task.error ?? TxaLanguage.t('error'))
+                        : "${task.progress.toInt()}%",
+                    style: TextStyle(
+                      color: isError ? Colors.redAccent : TxaTheme.textMuted,
+                      fontSize: 10,
+                    ),
+                  ),
+                ],
+              ],
             ),
-            title: Text(
-              TxaLanguage.t('delete_movie_confirm'),
-              style: const TextStyle(color: Colors.white),
+          ),
+          const SizedBox(width: 8),
+          if (isDone)
+            IconButton(
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder:
+                        (context) => TxaPlayer(
+                          movie: {'id': task.movieId, 'name': task.movieTitle},
+                          servers: [],
+                          initialEpisodeId: task.episodeId,
+                          localPath: task.savePath,
+                          localTitle: task.episodeTitle,
+                        ),
+                  ),
+                );
+              },
+              icon: const Icon(
+                Icons.play_circle_fill_rounded,
+                color: TxaTheme.accent,
+                size: 28,
+              ),
+            )
+          else if (isDownloading)
+            IconButton(
+              onPressed: () => manager.pauseTask(task.id),
+              icon: const Icon(Icons.pause_rounded, color: Colors.white),
+            )
+          else if (isPaused || isError)
+            IconButton(
+              onPressed: () => manager.resumeTask(task.id),
+              icon: Icon(
+                Icons.play_arrow_rounded,
+                color: isError ? Colors.redAccent : Colors.white,
+              ),
             ),
-            onTap: () {
-              Navigator.pop(ctx);
-              TxaDownloadManager().removeMovie(movieId);
-            },
+          IconButton(
+            onPressed: () => manager.removeTask(task.id),
+            icon: const Icon(
+              Icons.close_rounded,
+              color: TxaTheme.textMuted,
+              size: 20,
+            ),
           ),
         ],
       ),
@@ -329,32 +450,36 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
   void _showDeleteConfirm() {
     showDialog(
       context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: TxaTheme.cardBg,
-        title: Text(
-          TxaLanguage.t('delete_all_confirm'),
-          style: const TextStyle(color: Colors.white),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(TxaLanguage.t('cancel')),
+      builder:
+          (ctx) => AlertDialog(
+            backgroundColor: TxaTheme.cardBg,
+            title: Text(
+              TxaLanguage.t('delete_all_confirm'),
+              style: const TextStyle(color: Colors.white),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(ctx),
+                child: Text(TxaLanguage.t('cancel')),
+              ),
+              TextButton(
+                onPressed: () {
+                  Navigator.pop(ctx);
+                  for (var mid in _selectedMovies) {
+                    TxaDownloadManager().removeMovie(mid);
+                  }
+                  setState(() {
+                    _isSelectionMode = false;
+                    _selectedMovies.clear();
+                  });
+                },
+                child: const Text(
+                  'Xóa',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+              ),
+            ],
           ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              for (var mid in _selectedMovies) {
-                TxaDownloadManager().removeMovie(mid);
-              }
-              setState(() {
-                _isSelectionMode = false;
-                _selectedMovies.clear();
-              });
-            },
-            child: const Text('Xóa', style: TextStyle(color: Colors.redAccent)),
-          ),
-        ],
-      ),
     );
   }
 }

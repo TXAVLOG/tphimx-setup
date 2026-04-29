@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:tphimx_setup/utils/txa_format.dart';
 import '../utils/txa_logger.dart';
 import 'txa_language.dart';
 
@@ -107,8 +108,13 @@ class TxaDownloadManager extends ChangeNotifier {
   List<DownloadTask> _tasks = [];
   List<DownloadTask> get tasks => _tasks;
 
-  final int _maxConcurrent = 3;
+  final int _maxConcurrent = 5;
   String _currentMovieDownloading = '';
+  final Map<String, CancelToken> _cancelTokens = {};
+  DateTime _lastSpeedCheck = DateTime.now();
+  int _lastBytes = 0;
+  String _currentSpeed = '0 KB/s';
+  String get currentSpeed => _currentSpeed;
 
   bool _initialized = false;
 
@@ -144,11 +150,13 @@ class TxaDownloadManager extends ChangeNotifier {
   }
 
   bool isTaskActive(String movieId, String episodeId) {
-    return _tasks.any((t) =>
-        t.movieId == movieId &&
-        t.episodeId == episodeId &&
-        t.status != DownloadStatus.completed &&
-        t.status != DownloadStatus.error);
+    return _tasks.any(
+      (t) =>
+          t.movieId == movieId &&
+          t.episodeId == episodeId &&
+          t.status != DownloadStatus.completed &&
+          t.status != DownloadStatus.error,
+    );
   }
 
   Future<void> addTask({
@@ -160,15 +168,23 @@ class TxaDownloadManager extends ChangeNotifier {
     required String poster,
     required String format,
   }) async {
-    final id = _generateTaskId("$movieId-$episodeId");
-    if (_tasks.any((t) => t.id == id)) {
-      TxaLogger.log("Task already exists: $id");
+    if (!_initialized) {
+      await init();
+    }
+    final String taskId = "${movieId}_$episodeId";
+    final bool isDuplicate = _tasks.any((t) => t.id == taskId);
+    if (isDuplicate) {
+      TxaLogger.log(
+        'Task already exists: $movieTitle - $episodeTitle',
+        tag: 'DOWNLOAD',
+        type: 'download',
+      );
       return;
     }
 
     final isHls = url.contains('.m3u8');
     final task = DownloadTask(
-      id: id,
+      id: taskId,
       movieId: movieId,
       episodeId: episodeId,
       movieTitle: movieTitle,
@@ -180,19 +196,20 @@ class TxaDownloadManager extends ChangeNotifier {
     );
 
     _tasks.add(task);
+    TxaLogger.log(
+      'Added download task: $movieTitle - $episodeTitle',
+      tag: 'DOWNLOAD',
+      type: 'download',
+    );
     await _saveTasks();
+    _processQueue();
     notifyListeners();
 
     if (isHls) {
-      _startHlsDownload(task);
+      _startDownloadTask(task);
     } else {
       _processQueue();
     }
-
-    TxaLogger.log(
-      "Added download task: $movieTitle - $episodeTitle",
-      isError: false,
-    );
   }
 
   void _processQueue() {
@@ -255,10 +272,15 @@ class TxaDownloadManager extends ChangeNotifier {
       final filePath = "$dirPath/$fileName";
       task.savePath = filePath;
 
-      if (task.format == 'mp4') {
-        await _downloadChunked(task);
-      } else {
+      TxaLogger.log(
+        'Starting download: ${task.movieTitle} - ${task.episodeTitle}',
+        tag: 'DOWNLOAD',
+        type: 'download',
+      );
+      if (task.format == 'm3u8') {
         await _downloadM3U8(task);
+      } else {
+        await _downloadChunked(task);
       }
 
       task.status = DownloadStatus.completed;
@@ -267,7 +289,6 @@ class TxaDownloadManager extends ChangeNotifier {
       _checkMovieCompletion(task.movieId);
       _processQueue();
     } catch (e) {
-      TxaLogger.log("Download Error (${task.id}): $e", isError: true);
       task.status = DownloadStatus.error;
       task.error = e.toString();
       _processQueue();
@@ -277,24 +298,38 @@ class TxaDownloadManager extends ChangeNotifier {
 
   Future<void> _downloadChunked(DownloadTask task) async {
     final cancelToken = CancelToken();
-    await _dio.download(
-      task.url,
-      task.savePath!,
-      cancelToken: cancelToken,
-      onReceiveProgress: (count, total) {
-        if (total != -1) {
-          task.downloadedBytes = count;
-          task.totalBytes = total;
-          task.progress = (count / total) * 100;
-
-          if (count % (1024 * 1024) == 0) {
-            // Every 1MB
-            _updateNotification(task);
-            notifyListeners();
+    try {
+      await _dio.download(
+        task.url,
+        task.savePath!,
+        cancelToken: cancelToken,
+        onReceiveProgress: (count, total) {
+          if (task.status != DownloadStatus.downloading) {
+            cancelToken.cancel("User paused or removed task");
+            return;
           }
-        }
-      },
-    );
+          if (total != -1) {
+            task.downloadedBytes = count;
+            task.totalBytes = total;
+            task.progress = (count / total) * 100;
+
+            // Update UI and Notifications less frequently but speed regularly
+            _updateSpeed();
+            if (count % (1024 * 512) == 0) {
+              // Every 512KB
+              _updateNotification(task);
+              notifyListeners();
+            }
+          }
+        },
+      );
+    } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        TxaLogger.log("Download cancelled/paused: ${task.id}");
+      } else {
+        rethrow;
+      }
+    }
   }
 
   Future<void> _downloadM3U8(DownloadTask task) async {
@@ -314,6 +349,20 @@ class TxaDownloadManager extends ChangeNotifier {
   }
 
   Future<void> _updateNotification(DownloadTask task) async {
+    _updateSpeed();
+
+    final movieTasks = _tasks.where((t) => t.movieId == task.movieId).toList();
+    final done = movieTasks
+        .where((t) => t.status == DownloadStatus.completed)
+        .length;
+    final total = movieTasks.length;
+
+    String countInfo = "";
+    if (total > 1) {
+      countInfo =
+          "${TxaLanguage.t('episodes_count').replaceAll('%c%', (done + 1).toString()).replaceAll('%t%', total.toString())} • ";
+    }
+
     final android = AndroidNotificationDetails(
       'txa_downloads',
       TxaLanguage.t('download_channel_name'),
@@ -323,14 +372,48 @@ class TxaDownloadManager extends ChangeNotifier {
       maxProgress: 100,
       progress: task.progress.toInt(),
       onlyAlertOnce: true,
+      ongoing: true, // Keep it ongoing while downloading
     );
+
+    String sizeInfo = "";
+    if (task.totalBytes > 0) {
+      sizeInfo = " (${TxaFormat.formatFileSize(task.downloadedBytes)} / ${TxaFormat.formatFileSize(task.totalBytes)})";
+    }
 
     await _notifications.show(
       id: task.id.hashCode,
       title: task.movieTitle,
-      body: "${task.episodeTitle}: ${task.progress.toInt()}%",
+      body:
+          "$countInfo${task.episodeTitle}: ${task.progress.toInt()}%$sizeInfo • $_currentSpeed",
       notificationDetails: NotificationDetails(android: android),
     );
+  }
+
+  void _updateSpeed() {
+    final now = DateTime.now();
+    final diff = now.difference(_lastSpeedCheck).inMilliseconds;
+    if (diff >= 1000) {
+      final activeTasks = _tasks
+          .where((t) => t.status == DownloadStatus.downloading)
+          .toList();
+      int currentTotalBytes = 0;
+      for (var t in activeTasks) {
+        currentTotalBytes += t.downloadedBytes;
+      }
+
+      final bytesDiff = currentTotalBytes - _lastBytes;
+      if (bytesDiff > 0) {
+        final speed = (bytesDiff / (diff / 1000)); // bytes per second
+        _currentSpeed = TxaFormat.formatNetworkSpeed(
+          speed * 8,
+        ); // TxaFormat expects bits/s
+      } else {
+        _currentSpeed = "0 KB/s";
+      }
+
+      _lastBytes = currentTotalBytes;
+      _lastSpeedCheck = now;
+    }
   }
 
   void _showMovieDoneNotification(String title) {
@@ -375,121 +458,77 @@ class TxaDownloadManager extends ChangeNotifier {
       _tasks.remove(task);
     }
     await _saveTasks();
-    if (_currentMovieDownloading == movieId) _currentMovieDownloading = '';
+    if (_currentMovieDownloading == movieId) {
+      _currentMovieDownloading = '';
+    }
     _processQueue();
     notifyListeners();
   }
 
-  String _generateTaskId(String input) {
-    return input.hashCode.abs().toString();
+  Future<void> removeTask(String taskId) async {
+    final idx = _tasks.indexWhere((t) => t.id == taskId);
+    if (idx == -1) return;
+
+    final task = _tasks[idx];
+    if (task.savePath != null) {
+      final file = File(task.savePath!);
+      if (await file.exists()) await file.delete();
+      // If HLS, delete the whole folder
+      if (task.isHls) {
+        final dir = file.parent;
+        if (await dir.exists()) await dir.delete(recursive: true);
+      }
+    }
+    _tasks.removeAt(idx);
+    await _saveTasks();
+    _processQueue();
+    notifyListeners();
   }
 
-  Future<void> _startHlsDownload(DownloadTask task) async {
-    try {
-      task.status = DownloadStatus.downloading;
+  void pauseTask(String taskId) {
+    final task = _tasks.firstWhere((t) => t.id == taskId);
+    if (task.status == DownloadStatus.downloading) {
+      task.status = DownloadStatus.paused;
+      _cancelTokens[taskId]?.cancel("User paused");
+      _cancelTokens.remove(taskId);
       notifyListeners();
-
-      final dio = Dio();
-      final response = await dio.get(task.url);
-      final String m3u8Content = response.data.toString();
-
-      final lines = m3u8Content.split('\n');
-      final List<String> segmentUrls = [];
-      final baseUrl = task.url.substring(0, task.url.lastIndexOf('/') + 1);
-
-      for (var line in lines) {
-        final trimmedLine = line.trim();
-        if (trimmedLine.isNotEmpty && !trimmedLine.startsWith('#')) {
-          if (trimmedLine.startsWith('http')) {
-            segmentUrls.add(trimmedLine);
-          } else {
-            segmentUrls.add(baseUrl + trimmedLine);
-          }
-        }
-      }
-
-      if (segmentUrls.isEmpty) {
-        throw Exception("No video segments found in M3U8");
-      }
-
-      task.totalSegments = segmentUrls.length;
-      final dir = await getApplicationDocumentsDirectory();
-      final movieDir = Directory(
-        '${dir.path}/downloads/${task.movieId}/${task.id}',
-      );
-      if (!await movieDir.exists()) {
-        await movieDir.create(recursive: true);
-      }
-
-      int completed = 0;
-      for (var i = 0; i < segmentUrls.length; i++) {
-        if (!_tasks.any((t) => t.id == task.id)) return;
-
-        final segmentUrl = segmentUrls[i];
-        final segmentPath = '${movieDir.path}/seg_$i.ts';
-
-        if (!await File(segmentPath).exists()) {
-          await dio.download(segmentUrl, segmentPath);
-        }
-
-        completed++;
-        task.downloadedSegments = completed;
-        task.progress = (completed / segmentUrls.length) * 100;
-
-        if (completed % 5 == 0 || completed == segmentUrls.length) {
-          notifyListeners();
-          await _saveTasks();
-        }
-      }
-
-      String localM3u8 = "";
-      int segIdx = 0;
-      for (var line in lines) {
-        final trimmedLine = line.trim();
-        if (trimmedLine.isNotEmpty && !trimmedLine.startsWith('#')) {
-          localM3u8 += "seg_$segIdx.ts\n";
-          segIdx++;
-        } else {
-          localM3u8 += "$trimmedLine\n";
-        }
-      }
-
-      final localM3u8File = File('${movieDir.path}/index.m3u8');
-      await localM3u8File.writeAsString(localM3u8);
-
-      task.status = DownloadStatus.completed;
-      task.savePath = localM3u8File.path;
-      task.progress = 100.0;
-      await _saveTasks();
-      notifyListeners();
-
-      _showNotification(
-        TxaLanguage.t('download_completed'),
-        "${task.movieTitle} - ${task.episodeTitle}",
-      );
-    } catch (e) {
-      TxaLogger.log("HLS Download Error: $e", isError: true);
-      task.status = DownloadStatus.error;
-      task.error = e.toString();
-      notifyListeners();
+      _saveTasks();
     }
   }
 
-  Future<void> _showNotification(String title, String body) async {
-    final plugin = FlutterLocalNotificationsPlugin();
-    final androidDetails = AndroidNotificationDetails(
-      'txa_download_channel',
-      TxaLanguage.t('download_channel_name'),
-      channelDescription: TxaLanguage.t('download_channel_desc'),
-      importance: Importance.high,
-      priority: Priority.high,
-    );
-    final details = NotificationDetails(android: androidDetails);
-    await plugin.show(
-      id: 0,
-      title: title,
-      body: body,
-      notificationDetails: details,
-    );
+  void priorityTask(String taskId) {
+    final idx = _tasks.indexWhere((t) => t.id == taskId);
+    if (idx == -1) return;
+
+    final task = _tasks.removeAt(idx);
+    _tasks.insert(0, task); // Move to front
+
+    if (task.status == DownloadStatus.paused ||
+        task.status == DownloadStatus.error) {
+      task.status = DownloadStatus.pending;
+    }
+
+    // Stop current downloading if different
+    for (var t in _tasks) {
+      if (t.id != taskId && t.status == DownloadStatus.downloading) {
+        pauseTask(t.id);
+        t.status = DownloadStatus.pending; // Back to queue
+      }
+    }
+
+    _processQueue();
+    notifyListeners();
+    _saveTasks();
+  }
+
+  void resumeTask(String taskId) {
+    final task = _tasks.firstWhere((t) => t.id == taskId);
+    if (task.status == DownloadStatus.paused ||
+        task.status == DownloadStatus.error) {
+      task.status = DownloadStatus.pending;
+      _processQueue();
+      notifyListeners();
+      _saveTasks();
+    }
   }
 }

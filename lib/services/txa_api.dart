@@ -7,8 +7,8 @@ class TxaApi {
   static const String baseUrl = 'https://film.nrotxa.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '4.0.1';
-  static const String buildNumber = '401';
+  static const String apiVersion = '4.1.0';
+  static const String buildNumber = '410';
 
   // Community Links
   static const String facebookFanpage =
@@ -214,8 +214,16 @@ class TxaApi {
 
   /// Lấy lịch sử cập nhật
   Future<List<dynamic>> getChangelog() async {
-    final response = await get(changelog);
-    return response.data as List<dynamic>;
+    try {
+      final response = await get(changelog);
+      if (response.data != null && response.data['data'] != null) {
+        return response.data['data'] as List<dynamic>;
+      }
+      return [];
+    } catch (e) {
+      TxaLogger.log("getChangelog API Error: $e", isError: true);
+      return [];
+    }
   }
 
   /// Track search click

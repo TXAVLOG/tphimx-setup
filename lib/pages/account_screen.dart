@@ -652,7 +652,7 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.0.1';
+                  final version = snapshot.data?.version ?? '4.1.0';
                   final buildNumber = snapshot.data?.buildNumber ?? '401';
                   return InkWell(
                     onTap: () => Navigator.push(

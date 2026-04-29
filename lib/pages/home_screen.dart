@@ -35,6 +35,9 @@ import '../utils/txa_logger.dart';
 import '../utils/txa_format.dart';
 import '../services/txa_settings.dart';
 import '../services/notification_provider.dart';
+import '../services/txa_network.dart';
+import '../services/txa_download_manager.dart';
+import 'download_manager_screen.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
@@ -492,41 +495,107 @@ class _HomeScreenState extends State<HomeScreen> {
         key: _scaffoldKey,
         backgroundColor: TxaTheme.primaryBg,
         drawer: _buildDrawer(),
-        body: Stack(
-          children: [
-            // Background
-            Positioned.fill(
-              child: Container(
-                decoration: const BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [TxaTheme.primaryBg, Color(0xFF0F172A)],
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
+        body: Consumer2<TxaNetwork, TxaDownloadManager>(
+          builder: (context, network, dm, child) {
+            final isOffline = network.isOffline;
+            final hasDownloads = dm.tasks.any(
+              (t) => t.status == DownloadStatus.completed,
+            );
+
+            if (isOffline) {
+              if (hasDownloads) {
+                // Simplified UI: Only show Download Manager
+                return const DownloadManagerScreen(isOfflineMode: true);
+              } else {
+                // Error widget for no internet + no downloads
+                return Center(
+                  child: Padding(
+                    padding: const EdgeInsets.all(32.0),
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(
+                          Icons.cloud_off_rounded,
+                          size: 80,
+                          color: TxaTheme.textMuted,
+                        ),
+                        const SizedBox(height: 24),
+                        Text(
+                          TxaLanguage.t('offline_no_downloads_title'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          TxaLanguage.t('offline_no_downloads_msg'),
+                          style: const TextStyle(
+                            color: TxaTheme.textSecondary,
+                            fontSize: 14,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                        const SizedBox(height: 32),
+                        ElevatedButton.icon(
+                          onPressed: () => SystemNavigator.pop(),
+                          icon: const Icon(Icons.exit_to_app_rounded),
+                          label: Text(TxaLanguage.t('exit_app')),
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: TxaTheme.accent,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 24,
+                              vertical: 12,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }
+            }
+
+            return Stack(
+              children: [
+                // Background
+                Positioned.fill(
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [TxaTheme.primaryBg, Color(0xFF0F172A)],
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                      ),
+                    ),
                   ),
                 ),
-              ),
-            ),
 
-            Positioned.fill(
-              child: IndexedStack(index: _currentIndex, children: _tabs),
-            ),
+                Positioned.fill(
+                  child: IndexedStack(index: _currentIndex, children: _tabs),
+                ),
 
-            // Home Header (Pinned) - Only show on Home Tab
-            if (_currentIndex == 0) _buildHomeHeader(),
+                // Home Header (Pinned) - Only show on Home Tab
+                if (_currentIndex == 0) _buildHomeHeader(),
 
-            // TxaNav
-            Consumer<NotificationProvider>(
-              builder: (context, notif, child) {
-                return TxaNav(
-                  currentIndex: _currentIndex,
-                  unreadNotifications: notif.unreadCount,
-                  onTap: (index) {
-                    setState(() => _currentIndex = index);
+                // TxaNav
+                Consumer<NotificationProvider>(
+                  builder: (context, notif, child) {
+                    return TxaNav(
+                      currentIndex: _currentIndex,
+                      unreadNotifications: notif.unreadCount,
+                      onTap: (index) {
+                        setState(() => _currentIndex = index);
+                      },
+                    );
                   },
-                );
-              },
-            ),
-          ],
+                ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -836,7 +905,7 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.0.1';
+                  final version = snapshot.data?.version ?? '4.1.0';
                   final build = snapshot.data?.buildNumber ?? '401';
                   return InkWell(
                     onTap: () => Navigator.push(

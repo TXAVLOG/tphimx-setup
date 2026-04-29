@@ -1,7 +1,24 @@
 import 'package:connectivity_plus/connectivity_plus.dart';
+import 'package:flutter/foundation.dart';
 
-class TxaNetwork {
+class TxaNetwork extends ChangeNotifier {
   final Connectivity _connectivity = Connectivity();
+  List<ConnectivityResult> _currentStatus = [ConnectivityResult.none];
+
+  TxaNetwork() {
+    _connectivity.onConnectivityChanged.listen((status) {
+      _currentStatus = status;
+      notifyListeners();
+    });
+    _init();
+  }
+
+  Future<void> _init() async {
+    _currentStatus = await _connectivity.checkConnectivity();
+    notifyListeners();
+  }
+
+  bool get isOffline => _currentStatus.contains(ConnectivityResult.none);
 
   /// Check current connection status
   Future<bool> isConnected() async {

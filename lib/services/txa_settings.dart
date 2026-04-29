@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -204,4 +205,43 @@ class TxaSettings {
 
   static String get lastNotifiedUpdateVersion => _prefs.getString('last_notified_update_version') ?? '';
   static set lastNotifiedUpdateVersion(String v) => _prefs.setString('last_notified_update_version', v);
+
+  // --- Watch History ---
+  static void saveLocalHistory(int episodeId, double position) {
+    _prefs.setDouble('hist_$episodeId', position);
+  }
+
+  static double getLocalHistory(int episodeId) {
+    return _prefs.getDouble('hist_$episodeId') ?? 0.0;
+  }
+
+  static void addPendingSync(Map<String, dynamic> data) {
+    List<String> pending = _prefs.getStringList('pending_history_sync') ?? [];
+    // Avoid duplicates for same episode
+    pending.removeWhere((item) {
+      try {
+        final decoded = jsonDecode(item);
+        return decoded['episode_id'] == data['episode_id'];
+      } catch (_) {
+        return false;
+      }
+    });
+    pending.add(jsonEncode(data));
+    _prefs.setStringList('pending_history_sync', pending);
+  }
+
+  static List<Map<String, dynamic>> getPendingSync() {
+    List<String> pending = _prefs.getStringList('pending_history_sync') ?? [];
+    return pending.map((e) {
+      try {
+        return jsonDecode(e) as Map<String, dynamic>;
+      } catch (_) {
+        return <String, dynamic>{};
+      }
+    }).where((m) => m.isNotEmpty).toList();
+  }
+
+  static void clearPendingSync() {
+    _prefs.remove('pending_history_sync');
+  }
 }

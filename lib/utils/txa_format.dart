@@ -56,6 +56,11 @@ class TxaFormat {
     return {'value': unitValue, 'unit': units[i], 'display': display};
   }
 
+  /// Format file size directly to string
+  static String formatFileSize(int bytes) {
+    return formatSize(bytes)['display'];
+  }
+
   /// Format speed (bytes/s to human readable) - For Download/Update
   static Map<String, dynamic> formatSpeed(
     double bytesPerSec, {
@@ -208,5 +213,45 @@ class TxaFormat {
   /// Format battery level
   static String formatBattery(int level) {
     return '$level%';
+  }
+
+  /// Format episode name to avoid duplication (e.g. "Tập Tập 1")
+  /// Also handles special cases like "Full", "Trailer" to not add "Tập" prefix.
+  static String formatEpisodeName(String? name) {
+    if (name == null || name.isEmpty) return "";
+    final trimmed = name.trim();
+
+    // Vietnamese "Tập" and English "Episode" / "Ep" / "Part" / "P"
+    // Also handle cases like "Tập1" or "Ep.1" (no space or with dot)
+    final prefixPattern = RegExp(r'^(tập|episode|ep\.?|part|p\.?)\s?\d+',
+        caseSensitive: false);
+
+    if (prefixPattern.hasMatch(trimmed)) return trimmed;
+
+    // Special cases like "Full", "Trailer", "Special", "Final"
+    // If it contains these words, usually we don't want to prepend "Tập"
+    final lowercase = trimmed.toLowerCase();
+    final specialKeywords = [
+      'full',
+      'trailer',
+      'special',
+      'hoàn tất',
+      'hoàn thành',
+      'final',
+      'tập cuối',
+      'hồi kết'
+    ];
+
+    for (var keyword in specialKeywords) {
+      if (lowercase.contains(keyword)) return trimmed;
+    }
+
+    // If it's just a number, add "Tập"
+    if (RegExp(r'^\d+$').hasMatch(trimmed)) {
+      return TxaLanguage.t('episode_label', replace: {'n': trimmed});
+    }
+
+    // Fallback: return as is
+    return trimmed;
   }
 }

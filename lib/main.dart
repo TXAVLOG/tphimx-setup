@@ -30,6 +30,11 @@ import 'services/txa_language.dart';
 import 'services/txa_background_service.dart';
 import 'services/txa_speed_service.dart';
 import 'services/txa_download_manager.dart';
+import 'services/txa_history_sync_service.dart';
+import 'pages/download_manager_screen.dart';
+import 'widgets/txa_watermark.dart';
+import 'services/txa_screenshot_service.dart';
+import 'package:screenshot/screenshot.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -68,7 +73,10 @@ void main() async {
     MultiProvider(
       providers: [
         Provider<TxaApi>(create: (_) => TxaApi()),
-        Provider<TxaNetwork>(create: (_) => TxaNetwork()),
+        ChangeNotifierProvider<TxaNetwork>(create: (_) => TxaNetwork()),
+        ProxyProvider2<TxaApi, TxaNetwork, TxaHistorySyncService>(
+          update: (_, api, network, _) => TxaHistorySyncService(api, network),
+        ),
         ChangeNotifierProvider<SearchProvider>(create: (_) => SearchProvider()),
         ChangeNotifierProvider<FavoriteProvider>(
           create: (context) => FavoriteProvider(context.read<TxaApi>()),
@@ -109,6 +117,12 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
     TxaSettings.isAppForeground = true;
     _initDeepLinks();
     _initNotifications();
+    
+    // Initialize screenshot detection
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      TxaScreenshotService().init(context);
+    });
+
     TxaSettings.onSettingsChanged = () {
       if (mounted) setState(() {});
     };
@@ -257,12 +271,17 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
       theme: TxaTheme.darkTheme.copyWith(textTheme: textTheme),
       home: widget.isTV ? const TVBlockScreen() : const MainEntry(),
       builder: (context, child) {
-        return MediaQuery(
-          data: MediaQuery.of(
-            context,
-          ).copyWith(textScaler: TextScaler.linear(TxaSettings.fontSizeScale)),
-          child: Stack(
-            children: [child ?? const SizedBox.shrink(), const TxaMiniPlayer()],
+        return Screenshot(
+          controller: TxaScreenshotService().screenshotController,
+          child: TxaWatermark(
+            child: MediaQuery(
+              data: MediaQuery.of(
+                context,
+              ).copyWith(textScaler: TextScaler.linear(TxaSettings.fontSizeScale)),
+              child: Stack(
+                children: [child ?? const SizedBox.shrink(), const TxaMiniPlayer()],
+              ),
+            ),
           ),
         );
       },
@@ -343,6 +362,7 @@ class _MainEntryState extends State<MainEntry> {
   @override
   void initState() {
     super.initState();
+    _checkConnectivity();
     TxaShortcutService.init((type) {
       if (!mounted) return;
       final miniProvider = context.read<TxaMiniPlayerProvider>();
@@ -356,9 +376,43 @@ class _MainEntryState extends State<MainEntry> {
           break;
       }
     });
+
+    // Start History Sync
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      context.read<TxaHistorySyncService>().start();
+    });
   }
 
   bool _showSplash = true;
+  bool _isOfflineMode = false;
+  bool _isNoConnectionNoData = false;
+
+  Future<void> _checkConnectivity() async {
+    final network = context.read<TxaNetwork>();
+    final isOnline = await network.isConnected();
+    if (!mounted) return;
+    
+    if (!isOnline) {
+      final downloadManager = context.read<TxaDownloadManager>();
+      // Check if there are ANY completed tasks to show in offline mode
+      if (downloadManager.tasks.any((t) => t.status == DownloadStatus.completed)) {
+        setState(() {
+          _isOfflineMode = true;
+          _isNoConnectionNoData = false;
+        });
+      } else {
+        setState(() {
+          _isOfflineMode = false;
+          _isNoConnectionNoData = true;
+        });
+      }
+    } else {
+      setState(() {
+        _isNoConnectionNoData = false;
+        _isOfflineMode = false;
+      });
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -371,8 +425,96 @@ class _MainEntryState extends State<MainEntry> {
         },
       );
     }
+
+    if (_isNoConnectionNoData) {
+      return const NoConnectionScreen();
+    }
+
+    if (_isOfflineMode) {
+      return const OfflineModeScreen();
+    }
+
     return HomeScreen(
       key: ValueKey("${TxaSettings.authToken}_${TxaLanguage.currentLang}"),
-    ); // Pass ValueKey to force rebuild on auth/lang change
+    );
+  }
+}
+
+class NoConnectionScreen extends StatelessWidget {
+  const NoConnectionScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: TxaTheme.primaryBg,
+      body: Center(
+        child: Padding(
+          padding: const EdgeInsets.all(32.0),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const Icon(Icons.wifi_off_rounded, size: 80, color: Colors.redAccent),
+              const SizedBox(height: 24),
+              Text(
+                TxaLanguage.t('no_internet_no_downloads'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                TxaLanguage.t('no_internet_msg'),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: Colors.white.withValues(alpha: 0.7),
+                  fontSize: 16,
+                ),
+              ),
+              const SizedBox(height: 32),
+              ElevatedButton.icon(
+                onPressed: () {
+                  // In a real app, we might want to restart or re-check
+                  // For now, let's just trigger a re-check
+                  final state = context.findAncestorStateOfType<_MainEntryState>();
+                  state?._checkConnectivity();
+                },
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.redAccent,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+                icon: const Icon(Icons.refresh_rounded),
+                label: Text(TxaLanguage.t('retry')),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class OfflineModeScreen extends StatelessWidget {
+  const OfflineModeScreen({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: TxaTheme.primaryBg,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: Text(
+          TxaLanguage.t('offline_mode'),
+          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+        ),
+        leading: const Icon(Icons.signal_wifi_off_rounded, color: Colors.redAccent),
+      ),
+      body: const DownloadManagerScreen(),
+    );
   }
 }

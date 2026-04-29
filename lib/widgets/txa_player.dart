@@ -25,6 +25,7 @@ import 'package:no_screen_mirror/no_screen_mirror.dart';
 import 'package:cast_plus/cast.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_settings/app_settings.dart' as app_settings_lib;
+import 'txa_watermark.dart';
 
 class TxaPlayer extends StatefulWidget {
   final dynamic movie;
@@ -32,6 +33,8 @@ class TxaPlayer extends StatefulWidget {
   final int? initialServerIndex;
   final String? initialEpisodeId;
   final BetterPlayerController? existingController;
+  final String? localPath;
+  final String? localTitle;
 
   const TxaPlayer({
     super.key,
@@ -41,6 +44,8 @@ class TxaPlayer extends StatefulWidget {
     this.initialEpisodeId,
     this.initialTime,
     this.existingController,
+    this.localPath,
+    this.localTitle,
   });
 
   final double? initialTime;
@@ -71,6 +76,7 @@ class _TxaPlayerState extends State<TxaPlayer>
   bool _showSkipIntro = false;
   bool _showSkipOutro = false;
   bool _autoNextTriggered = false;
+  bool _isFirstLoad = true;
 
   // --- NEW GESTURE & UI STATE ---
   double _brightness = TxaSettings.brightness;
@@ -142,9 +148,6 @@ class _TxaPlayerState extends State<TxaPlayer>
     _brightness = TxaSettings.brightness;
     _volume = TxaSettings.volume;
 
-    _loadMarkers();
-    _initBattery();
-
     if (widget.initialEpisodeId != null && widget.servers.isNotEmpty) {
       final episodes =
           widget.servers[_currentServerIndex]['server_data'] as List;
@@ -156,6 +159,8 @@ class _TxaPlayerState extends State<TxaPlayer>
         }
       }
     }
+    _loadMarkers(); // Call after episode index is finalized
+    _initBattery();
 
     if (widget.existingController != null) {
       _betterPlayerController = widget.existingController;
@@ -198,17 +203,24 @@ class _TxaPlayerState extends State<TxaPlayer>
     final dur = _betterPlayerController!.videoPlayerController?.value.duration;
 
     if (pos == null || dur == null || dur.inSeconds == 0) return;
+    if (widget.servers.isEmpty || _currentServerIndex >= widget.servers.length) return;
 
     final server = widget.servers[_currentServerIndex];
-    final ep = (server['server_data'] as List)[_currentEpisodeIndex];
+    final serverData = server['server_data'] as List;
+    if (_currentEpisodeIndex >= serverData.length) return;
+    
+    final ep = serverData[_currentEpisodeIndex];
+
+    final mId = int.tryParse(widget.movie['id'].toString()) ?? 0;
+    final eId = int.tryParse(ep['id'].toString()) ?? 0;
+
+    if (mId == 0 || eId == 0) return;
+
+    // ALWAYS save locally first for instant offline resume
+    TxaSettings.saveLocalHistory(eId, pos.inSeconds.toDouble());
 
     try {
       final api = Provider.of<TxaApi>(context, listen: false);
-      final mId = int.tryParse(widget.movie['id'].toString()) ?? 0;
-      final eId = int.tryParse(ep['id'].toString()) ?? 0;
-
-      if (mId == 0 || eId == 0) return;
-
       await api.updateWatchHistory(
         movieId: mId,
         episodeId: eId,
@@ -216,7 +228,14 @@ class _TxaPlayerState extends State<TxaPlayer>
         duration: dur.inSeconds.toDouble(),
       );
     } catch (e) {
-      TxaLogger.log("WatchHistory Sync Error: $e", isError: true);
+      // If offline or error, save to pending queue for later sync
+      TxaLogger.log("WatchHistory Server Sync Failed, cached locally. ID: $eId");
+      TxaSettings.addPendingSync({
+        'movie_id': mId,
+        'episode_id': eId,
+        'current_time': pos.inSeconds.toDouble(),
+        'duration': dur.inSeconds.toDouble(),
+      });
     }
   }
 
@@ -488,12 +507,42 @@ class _TxaPlayerState extends State<TxaPlayer>
         ? widget.servers[_currentServerIndex]
         : null;
     final serverData = server != null ? server['server_data'] as List : [];
-    if (serverData.isEmpty) {
+
+    final episode =
+        serverData.isNotEmpty && _currentEpisodeIndex < serverData.length
+            ? serverData[_currentEpisodeIndex]
+            : null;
+
+    if (widget.localPath != null) {
+      final file = File(widget.localPath!);
+      if (await file.exists()) {
+        // Construct a pseudo-episode if null, to allow history tracking via initialEpisodeId
+        final effectiveEpisode =
+            episode ??
+            {
+              'id': widget.initialEpisodeId ?? '0',
+              'name': widget.localTitle ?? 'Offline',
+            };
+
+        await _trySource(
+          [
+            {
+              'type': 'file',
+              'url': widget.localPath!,
+              'name': widget.localTitle ?? 'Offline',
+            },
+          ],
+          0,
+          effectiveEpisode,
+        );
+        return;
+      }
+    }
+
+    if (serverData.isEmpty || episode == null) {
       setState(() => _error = true);
       return;
     }
-
-    final episode = serverData[_currentEpisodeIndex];
 
     final List<Map<String, String>> sources = [];
     if (episode['stream_v6']?.toString().isNotEmpty == true) {
@@ -576,7 +625,9 @@ class _TxaPlayerState extends State<TxaPlayer>
     }
 
     BetterPlayerDataSource dataSource = BetterPlayerDataSource(
-      BetterPlayerDataSourceType.network,
+      type == 'file'
+          ? BetterPlayerDataSourceType.file
+          : BetterPlayerDataSourceType.network,
       url,
       headers: {
         "X-TXC-Client": "TPhimX-App-V6",
@@ -609,7 +660,23 @@ class _TxaPlayerState extends State<TxaPlayer>
       await _betterPlayerController!.setupDataSource(dataSource);
 
       // Resume playback
-      final resumeTime = _manualResumeTime ?? widget.initialTime;
+      double? resumeTime = _manualResumeTime;
+      if (_isFirstLoad && (resumeTime == null || resumeTime == 0)) {
+        resumeTime = widget.initialTime;
+        _isFirstLoad = false;
+      }
+      
+      // If no initial time provided (e.g. from Download Manager), check local cache
+      if (resumeTime == null || resumeTime == 0) {
+        final eId = int.tryParse(episode?['id']?.toString() ?? '0') ?? 0;
+        if (eId > 0) {
+          resumeTime = TxaSettings.getLocalHistory(eId);
+          if (resumeTime > 0) {
+            TxaLogger.log("Resuming from local history: $resumeTime s");
+          }
+        }
+      }
+
       if (resumeTime != null && resumeTime > 0) {
         await _betterPlayerController!.seekTo(
           Duration(seconds: resumeTime.toInt()),
@@ -1211,6 +1278,7 @@ class _TxaPlayerState extends State<TxaPlayer>
         _currentEpisodeIndex--;
         _manualResumeTime = null;
       });
+      _loadMarkers();
       _initializePlayer();
     }
   }
@@ -1224,6 +1292,7 @@ class _TxaPlayerState extends State<TxaPlayer>
         _currentEpisodeIndex++;
         _manualResumeTime = null;
       });
+      _loadMarkers();
       _initializePlayer();
     } else {
       _syncHistory(); // Final sync on exit
@@ -1343,6 +1412,7 @@ class _TxaPlayerState extends State<TxaPlayer>
       setState(() {
         _currentServerIndex = 0;
         _showServerDrawer = false;
+        _manualResumeTime = null; // Important: Clear manual resume when error-switching
       });
       return;
     }
@@ -1515,6 +1585,7 @@ class _TxaPlayerState extends State<TxaPlayer>
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
+    
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
@@ -1524,54 +1595,55 @@ class _TxaPlayerState extends State<TxaPlayer>
           SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
         }
       },
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: GestureDetector(
-          onTapUp: (d) => _handleTap(d, width),
-          onVerticalDragUpdate: (d) => _handleVerticalDrag(d, width),
-          onDoubleTapDown: (d) => _onDoubleTap(d, width),
-          onLongPressStart: (_) => _onLongPress(true),
-          onLongPressEnd: (_) => _onLongPress(false),
-          child: Stack(
-            children: [
-              // 1. VIDEO
-              Center(
-                child: _isInitialized
-                    ? Stack(
-                        children: [
-                          _isEmbed
-                              ? WebViewWidget(controller: _webViewController!)
-                              : BetterPlayer(
-                                  controller: _betterPlayerController!,
+      child: PiPSwitcher(
+        childWhenEnabled: _buildPiPUI(),
+        childWhenDisabled: Scaffold(
+          backgroundColor: Colors.black,
+          body: GestureDetector(
+            onTapUp: (d) => _handleTap(d, width),
+            onVerticalDragUpdate: (d) => _handleVerticalDrag(d, width),
+            onDoubleTapDown: (d) => _onDoubleTap(d, width),
+            onLongPressStart: (_) => _onLongPress(true),
+            onLongPressEnd: (_) => _onLongPress(false),
+            child: TxaWatermark(
+              child: Stack(
+                children: [
+                  // 1. VIDEO
+                  Center(
+                    child: _isInitialized
+                        ? Stack(
+                            children: [
+                              _isEmbed
+                                  ? WebViewWidget(controller: _webViewController!)
+                                  : BetterPlayer(
+                                      controller: _betterPlayerController!,
+                                    ),
+                              if (_isBuffering && !_isEmbed)
+                                Container(
+                                  color: Colors.black26,
+                                  child: _buildLoadingUI(),
                                 ),
-                          if (_isBuffering && !_isEmbed)
-                            Container(
-                              color: Colors.black26,
-                              child: _buildLoadingUI(),
-                            ),
-                        ],
-                      )
-                    : _error
-                    ? _buildErrorUI()
-                    : _buildLoadingUI(),
-              ),
+                            ],
+                          )
+                        : _error
+                        ? _buildErrorUI()
+                        : _buildLoadingUI(),
+                  ),
 
-              // 2. WATERMARK (Corner)
-              Positioned(
-                top: 40,
-                right: 20,
-                child: Opacity(
-                  opacity: 0.3,
-                  child: Text(
-                    TxaLanguage.t('player_watermark'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 10,
-                      letterSpacing: 1.2,
+                // 2.1 LOGO (Bottom-Left)
+                Positioned(
+                  bottom: 20,
+                  left: 20,
+                  child: Opacity(
+                    opacity: 0.5,
+                    child: Image.asset(
+                      'assets/images/logo_mini.png',
+                      width: 40,
+                      height: 40,
+                      errorBuilder: (ctx, e, st) => const SizedBox.shrink(),
                     ),
                   ),
                 ),
-              ),
 
               // 2.5 CLOCK (Top-Left)
               if (TxaSettings.showClock)
@@ -1609,39 +1681,45 @@ class _TxaPlayerState extends State<TxaPlayer>
                   ),
                 ),
 
-              // 2.6 MOVIE INFO (Top-Center)
-              if (_showControls && !_isLocked)
+              // 2.6 MOVIE INFO (Top-Center) - Show only when controls are HIDDEN
+              if (!_showControls && !_isLocked && _isInitialized && !_error)
                 Positioned(
-                  top: 40,
+                  top: 35,
                   left: 0,
                   right: 0,
                   child: Center(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                       decoration: BoxDecoration(
-                        color: Colors.black38,
+                        color: Colors.black26,
                         borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white10),
+                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
                       ),
                       child: Builder(builder: (ctx) {
-                        final episodes = widget.servers[_currentServerIndex]['server_data'] as List;
-                        String episodeName = episodes[_currentEpisodeIndex]['name']?.toString() ?? '';
-                        
-                        // Check if episodeName is just a number, then add "Tập" prefix
-                        final isNumeric = RegExp(r'^\d+$').hasMatch(episodeName);
-                        if (isNumeric) {
-                          episodeName = TxaLanguage.t('episode_label', replace: {'n': episodeName});
+                        String movieName = widget.movie['name'] ?? '';
+                        String episodeName = '';
+                        String serverName = '';
+
+                        if (widget.localPath != null) {
+                          episodeName = widget.localTitle ?? 'Offline';
+                          serverName = TxaLanguage.t('downloaded');
+                        } else if (widget.servers.isNotEmpty && _currentServerIndex < widget.servers.length) {
+                          final server = widget.servers[_currentServerIndex];
+                          serverName = server['server_name'] ?? 'Server';
+                          final episodes = server['server_data'] as List? ?? [];
+                          if (_currentEpisodeIndex < episodes.length) {
+                            final ep = episodes[_currentEpisodeIndex];
+                            episodeName = TxaFormat.formatEpisodeName(ep['name']?.toString());
+                          }
                         }
 
-                        final serverName = widget.servers[_currentServerIndex]['name'];
-                        final movieName = widget.movie['name'];
                         return Text(
-                          "$movieName - $episodeName ($serverName) - TPHIMX",
-                          style: const TextStyle(
-                            color: Colors.white60,
-                            fontSize: 11,
-                            fontWeight: FontWeight.w500,
-                            letterSpacing: 0.5,
+                          "$movieName • $episodeName${serverName.isNotEmpty ? ' ($serverName)' : ''}",
+                          style: TextStyle(
+                            color: Colors.white.withValues(alpha: 0.5),
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            letterSpacing: 0.8,
                           ),
                         );
                       }),
@@ -1723,16 +1801,20 @@ class _TxaPlayerState extends State<TxaPlayer>
           ),
         ),
       ),
-    );
-  }
+    ),
+  ),
+);
+}
 
   Widget _buildAutoNextOverlay() {
+    if (widget.servers.isEmpty || _currentServerIndex >= widget.servers.length) {
+      return const SizedBox.shrink();
+    }
     final serverData =
-        widget.servers[_currentServerIndex]['server_data'] as List;
+        widget.servers[_currentServerIndex]['server_data'] as List? ?? [];
     final nextEpIndex = _currentEpisodeIndex + 1;
-    final nextEp = nextEpIndex < serverData.length
-        ? serverData[nextEpIndex]
-        : null;
+    final nextEp =
+        nextEpIndex < serverData.length ? serverData[nextEpIndex] : null;
 
     if (nextEp == null) return const SizedBox.shrink();
 
@@ -1853,11 +1935,24 @@ class _TxaPlayerState extends State<TxaPlayer>
   }
 
   Widget _buildControlOverlay() {
-    final serverData =
-        widget.servers[_currentServerIndex]['server_data'] as List;
-    final ep = serverData[_currentEpisodeIndex];
-    final serverName =
-        widget.servers[_currentServerIndex]['server_name'] ?? 'Server';
+    String movieTitle = widget.movie['name'] ?? '';
+    String episodeTitle = '';
+    String serverName = '';
+    List serverData = [];
+
+    if (widget.localPath != null) {
+      episodeTitle = widget.localTitle ?? 'Offline';
+      serverName = TxaLanguage.t('downloaded');
+    } else if (widget.servers.isNotEmpty &&
+        _currentServerIndex < widget.servers.length) {
+      final server = widget.servers[_currentServerIndex];
+      serverName = server['server_name'] ?? 'Server';
+      serverData = server['server_data'] as List? ?? [];
+      if (_currentEpisodeIndex < serverData.length) {
+        final ep = serverData[_currentEpisodeIndex];
+        episodeTitle = TxaFormat.formatEpisodeName(ep['name']?.toString());
+      }
+    }
 
     return Stack(
       children: [
@@ -1928,7 +2023,7 @@ class _TxaPlayerState extends State<TxaPlayer>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          "${widget.movie['name']} - ${TxaLanguage.t('episode')} ${ep['name']}",
+                          "$movieTitle - $episodeTitle",
                           textAlign: TextAlign.center,
                           style: const TextStyle(
                             color: Colors.white,
@@ -2256,7 +2351,43 @@ class _TxaPlayerState extends State<TxaPlayer>
               ),
             ),
           ),
-      ],
+        ],
+      );
+  }
+
+  Widget _buildPiPUI() {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            _isInitialized
+                ? (_isEmbed
+                    ? WebViewWidget(controller: _webViewController!)
+                    : BetterPlayer(controller: _betterPlayerController!))
+                : const SizedBox.shrink(),
+            Positioned(
+              top: 16,
+              left: 16,
+              right: 16,
+              child: IgnorePointer(
+                child: Text(
+                  widget.movie['name'] ?? '',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    shadows: [Shadow(blurRadius: 10, color: Colors.black)],
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -2309,102 +2440,82 @@ class _TxaPlayerState extends State<TxaPlayer>
                 ),
               ],
             ),
-            Stack(
-              alignment: Alignment.center,
-              children: [
-                // 1. MARKERS
-                if (dur > 0)
-                  Positioned.fill(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      child: Stack(
-                        children: [
-                          if (_introEnd > _introStart)
-                            Positioned(
-                              left:
-                                  (_introStart / dur) *
-                                  (MediaQuery.of(context).size.width - 48),
-                              width:
-                                  ((_introEnd - _introStart) / dur) *
-                                  (MediaQuery.of(context).size.width - 48),
-                              top: 23,
-                              bottom: 23,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.amber.withValues(alpha: 0.8),
-                                  borderRadius: BorderRadius.circular(4),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.amber.withValues(
-                                        alpha: 0.3,
-                                      ),
-                                      blurRadius: 4,
+            LayoutBuilder(
+              builder: (ctx, constraints) {
+                final barWidth = constraints.maxWidth;
+                return Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    // 1. MARKERS (Visual overlays under the slider)
+                    if (dur > 0)
+                      Positioned.fill(
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          child: Stack(
+                            children: [
+                              if (_introEnd > _introStart)
+                                Positioned(
+                                  left: (_introStart / dur) * (barWidth - 24),
+                                  width: ((_introEnd - _introStart) / dur) *
+                                      (barWidth - 24),
+                                  top: 22,
+                                  bottom: 22,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.amber.withValues(alpha: 0.7),
+                                      borderRadius: BorderRadius.circular(2),
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ),
-                          if (_outroStart > 0)
-                            Positioned(
-                              left:
-                                  (_outroStart / dur) *
-                                  (MediaQuery.of(context).size.width - 48),
-                              right: 0,
-                              top: 23,
-                              bottom: 23,
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  color: Colors.red.withValues(alpha: 0.8),
-                                  borderRadius: BorderRadius.circular(4),
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: Colors.red.withValues(alpha: 0.3),
-                                      blurRadius: 4,
+                              if (_outroStart > 0 && _outroStart < dur)
+                                Positioned(
+                                  left: (_outroStart / dur) * (barWidth - 24),
+                                  right: 0,
+                                  top: 22,
+                                  bottom: 22,
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withValues(alpha: 0.7),
+                                      borderRadius: BorderRadius.circular(2),
                                     ),
-                                  ],
+                                  ),
                                 ),
-                              ),
-                            ),
-                        ],
+                            ],
+                          ),
+                        ),
+                      ),
+
+                    // 2. ACTUAL SLIDER
+                    SliderTheme(
+                      data: SliderTheme.of(context).copyWith(
+                        trackHeight: 4,
+                        thumbShape: const RoundSliderThumbShape(
+                          enabledThumbRadius: 7,
+                        ),
+                        overlayShape: const RoundSliderOverlayShape(
+                          overlayRadius: 14,
+                        ),
+                        activeTrackColor: TxaTheme.accent,
+                        inactiveTrackColor: Colors.white10,
+                        trackShape: const RoundedRectSliderTrackShape(),
+                        thumbColor: Colors.white,
+                      ),
+                      child: Slider(
+                        value: pos.clamp(0.0, dur > 0 ? dur : 0.0),
+                        max: dur > 0 ? dur : 1.0,
+                        onChanged: (v) {
+                          _betterPlayerController!.seekTo(
+                            Duration(seconds: v.toInt()),
+                          );
+                          if (_autoNextTriggered && v < (dur - 20)) {
+                            setState(() => _autoNextTriggered = false);
+                          }
+                        },
                       ),
                     ),
-                  ),
-
-                // 2. ACTUAL SLIDER
-                SliderTheme(
-                  data: SliderTheme.of(context).copyWith(
-                    trackHeight: 6, // Thicker for premium feel
-                    thumbShape: const RoundSliderThumbShape(
-                      enabledThumbRadius: 8,
-                    ), // More visible thumb
-                    overlayShape: const RoundSliderOverlayShape(
-                      overlayRadius: 16,
-                    ),
-                    activeTrackColor: TxaTheme.accent,
-                    inactiveTrackColor: Colors.white10,
-                    activeTickMarkColor: Colors.transparent,
-                    inactiveTickMarkColor: Colors.transparent,
-                    trackShape:
-                        const RoundedRectSliderTrackShape(), // Smoother corners
-                    thumbColor: TxaTheme.accent,
-                  ),
-                  child: Slider(
-                    value: pos.clamp(0.0, dur > 0 ? dur : 0.0),
-                    max: dur > 0 ? dur : 1.0,
-                    label: _formatDuration(Duration(seconds: pos.toInt())),
-                    divisions: dur > 0 ? dur.toInt() : null,
-                    onChanged: (v) {
-                      _betterPlayerController!.seekTo(
-                        Duration(seconds: v.toInt()),
-                      );
-                      // Reset auto next if seeking back
-                      if (_autoNextTriggered && v < (dur - 20)) {
-                        setState(() => _autoNextTriggered = false);
-                      }
-                    },
-                  ),
-                ),
-              ],
+                  ],
+                );
+              },
             ),
           ],
         );
@@ -3069,6 +3180,7 @@ class _TxaPlayerState extends State<TxaPlayer>
     }
     return '$mm:${ss.toString().padLeft(2, '0')}';
   }
+
 }
 
 class _CenterControlIcon extends StatelessWidget {
