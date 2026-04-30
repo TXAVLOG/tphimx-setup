@@ -4,7 +4,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../services/txa_download_manager.dart';
 import '../services/txa_language.dart';
 import '../theme/txa_theme.dart';
-import '../widgets/txa_player.dart';
+import 'download_episodes_screen.dart';
 
 class DownloadManagerScreen extends StatefulWidget {
   final bool isOfflineMode;
@@ -17,7 +17,6 @@ class DownloadManagerScreen extends StatefulWidget {
 class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
   bool _isSelectionMode = false;
   final Set<String> _selectedMovies = {};
-  String? _expandedMovieId;
 
   @override
   Widget build(BuildContext context) {
@@ -87,8 +86,14 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
 
           final movieIds = grouped.keys.toList();
 
-          return ListView.builder(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          return GridView.builder(
+            padding: const EdgeInsets.all(16),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+              crossAxisCount: 3,
+              childAspectRatio: 0.6,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 16,
+            ),
             itemCount: movieIds.length,
             itemBuilder: (context, index) {
               final mid = movieIds[index];
@@ -108,206 +113,193 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
                     (totalCount * 100);
               }
 
-              return Column(
-                children: [
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 12),
-                    child: InkWell(
-                      onTap: () {
-                        if (_isSelectionMode) {
-                          setState(() {
-                            if (_selectedMovies.contains(mid)) {
-                              _selectedMovies.remove(mid);
-                            } else {
-                              _selectedMovies.add(mid);
-                            }
-                          });
-                        } else {
-                          setState(() {
-                            if (_expandedMovieId == mid) {
-                              _expandedMovieId = null;
-                            } else {
-                              _expandedMovieId = mid;
-                            }
-                          });
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(12),
-                      child: Container(
-                        height: 100,
-                        decoration: BoxDecoration(
-                          color: TxaTheme.cardBg,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(
-                            color: _selectedMovies.contains(mid)
-                                ? TxaTheme.accent
-                                : TxaTheme.glassBorder,
-                          ),
+              final isSelected = _selectedMovies.contains(mid);
+
+              return GestureDetector(
+                onLongPress: () {
+                  if (!_isSelectionMode) {
+                    setState(() {
+                      _isSelectionMode = true;
+                      _selectedMovies.add(mid);
+                    });
+                  }
+                },
+                onTap: () {
+                  if (_isSelectionMode) {
+                    setState(() {
+                      if (isSelected) {
+                        _selectedMovies.remove(mid);
+                        if (_selectedMovies.isEmpty) _isSelectionMode = false;
+                      } else {
+                        _selectedMovies.add(mid);
+                      }
+                    });
+                  } else {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => DownloadEpisodesScreen(
+                          movieId: mid,
+                          movieTitle: firstTask.movieTitle,
+                          poster: firstTask.poster,
                         ),
-                        child: Row(
-                          children: [
-                            Stack(
-                              children: [
-                                ClipRRect(
-                                  borderRadius: const BorderRadius.horizontal(
-                                    left: Radius.circular(12),
-                                  ),
-                                  child: CachedNetworkImage(
-                                    imageUrl: firstTask.poster,
-                                    width: 70,
-                                    height: 100,
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                                if (!isAllDone)
-                                  ClipRRect(
-                                    borderRadius: const BorderRadius.horizontal(
-                                      left: Radius.circular(12),
+                      ),
+                    );
+                  }
+                },
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Expanded(
+                      child: Stack(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(
+                                color: isSelected
+                                    ? TxaTheme.accent
+                                    : TxaTheme.glassBorder,
+                                width: isSelected ? 2 : 1,
+                              ),
+                              boxShadow: [
+                                if (isSelected)
+                                  BoxShadow(
+                                    color: TxaTheme.accent.withValues(
+                                      alpha: 0.3,
                                     ),
-                                    child: Container(
-                                      width: 70,
-                                      height: 100,
-                                      alignment: Alignment.bottomCenter,
-                                      child: Container(
-                                        height: 100 * (1 - overallProgress),
-                                        color: Colors.black.withValues(
-                                          alpha: 0.6,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                if (!isAllDone)
-                                  const Positioned.fill(
-                                    child: Center(
-                                      child: SizedBox(
-                                        width: 24,
-                                        height: 24,
-                                        child: CircularProgressIndicator(
-                                          strokeWidth: 2,
-                                          color: TxaTheme.accent,
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                if (_isSelectionMode)
-                                  Positioned(
-                                    top: 4,
-                                    left: 4,
-                                    child: Icon(
-                                      _selectedMovies.contains(mid)
-                                          ? Icons.check_circle_rounded
-                                          : Icons.radio_button_unchecked_rounded,
-                                      color: TxaTheme.accent,
-                                      size: 20,
-                                    ),
+                                    blurRadius: 8,
+                                    spreadRadius: 1,
                                   ),
                               ],
                             ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    firstTask.movieTitle,
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 15,
-                                    ),
-                                    maxLines: 1,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                  const SizedBox(height: 4),
-                                  Text(
-                                    TxaLanguage.t(
-                                      'downloaded_series_progress',
-                                      replace: {
-                                        'p': (overallProgress * 100)
-                                            .toInt()
-                                            .toString(),
-                                        'c': completedCount.toString(),
-                                        't': totalCount.toString(),
-                                      },
-                                    ),
-                                    style: const TextStyle(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: CachedNetworkImage(
+                                imageUrl: firstTask.poster,
+                                fit: BoxFit.cover,
+                                width: double.infinity,
+                                height: double.infinity,
+                                placeholder: (context, url) => Container(
+                                  color: TxaTheme.cardBg,
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.movie_outlined,
                                       color: TxaTheme.textMuted,
-                                      fontSize: 12,
                                     ),
                                   ),
-                                  const SizedBox(height: 8),
-                                  if (!isAllDone)
-                                    Row(
-                                      children: [
-                                        Expanded(
-                                          child: LinearProgressIndicator(
-                                            value: overallProgress,
-                                            backgroundColor: Colors.white10,
-                                            valueColor:
-                                                const AlwaysStoppedAnimation<
-                                                  Color
-                                                >(TxaTheme.accent),
-                                            minHeight: 4,
-                                            borderRadius: BorderRadius.circular(
-                                              2,
-                                            ),
-                                          ),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        GestureDetector(
-                                          onTap:
-                                              () => manager.prioritizeMovie(
-                                                mid,
-                                              ),
-                                          child: Container(
-                                            padding: const EdgeInsets.symmetric(
-                                              horizontal: 8,
-                                              vertical: 4,
-                                            ),
-                                            decoration: BoxDecoration(
-                                              color: TxaTheme.accent.withValues(
-                                                alpha: 0.1,
-                                              ),
-                                              borderRadius:
-                                                  BorderRadius.circular(4),
-                                              border: Border.all(
-                                                color: TxaTheme.accent
-                                                    .withValues(alpha: 0.5),
-                                              ),
-                                            ),
-                                            child: Text(
-                                              TxaLanguage.t(
-                                                'priority_download',
-                                              ),
-                                              style: const TextStyle(
-                                                color: TxaTheme.accent,
-                                                fontSize: 9,
-                                                fontWeight: FontWeight.bold,
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                ),
+                                errorWidget: (context, url, error) => Container(
+                                  color: TxaTheme.cardBg,
+                                  child: const Center(
+                                    child: Icon(
+                                      Icons.error_outline_rounded,
+                                      color: Colors.redAccent,
                                     ),
+                                  ),
+                                ),
+                              ),
+                            ),
+                          ),
+                          // Gradient Overlay for text readability if needed, but here we use a separate label
+
+                          // Download Progress Overlay
+                          if (!isAllDone)
+                            Positioned.fill(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10),
+                                  color: Colors.black45,
+                                ),
+                                child: Center(
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      SizedBox(
+                                        width: 32,
+                                        height: 32,
+                                        child: CircularProgressIndicator(
+                                          value: overallProgress,
+                                          strokeWidth: 3,
+                                          backgroundColor: Colors.white24,
+                                          valueColor:
+                                              const AlwaysStoppedAnimation<
+                                                Color
+                                              >(TxaTheme.accent),
+                                        ),
+                                      ),
+                                      Text(
+                                        "${(overallProgress * 100).toInt()}%",
+                                        style: const TextStyle(
+                                          color: Colors.white,
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+
+                          // Episode count badge
+                          Positioned(
+                            top: 6,
+                            right: 6,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 6,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.black.withValues(alpha: 0.7),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: Text(
+                                TxaLanguage.t(
+                                  'episode_count_label',
+                                  replace: {'n': totalCount.toString()},
+                                ),
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 9,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+
+                          if (_isSelectionMode)
+                            Positioned(
+                              top: 6,
+                              left: 6,
+                              child: Icon(
+                                isSelected
+                                    ? Icons.check_circle_rounded
+                                    : Icons.radio_button_unchecked_rounded,
+                                color: TxaTheme.accent,
+                                size: 22,
+                                shadows: const [
+                                  Shadow(color: Colors.black87, blurRadius: 4),
                                 ],
                               ),
                             ),
-                            IconButton(
-                              onPressed: () => _showMovieActions(mid),
-                              icon: const Icon(
-                                Icons.more_vert_rounded,
-                                color: TxaTheme.textMuted,
-                              ),
-                            ),
-                          ],
-                        ),
+                        ],
                       ),
                     ),
-                  ),
-                  if (_expandedMovieId == mid)
-                    ...movieTasks.map((task) => _buildEpisodeItem(task)),
-                ],
+                    const SizedBox(height: 8),
+                    Text(
+                      firstTask.movieTitle,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ],
+                ),
               );
             },
           );
@@ -316,170 +308,38 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
     );
   }
 
-  void _showMovieActions(String movieId) {
-    showModalBottomSheet(
+  void _showDeleteConfirm() {
+    showDialog(
       context: context,
-      backgroundColor: TxaTheme.cardBg,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder:
-          (ctx) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                leading: const Icon(
-                  Icons.delete_outline_rounded,
-                  color: Colors.redAccent,
-                ),
-                title: Text(
-                  TxaLanguage.t('delete_movie_confirm'),
-                  style: const TextStyle(color: Colors.white),
-                ),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  TxaDownloadManager().removeMovie(movieId);
-                },
-              ),
-            ],
+      builder: (ctx) => AlertDialog(
+        backgroundColor: TxaTheme.cardBg,
+        title: Text(
+          TxaLanguage.t('delete_all_confirm'),
+          style: const TextStyle(color: Colors.white),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: Text(TxaLanguage.t('cancel')),
           ),
-    );
-  }
-
-  Widget _buildEpisodeItem(DownloadTask task) {
-    final manager = TxaDownloadManager();
-    final isDone = task.status == DownloadStatus.completed;
-    final isError = task.status == DownloadStatus.error;
-    final isDownloading = task.status == DownloadStatus.downloading;
-    final isPaused = task.status == DownloadStatus.paused;
-
-    return Container(
-      margin: const EdgeInsets.only(left: 24, right: 0, bottom: 8),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: TxaTheme.cardBg.withValues(alpha: 0.5),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: TxaTheme.glassBorder),
-      ),
-      child: Row(
-        children: [
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  task.episodeTitle,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                if (!isDone) ...[
-                  const SizedBox(height: 8),
-                  LinearProgressIndicator(
-                    value: task.progress / 100,
-                    backgroundColor: Colors.white10,
-                    color: isError ? Colors.redAccent : TxaTheme.accent,
-                    minHeight: 2,
-                    borderRadius: BorderRadius.circular(1),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isError
-                        ? (task.error ?? TxaLanguage.t('error'))
-                        : "${task.progress.toInt()}%",
-                    style: TextStyle(
-                      color: isError ? Colors.redAccent : TxaTheme.textMuted,
-                      fontSize: 10,
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-          const SizedBox(width: 8),
-          if (isDone)
-            IconButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(
-                    builder:
-                        (context) => TxaPlayer(
-                          movie: {'id': task.movieId, 'name': task.movieTitle},
-                          servers: [],
-                          initialEpisodeId: task.episodeId,
-                          localPath: task.savePath,
-                          localTitle: task.episodeTitle,
-                        ),
-                  ),
-                );
-              },
-              icon: const Icon(
-                Icons.play_circle_fill_rounded,
-                color: TxaTheme.accent,
-                size: 28,
-              ),
-            )
-          else if (isDownloading)
-            IconButton(
-              onPressed: () => manager.pauseTask(task.id),
-              icon: const Icon(Icons.pause_rounded, color: Colors.white),
-            )
-          else if (isPaused || isError)
-            IconButton(
-              onPressed: () => manager.resumeTask(task.id),
-              icon: Icon(
-                Icons.play_arrow_rounded,
-                color: isError ? Colors.redAccent : Colors.white,
-              ),
-            ),
-          IconButton(
-            onPressed: () => manager.removeTask(task.id),
-            icon: const Icon(
-              Icons.close_rounded,
-              color: TxaTheme.textMuted,
-              size: 20,
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              for (var mid in _selectedMovies) {
+                TxaDownloadManager().removeMovie(mid);
+              }
+              setState(() {
+                _isSelectionMode = false;
+                _selectedMovies.clear();
+              });
+            },
+            child: Text(
+              TxaLanguage.t('delete'),
+              style: const TextStyle(color: Colors.redAccent),
             ),
           ),
         ],
       ),
-    );
-  }
-
-  void _showDeleteConfirm() {
-    showDialog(
-      context: context,
-      builder:
-          (ctx) => AlertDialog(
-            backgroundColor: TxaTheme.cardBg,
-            title: Text(
-              TxaLanguage.t('delete_all_confirm'),
-              style: const TextStyle(color: Colors.white),
-            ),
-            actions: [
-              TextButton(
-                onPressed: () => Navigator.pop(ctx),
-                child: Text(TxaLanguage.t('cancel')),
-              ),
-              TextButton(
-                onPressed: () {
-                  Navigator.pop(ctx);
-                  for (var mid in _selectedMovies) {
-                    TxaDownloadManager().removeMovie(mid);
-                  }
-                  setState(() {
-                    _isSelectionMode = false;
-                    _selectedMovies.clear();
-                  });
-                },
-                child: const Text(
-                  'Xóa',
-                  style: TextStyle(color: Colors.redAccent),
-                ),
-              ),
-            ],
-          ),
     );
   }
 }

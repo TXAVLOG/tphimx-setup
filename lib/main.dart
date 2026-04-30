@@ -117,7 +117,7 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
     TxaSettings.isAppForeground = true;
     _initDeepLinks();
     _initNotifications();
-    
+
     // Initialize screenshot detection
     WidgetsBinding.instance.addPostFrameCallback((_) {
       TxaScreenshotService().init(context);
@@ -165,12 +165,16 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
       // Handle notification if app was launched from it
       final launchDetails = await plugin.getNotificationAppLaunchDetails();
       if (launchDetails?.didNotificationLaunchApp ?? false) {
-        _handleNotificationPayload(launchDetails?.notificationResponse?.payload);
+        _handleNotificationPayload(
+          launchDetails?.notificationResponse?.payload,
+        );
       }
 
       if (Platform.isIOS) {
         await plugin
-            .resolvePlatformSpecificImplementation<IOSFlutterLocalNotificationsPlugin>()
+            .resolvePlatformSpecificImplementation<
+              IOSFlutterLocalNotificationsPlugin
+            >()
             ?.requestPermissions(alert: true, badge: true, sound: true);
       }
     } catch (e) {
@@ -258,7 +262,9 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
         textTheme = GoogleFonts.oswaldTextTheme(ThemeData.dark().textTheme);
         break;
       case 'Playfair Display':
-        textTheme = GoogleFonts.playfairDisplayTextTheme(ThemeData.dark().textTheme);
+        textTheme = GoogleFonts.playfairDisplayTextTheme(
+          ThemeData.dark().textTheme,
+        );
         break;
       default:
         textTheme = GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme);
@@ -275,11 +281,14 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
           controller: TxaScreenshotService().screenshotController,
           child: TxaWatermark(
             child: MediaQuery(
-              data: MediaQuery.of(
-                context,
-              ).copyWith(textScaler: TextScaler.linear(TxaSettings.fontSizeScale)),
+              data: MediaQuery.of(context).copyWith(
+                textScaler: TextScaler.linear(TxaSettings.fontSizeScale),
+              ),
               child: Stack(
-                children: [child ?? const SizedBox.shrink(), const TxaMiniPlayer()],
+                children: [
+                  child ?? const SizedBox.shrink(),
+                  const TxaMiniPlayer(),
+                ],
               ),
             ),
           ),
@@ -394,11 +403,13 @@ class _MainEntryState extends State<MainEntry> {
     final network = context.read<TxaNetwork>();
     final isOnline = await network.isConnected();
     if (!mounted) return;
-    
+
     if (!isOnline) {
       final downloadManager = context.read<TxaDownloadManager>();
       // Check if there are ANY completed tasks to show in offline mode
-      if (downloadManager.tasks.any((t) => t.status == DownloadStatus.completed)) {
+      if (downloadManager.tasks.any(
+        (t) => t.status == DownloadStatus.completed,
+      )) {
         setState(() {
           _isOfflineMode = true;
           _isNoConnectionNoData = false;
@@ -456,7 +467,11 @@ class NoConnectionScreen extends StatelessWidget {
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              const Icon(Icons.wifi_off_rounded, size: 80, color: Colors.redAccent),
+              const Icon(
+                Icons.wifi_off_rounded,
+                size: 80,
+                color: Colors.redAccent,
+              ),
               const SizedBox(height: 24),
               Text(
                 TxaLanguage.t('no_internet_no_downloads'),
@@ -481,14 +496,20 @@ class NoConnectionScreen extends StatelessWidget {
                 onPressed: () {
                   // In a real app, we might want to restart or re-check
                   // For now, let's just trigger a re-check
-                  final state = context.findAncestorStateOfType<_MainEntryState>();
+                  final state = context
+                      .findAncestorStateOfType<_MainEntryState>();
                   state?._checkConnectivity();
                 },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: Colors.redAccent,
                   foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 12,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
                 ),
                 icon: const Icon(Icons.refresh_rounded),
                 label: Text(TxaLanguage.t('retry')),
@@ -513,9 +534,15 @@ class OfflineModeScreen extends StatelessWidget {
         elevation: 0,
         title: Text(
           TxaLanguage.t('offline_mode'),
-          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-        leading: const Icon(Icons.signal_wifi_off_rounded, color: Colors.redAccent),
+        leading: const Icon(
+          Icons.signal_wifi_off_rounded,
+          color: Colors.redAccent,
+        ),
       ),
       body: const DownloadManagerScreen(),
     );

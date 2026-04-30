@@ -66,14 +66,21 @@ class TxaUpdateModal extends StatelessWidget {
           Row(
             children: [
               Container(
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 10,
+                  vertical: 4,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.blue.withValues(alpha: 0.1),
                   borderRadius: BorderRadius.circular(4),
                 ),
                 child: Text(
                   TxaLanguage.t('version_label', replace: {'version': version}),
-                  style: const TextStyle(color: Colors.blue, fontWeight: FontWeight.bold, fontSize: 13),
+                  style: const TextStyle(
+                    color: Colors.blue,
+                    fontWeight: FontWeight.bold,
+                    fontSize: 13,
+                  ),
                 ),
               ),
               const Spacer(),
@@ -88,13 +95,21 @@ class TxaUpdateModal extends StatelessWidget {
             const SizedBox(height: 8),
             Text(
               releaseDate!,
-              style: const TextStyle(color: Colors.white38, fontSize: 12, fontStyle: FontStyle.italic),
+              style: const TextStyle(
+                color: Colors.white38,
+                fontSize: 12,
+                fontStyle: FontStyle.italic,
+              ),
             ),
           ],
           const SizedBox(height: 16),
           Text(
             TxaLanguage.t('whats_new'),
-            style: const TextStyle(color: Colors.white70, fontSize: 14, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 8),
           Container(
@@ -109,7 +124,11 @@ class TxaUpdateModal extends StatelessWidget {
               child: SingleChildScrollView(
                 child: Text(
                   changelog,
-                  style: const TextStyle(color: Colors.grey, fontSize: 13, height: 1.5),
+                  style: const TextStyle(
+                    color: Colors.grey,
+                    fontSize: 13,
+                    height: 1.5,
+                  ),
                 ),
               ),
             ),

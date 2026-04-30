@@ -18,7 +18,7 @@ void callbackDispatcher() {
       await TxaLanguage.init();
       final api = TxaApi();
       final prefs = await SharedPreferences.getInstance();
-      
+
       final notificationsPlugin = FlutterLocalNotificationsPlugin();
       const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
       const initSettings = InitializationSettings(android: androidInit);
@@ -29,13 +29,14 @@ void callbackDispatcher() {
         final updateData = await api.getCheckUpdate();
         final Map<String, dynamic>? appData = updateData['data'];
         final String latestVersion = appData?['latest_version'] ?? '';
-        
+
         final packageInfo = await PackageInfo.fromPlatform();
         final String currentVersion = packageInfo.version;
-        
-        if (latestVersion.isNotEmpty && _isNewer(latestVersion, currentVersion)) {
+
+        if (latestVersion.isNotEmpty &&
+            _isNewer(latestVersion, currentVersion)) {
           final lastNotified = TxaSettings.lastNotifiedUpdateVersion;
-          
+
           // Only show notification if it's a new version we haven't notified about yet
           if (lastNotified != latestVersion) {
             await _showNotification(
@@ -58,21 +59,21 @@ void callbackDispatcher() {
           final notifData = await api.getNotifications();
           final List<dynamic> notifs = notifData['data'] ?? [];
           final String lastNotifId = prefs.getString('last_bg_notif_id') ?? '';
-          
+
           if (notifs.isNotEmpty) {
             // Process up to 5 newest unread notifications
             int count = 0;
             String? latestId;
-            
+
             for (var notif in notifs) {
               final String currentId = notif['id']?.toString() ?? '';
               if (currentId == lastNotifId) break; // Reached old notifications
               if (notif['is_read'] == true) continue;
-              
+
               latestId ??= currentId;
-              
+
               final String slug = notif['movie_slug'] ?? '';
-              
+
               await _showNotification(
                 notificationsPlugin,
                 100 + count,
@@ -84,17 +85,20 @@ void callbackDispatcher() {
                 payload: slug.isNotEmpty ? 'movie_detail:$slug' : null,
                 groupKey: 'txa_episodes_group',
               );
-              
+
               count++;
-              if (count >= 5) break; 
+              if (count >= 5) break;
             }
-            
+
             if (latestId != null) {
               await prefs.setString('last_bg_notif_id', latestId);
-              
+
               // If multiple notifications, show a summary (Android only)
               if (count > 1) {
-                await _showSummaryNotification(notificationsPlugin, 'txa_episodes_group');
+                await _showSummaryNotification(
+                  notificationsPlugin,
+                  'txa_episodes_group',
+                );
               }
             }
           }
@@ -110,16 +114,17 @@ void callbackDispatcher() {
         if (days.isNotEmpty) {
           final todayMovies = days.first['movies'] as List<dynamic>? ?? [];
           final now = DateTime.now();
-          
+
           for (var movie in todayMovies) {
             final String? broadcastAtStr = movie['broadcast_at'];
             if (broadcastAtStr != null) {
               final broadcastAt = DateTime.parse(broadcastAtStr);
               final diff = broadcastAt.difference(now).inMinutes;
-              
+
               // If movie starts in 5-20 minutes, notify
               if (diff > 5 && diff < 20) {
-                final String movieKey = 'sched_notif_${movie['id']}_${broadcastAt.day}';
+                final String movieKey =
+                    'sched_notif_${movie['id']}_${broadcastAt.day}';
                 if (prefs.getBool(movieKey) != true) {
                   await _showNotification(
                     notificationsPlugin,
@@ -145,7 +150,7 @@ void callbackDispatcher() {
       } catch (e) {
         TxaLogger.log('[Background] Schedule check error: $e');
       }
-      
+
       return Future.value(true);
     } catch (e) {
       TxaLogger.log('[Background] Task error: $e', isError: true);
@@ -188,12 +193,12 @@ Future<void> _showNotification(
     setAsGroupSummary: false,
     actions: actions,
   );
-  
+
   final details = NotificationDetails(
     android: androidDetails,
     iOS: const DarwinNotificationDetails(),
   );
-  
+
   await plugin.show(
     id: id,
     title: title,
@@ -215,9 +220,13 @@ Future<void> _showSummaryNotification(
     priority: Priority.high,
     groupKey: groupKey,
     setAsGroupSummary: true,
-    styleInformation: const InboxStyleInformation([], contentTitle: 'TPhimX', summaryText: 'Nhiều cập nhật mới'),
+    styleInformation: const InboxStyleInformation(
+      [],
+      contentTitle: 'TPhimX',
+      summaryText: 'Nhiều cập nhật mới',
+    ),
   );
-  
+
   final details = NotificationDetails(android: androidDetails);
   await plugin.show(
     id: groupKey.hashCode,
@@ -228,8 +237,14 @@ Future<void> _showSummaryNotification(
 }
 
 bool _isNewer(String latest, String current) {
-  List<int> latestParts = latest.split('.').map((e) => int.tryParse(e) ?? 0).toList();
-  List<int> currentParts = current.split('.').map((e) => int.tryParse(e) ?? 0).toList();
+  List<int> latestParts = latest
+      .split('.')
+      .map((e) => int.tryParse(e) ?? 0)
+      .toList();
+  List<int> currentParts = current
+      .split('.')
+      .map((e) => int.tryParse(e) ?? 0)
+      .toList();
   for (int i = 0; i < latestParts.length && i < currentParts.length; i++) {
     if (latestParts[i] > currentParts[i]) return true;
     if (latestParts[i] < currentParts[i]) return false;
@@ -239,9 +254,7 @@ bool _isNewer(String latest, String current) {
 
 class TxaBackgroundService {
   static Future<void> init() async {
-    await Workmanager().initialize(
-      callbackDispatcher,
-    );
+    await Workmanager().initialize(callbackDispatcher);
   }
 
   static Future<void> registerUpdateTask() async {
@@ -250,9 +263,7 @@ class TxaBackgroundService {
       "txa-background-sync",
       "backgroundSyncTask",
       frequency: const Duration(minutes: 15),
-      constraints: Constraints(
-        networkType: NetworkType.connected,
-      ),
+      constraints: Constraints(networkType: NetworkType.connected),
       existingWorkPolicy: ExistingPeriodicWorkPolicy.replace,
     );
   }
@@ -278,7 +289,9 @@ class TxaBackgroundService {
       if (latestVersion.isNotEmpty && _isNewer(latestVersion, currentVersion)) {
         // New update found
         final notificationsPlugin = FlutterLocalNotificationsPlugin();
-        const androidInit = AndroidInitializationSettings('@mipmap/ic_launcher');
+        const androidInit = AndroidInitializationSettings(
+          '@mipmap/ic_launcher',
+        );
         const initSettings = InitializationSettings(android: androidInit);
         await notificationsPlugin.initialize(settings: initSettings);
 
@@ -301,7 +314,10 @@ class TxaBackgroundService {
       } else {
         // Up to date
         Fluttertoast.showToast(
-          msg: TxaLanguage.t('up_to_date', replace: {'version': currentVersion}),
+          msg: TxaLanguage.t(
+            'up_to_date',
+            replace: {'version': currentVersion},
+          ),
           toastLength: Toast.LENGTH_SHORT,
           gravity: ToastGravity.BOTTOM,
           backgroundColor: Colors.blueAccent,

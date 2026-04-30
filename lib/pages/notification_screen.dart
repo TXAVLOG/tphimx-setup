@@ -27,12 +27,18 @@ class NotificationScreen extends StatelessWidget {
         actions: [
           Consumer<NotificationProvider>(
             builder: (context, provider, child) {
-              if (provider.notifications.isEmpty) return const SizedBox.shrink();
-              return PopupMenuButton<String>( 
+              if (provider.notifications.isEmpty) {
+                return const SizedBox.shrink();
+              }
+              return PopupMenuButton<String>(
                 icon: const Icon(Icons.more_vert_rounded, color: Colors.white),
                 onSelected: (val) {
-                  if (val == 'read_all') provider.markAllRead();
-                  if (val == 'clear_all') provider.clearAll();
+                  if (val == 'read_all') {
+                    provider.markAllRead();
+                  }
+                  if (val == 'clear_all') {
+                    provider.clearAll();
+                  }
                 },
                 itemBuilder: (ctx) => [
                   PopupMenuItem(

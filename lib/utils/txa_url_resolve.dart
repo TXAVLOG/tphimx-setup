@@ -45,9 +45,13 @@ class TxaUrlResolve {
   /// Resolve MediaFire URL (Basic implementation - scraping direct link)
   static Future<Map<String, dynamic>> resolveMediaFire(String url) async {
     try {
-      final response = await http.get(Uri.parse(url), headers: {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
-      });
+      final response = await http.get(
+        Uri.parse(url),
+        headers: {
+          'User-Agent':
+              'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
+        },
+      );
 
       if (response.statusCode != 200) {
         throw Exception('HTTP ${response.statusCode}');
@@ -56,23 +60,35 @@ class TxaUrlResolve {
       final String html = response.body;
 
       // Extract direct download link
-      final RegExp matchRegex = RegExp(r'''https?://download\.mediafire\.com/[^\s"'>]+''');
+      final RegExp matchRegex = RegExp(
+        r'''https?://download\.mediafire\.com/[^\s"'>]+''',
+      );
       final RegExpMatch? match = matchRegex.firstMatch(html);
-      
+
       if (match != null) {
         final String? directUrl = match.group(0);
         if (directUrl != null) {
-          return {'success': true, 'url': directUrl, 'type': 'mediafire-direct'};
+          return {
+            'success': true,
+            'url': directUrl,
+            'type': 'mediafire-direct',
+          };
         }
       }
 
-      final RegExp buttonRegex = RegExp(r'''href="(https?://[^"]+)"[^>]*id="downloadButton"''');
+      final RegExp buttonRegex = RegExp(
+        r'''href="(https?://[^"]+)"[^>]*id="downloadButton"''',
+      );
       final RegExpMatch? buttonMatch = buttonRegex.firstMatch(html);
-      
+
       if (buttonMatch != null) {
         final String? buttonUrl = buttonMatch.group(1);
         if (buttonUrl != null) {
-          return {'success': true, 'url': buttonUrl, 'type': 'mediafire-button'};
+          return {
+            'success': true,
+            'url': buttonUrl,
+            'type': 'mediafire-button',
+          };
         }
       }
 
@@ -87,7 +103,7 @@ class TxaUrlResolve {
     try {
       final RegExp fileIdRegex = RegExp(r'[-\w]{25,}');
       final RegExpMatch? fileIdMatch = fileIdRegex.firstMatch(url);
-      
+
       if (fileIdMatch == null) {
         throw Exception('Invalid Google Drive file ID');
       }
@@ -96,8 +112,9 @@ class TxaUrlResolve {
       if (fileId == null) {
         throw Exception('File ID extraction failed');
       }
-      
-      final String directUrl = 'https://drive.google.com/uc?export=download&id=$fileId';
+
+      final String directUrl =
+          'https://drive.google.com/uc?export=download&id=$fileId';
 
       return {'success': true, 'url': directUrl, 'type': 'gdrive'};
     } catch (e) {

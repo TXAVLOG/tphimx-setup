@@ -5,11 +5,7 @@ class TxaTooltip extends StatelessWidget {
   final String message;
   final tooltipKey = GlobalKey<TooltipState>();
 
-  TxaTooltip({
-    super.key,
-    required this.child,
-    required this.message,
-  });
+  TxaTooltip({super.key, required this.child, required this.message});
 
   @override
   Widget build(BuildContext context) {

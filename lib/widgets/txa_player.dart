@@ -28,6 +28,7 @@ import 'package:app_settings/app_settings.dart' as app_settings_lib;
 import 'txa_watermark.dart';
 
 class TxaPlayer extends StatefulWidget {
+  static bool isPlayerActive = false;
   final dynamic movie;
   final List<dynamic> servers;
   final int? initialServerIndex;
@@ -57,6 +58,7 @@ class TxaPlayer extends StatefulWidget {
 class _TxaPlayerState extends State<TxaPlayer>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   BetterPlayerController? _betterPlayerController;
+  final GlobalKey _betterPlayerKey = GlobalKey();
   bool _error = false;
   bool _isInitialized = false;
   bool _isRefreshing = false;
@@ -143,6 +145,7 @@ class _TxaPlayerState extends State<TxaPlayer>
   @override
   void initState() {
     super.initState();
+    TxaPlayer.isPlayerActive = true;
     _currentServerIndex = widget.initialServerIndex ?? 0;
     _currentEpisodeIndex = 0;
     _brightness = TxaSettings.brightness;
@@ -203,12 +206,15 @@ class _TxaPlayerState extends State<TxaPlayer>
     final dur = _betterPlayerController!.videoPlayerController?.value.duration;
 
     if (pos == null || dur == null || dur.inSeconds == 0) return;
-    if (widget.servers.isEmpty || _currentServerIndex >= widget.servers.length) return;
+    if (widget.servers.isEmpty ||
+        _currentServerIndex >= widget.servers.length) {
+      return;
+    }
 
     final server = widget.servers[_currentServerIndex];
     final serverData = server['server_data'] as List;
     if (_currentEpisodeIndex >= serverData.length) return;
-    
+
     final ep = serverData[_currentEpisodeIndex];
 
     final mId = int.tryParse(widget.movie['id'].toString()) ?? 0;
@@ -229,7 +235,9 @@ class _TxaPlayerState extends State<TxaPlayer>
       );
     } catch (e) {
       // If offline or error, save to pending queue for later sync
-      TxaLogger.log("WatchHistory Server Sync Failed, cached locally. ID: $eId");
+      TxaLogger.log(
+        "WatchHistory Server Sync Failed, cached locally. ID: $eId",
+      );
       TxaSettings.addPendingSync({
         'movie_id': mId,
         'episode_id': eId,
@@ -241,6 +249,7 @@ class _TxaPlayerState extends State<TxaPlayer>
 
   @override
   void dispose() {
+    TxaPlayer.isPlayerActive = false;
     _toggleDND(false);
     _historySyncTimer?.cancel();
     _clockTimer.cancel();
@@ -510,8 +519,8 @@ class _TxaPlayerState extends State<TxaPlayer>
 
     final episode =
         serverData.isNotEmpty && _currentEpisodeIndex < serverData.length
-            ? serverData[_currentEpisodeIndex]
-            : null;
+        ? serverData[_currentEpisodeIndex]
+        : null;
 
     if (widget.localPath != null) {
       final file = File(widget.localPath!);
@@ -665,7 +674,7 @@ class _TxaPlayerState extends State<TxaPlayer>
         resumeTime = widget.initialTime;
         _isFirstLoad = false;
       }
-      
+
       // If no initial time provided (e.g. from Download Manager), check local cache
       if (resumeTime == null || resumeTime == 0) {
         final eId = int.tryParse(episode?['id']?.toString() ?? '0') ?? 0;
@@ -802,6 +811,26 @@ class _TxaPlayerState extends State<TxaPlayer>
 
   Future<void> _handlePlayerError() async {
     if (_isRefreshing || !mounted) return;
+
+    // Log detailed error
+    final msg =
+        _betterPlayerController
+            ?.videoPlayerController
+            ?.value
+            .errorDescription ??
+        'Unknown Video Error';
+    TxaLogger.log("Player Exception: $msg", isError: true);
+
+    if (widget.localPath != null) {
+      // Local file error - usually missing segments for HLS or corrupted file
+      setState(() {
+        _error = true;
+        _isRefreshing = false;
+        _detailedError = TxaLanguage.t('local_playback_error');
+      });
+      return;
+    }
+
     setState(() => _isRefreshing = true);
     _initializePlayer();
   }
@@ -907,7 +936,7 @@ class _TxaPlayerState extends State<TxaPlayer>
           if (!mounted) return;
           TxaToast.show(
             context,
-            "Phát hiện phản chiếu màn hình. Vui lòng tắt Miracast để tiếp tục xem.",
+            TxaLanguage.t('miracast_detected'),
             isError: true,
           );
         }
@@ -1091,8 +1120,12 @@ class _TxaPlayerState extends State<TxaPlayer>
       // Professional way: Open a cast web helper page or use Web Video Caster intent
       // Web Video Caster is the industry standard for casting web videos
       final String encodedUrl = Uri.encodeComponent(videoUrl);
-      final String encodedTitle = Uri.encodeComponent(widget.movie['name'] ?? '');
-      final String encodedPoster = Uri.encodeComponent(widget.movie['thumb_url'] ?? widget.movie['thumb'] ?? '');
+      final String encodedTitle = Uri.encodeComponent(
+        widget.movie['name'] ?? '',
+      );
+      final String encodedPoster = Uri.encodeComponent(
+        widget.movie['thumb_url'] ?? widget.movie['thumb'] ?? '',
+      );
 
       // Using the new professional web cast receiver page
       final castWebUrl =
@@ -1412,7 +1445,8 @@ class _TxaPlayerState extends State<TxaPlayer>
       setState(() {
         _currentServerIndex = 0;
         _showServerDrawer = false;
-        _manualResumeTime = null; // Important: Clear manual resume when error-switching
+        _manualResumeTime =
+            null; // Important: Clear manual resume when error-switching
       });
       return;
     }
@@ -1565,7 +1599,7 @@ class _TxaPlayerState extends State<TxaPlayer>
   }
 
   Future<void> _toggleDND(bool enable) async {
-    if (!TxaSettings.autoDND) return;
+    if (!TxaSettings.autoDND && enable) return;
     try {
       final bool? hasPermission = await _dndChannel.invokeMethod<bool>(
         'checkPermission',
@@ -1585,7 +1619,7 @@ class _TxaPlayerState extends State<TxaPlayer>
   @override
   Widget build(BuildContext context) {
     final width = MediaQuery.of(context).size.width;
-    
+
     return PopScope(
       canPop: true,
       onPopInvokedWithResult: (didPop, result) {
@@ -1614,7 +1648,9 @@ class _TxaPlayerState extends State<TxaPlayer>
                         ? Stack(
                             children: [
                               _isEmbed
-                                  ? WebViewWidget(controller: _webViewController!)
+                                  ? WebViewWidget(
+                                      controller: _webViewController!,
+                                    )
                                   : BetterPlayer(
                                       controller: _betterPlayerController!,
                                     ),
@@ -1630,191 +1666,222 @@ class _TxaPlayerState extends State<TxaPlayer>
                         : _buildLoadingUI(),
                   ),
 
-                // 2.1 LOGO (Bottom-Left)
-                Positioned(
-                  bottom: 20,
-                  left: 20,
-                  child: Opacity(
-                    opacity: 0.5,
-                    child: Image.asset(
-                      'assets/images/logo_mini.png',
-                      width: 40,
-                      height: 40,
-                      errorBuilder: (ctx, e, st) => const SizedBox.shrink(),
-                    ),
-                  ),
-                ),
-
-              // 2.5 CLOCK (Top-Left)
-              if (TxaSettings.showClock)
-                Positioned(
-                  top: 40,
-                  left: 20,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 8,
-                      vertical: 4,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black26,
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          TxaFormat.formatDate(
-                            _now,
-                            pattern: TxaSettings.clockFormat,
-                          ),
-                          style: const TextStyle(
-                            color: Colors.white70,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            letterSpacing: 1.0,
-                          ),
-                        ),
-                        const SizedBox(width: 10),
-                        _buildBatteryIndicator(),
-                      ],
-                    ),
-                  ),
-                ),
-
-              // 2.6 MOVIE INFO (Top-Center) - Show only when controls are HIDDEN
-              if (!_showControls && !_isLocked && _isInitialized && !_error)
-                Positioned(
-                  top: 35,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: Colors.black26,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                  // 2.1 LOGO (Bottom-Left)
+                  Positioned(
+                    bottom: 20,
+                    left: 20,
+                    child: Opacity(
+                      opacity: 0.5,
+                      child: Image.asset(
+                        'assets/images/logo_mini.png',
+                        width: 40,
+                        height: 40,
+                        errorBuilder: (ctx, e, st) => const SizedBox.shrink(),
                       ),
-                      child: Builder(builder: (ctx) {
-                        String movieName = widget.movie['name'] ?? '';
-                        String episodeName = '';
-                        String serverName = '';
-
-                        if (widget.localPath != null) {
-                          episodeName = widget.localTitle ?? 'Offline';
-                          serverName = TxaLanguage.t('downloaded');
-                        } else if (widget.servers.isNotEmpty && _currentServerIndex < widget.servers.length) {
-                          final server = widget.servers[_currentServerIndex];
-                          serverName = server['server_name'] ?? 'Server';
-                          final episodes = server['server_data'] as List? ?? [];
-                          if (_currentEpisodeIndex < episodes.length) {
-                            final ep = episodes[_currentEpisodeIndex];
-                            episodeName = TxaFormat.formatEpisodeName(ep['name']?.toString());
-                          }
-                        }
-
-                        return Text(
-                          "$movieName • $episodeName${serverName.isNotEmpty ? ' ($serverName)' : ''}",
-                          style: TextStyle(
-                            color: Colors.white.withValues(alpha: 0.5),
-                            fontSize: 10,
-                            fontWeight: FontWeight.w600,
-                            letterSpacing: 0.8,
-                          ),
-                        );
-                      }),
                     ),
                   ),
-                ),
 
-              // 3. GESTURE FEEDBACK OVERLAY
-              if (_overlayLabel != null || _overlayIcon != null)
-                Center(
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 20,
-                      vertical: 12,
-                    ),
-                    decoration: BoxDecoration(
-                      color: Colors.black54,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Icon(_overlayIcon, color: Colors.white, size: 40),
-                        const SizedBox(height: 8),
-                        Text(
-                          _overlayLabel!,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
-                          ),
+                  // 2.5 CLOCK (Top-Left)
+                  if (TxaSettings.showClock)
+                    Positioned(
+                      top: 40,
+                      left: 20,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
                         ),
-                        if (_overlayValue != null) ...[
-                          const SizedBox(height: 8),
-                          SizedBox(
-                            width: 100,
-                            child: LinearProgressIndicator(
-                              value: _overlayValue,
-                              backgroundColor: Colors.white24,
-                              color: TxaTheme.accent,
+                        decoration: BoxDecoration(
+                          color: Colors.black26,
+                          borderRadius: BorderRadius.circular(6),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Text(
+                              TxaFormat.formatDate(
+                                _now,
+                                pattern: TxaSettings.clockFormat,
+                              ),
+                              style: const TextStyle(
+                                color: Colors.white70,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 1.0,
+                              ),
+                            ),
+                            const SizedBox(width: 10),
+                            _buildBatteryIndicator(),
+                          ],
+                        ),
+                      ),
+                    ),
+
+                  // 2.6 MOVIE INFO (Top-Center) - Show only when controls are HIDDEN
+                  if (!_showControls && !_isLocked && _isInitialized && !_error)
+                    Positioned(
+                      top: 35,
+                      left: 0,
+                      right: 0,
+                      child: Center(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 16,
+                            vertical: 6,
+                          ),
+                          decoration: BoxDecoration(
+                            color: Colors.black26,
+                            borderRadius: BorderRadius.circular(20),
+                            border: Border.all(
+                              color: Colors.white.withValues(alpha: 0.05),
                             ),
                           ),
-                        ],
-                      ],
+                          child: Builder(
+                            builder: (ctx) {
+                              String movieName = widget.movie['name'] ?? '';
+                              String episodeName = '';
+                              String serverName = '';
+
+                              if (widget.localPath != null) {
+                                episodeName = widget.localTitle ?? 'Offline';
+                                serverName = TxaLanguage.t('downloaded');
+                              } else if (widget.servers.isNotEmpty &&
+                                  _currentServerIndex < widget.servers.length) {
+                                final server =
+                                    widget.servers[_currentServerIndex];
+                                serverName = server['server_name'] ?? 'Server';
+                                final episodes =
+                                    server['server_data'] as List? ?? [];
+                                if (_currentEpisodeIndex < episodes.length) {
+                                  final ep = episodes[_currentEpisodeIndex];
+                                  episodeName = TxaFormat.formatEpisodeName(
+                                    ep['name']?.toString(),
+                                  );
+                                }
+                              }
+
+                              return Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  if (widget.localPath != null) ...[
+                                    const Icon(
+                                      Icons.download_done_rounded,
+                                      color: TxaTheme.accent,
+                                      size: 10,
+                                    ),
+                                    const SizedBox(width: 4),
+                                  ],
+                                  Text(
+                                    "$movieName • $episodeName${serverName.isNotEmpty ? ' ($serverName)' : ''}",
+                                    style: TextStyle(
+                                      color: Colors.white.withValues(
+                                        alpha: 0.5,
+                                      ),
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w600,
+                                      letterSpacing: 0.8,
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                ),
 
-              // 4. CUSTOM CONTROLS
-              if (_showControls && _isInitialized && !_error) ...[
-                _buildControlOverlay(),
-              ],
+                  // 3. GESTURE FEEDBACK OVERLAY
+                  if (_overlayLabel != null || _overlayIcon != null)
+                    Center(
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 20,
+                          vertical: 12,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(_overlayIcon, color: Colors.white, size: 40),
+                            const SizedBox(height: 8),
+                            Text(
+                              _overlayLabel!,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (_overlayValue != null) ...[
+                              const SizedBox(height: 8),
+                              SizedBox(
+                                width: 100,
+                                child: LinearProgressIndicator(
+                                  value: _overlayValue,
+                                  backgroundColor: Colors.white24,
+                                  color: TxaTheme.accent,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ),
 
-              // 4.5 EPISODE DRAWER
-              if (_showEpisodeDrawer && _isInitialized && !_error)
-                _buildEpisodeSelectionOverlay(),
+                  // 4. CUSTOM CONTROLS
+                  if (_showControls && _isInitialized && !_error) ...[
+                    _buildControlOverlay(),
+                  ],
 
-              // 4.6 SERVER DRAWER
-              if (_showServerDrawer && _isInitialized && !_error)
-                _buildServerSelectionOverlay(),
+                  // 4.5 EPISODE DRAWER
+                  if (_showEpisodeDrawer && _isInitialized && !_error)
+                    _buildEpisodeSelectionOverlay(),
 
-              // 6. AUTO NEXT PREVIEW (PREMIUM)
-              if (_showAutoNextCountdownOverlay && _isInitialized && !_error)
-                _buildAutoNextOverlay(),
+                  // 4.6 SERVER DRAWER
+                  if (_showServerDrawer && _isInitialized && !_error)
+                    _buildServerSelectionOverlay(),
 
-              // 7. SKIP BUTTONS
-              if (_showSkipIntro)
-                _buildSkipOverlay(TxaLanguage.t('skip_intro'), () {
-                  _betterPlayerController!.seekTo(
-                    Duration(seconds: _introEnd.toInt()),
-                  );
-                }, Alignment.bottomRight),
-              if (_showSkipOutro)
-                _buildSkipOverlay(
-                  TxaLanguage.t('skip_outro_next'),
-                  _playNext,
-                  Alignment.bottomRight,
-                ),
-            ],
+                  // 6. AUTO NEXT PREVIEW (PREMIUM)
+                  if (_showAutoNextCountdownOverlay &&
+                      _isInitialized &&
+                      !_error)
+                    _buildAutoNextOverlay(),
+
+                  // 7. SKIP BUTTONS
+                  if (_showSkipIntro)
+                    _buildSkipOverlay(TxaLanguage.t('skip_intro'), () {
+                      _betterPlayerController!.seekTo(
+                        Duration(seconds: _introEnd.toInt()),
+                      );
+                    }, Alignment.bottomRight),
+                  if (_showSkipOutro)
+                    _buildSkipOverlay(
+                      TxaLanguage.t('skip_outro_next'),
+                      _playNext,
+                      Alignment.bottomRight,
+                    ),
+                ],
+              ),
+            ),
           ),
         ),
       ),
-    ),
-  ),
-);
-}
+    );
+  }
 
   Widget _buildAutoNextOverlay() {
-    if (widget.servers.isEmpty || _currentServerIndex >= widget.servers.length) {
+    if (widget.servers.isEmpty ||
+        _currentServerIndex >= widget.servers.length) {
       return const SizedBox.shrink();
     }
     final serverData =
         widget.servers[_currentServerIndex]['server_data'] as List? ?? [];
     final nextEpIndex = _currentEpisodeIndex + 1;
-    final nextEp =
-        nextEpIndex < serverData.length ? serverData[nextEpIndex] : null;
+    final nextEp = nextEpIndex < serverData.length
+        ? serverData[nextEpIndex]
+        : null;
 
     if (nextEp == null) return const SizedBox.shrink();
 
@@ -2051,9 +2118,16 @@ class _TxaPlayerState extends State<TxaPlayer>
                     onTap: () async {
                       if (_betterPlayerController != null && _isInitialized) {
                         await _syncHistory(); // Sync before PiP
-                        _floating.enable(
-                          ImmediatePiP(aspectRatio: const Rational(16, 9)),
-                        );
+                        if (_isEmbed) {
+                          _floating.enable(
+                            ImmediatePiP(aspectRatio: const Rational(16, 9)),
+                          );
+                        } else {
+                          // Use BetterPlayer's native PiP for the actual video source
+                          _betterPlayerController!.enablePictureInPicture(
+                            _betterPlayerKey,
+                          );
+                        }
                       }
                     },
                   ),
@@ -2351,8 +2425,8 @@ class _TxaPlayerState extends State<TxaPlayer>
               ),
             ),
           ),
-        ],
-      );
+      ],
+    );
   }
 
   Widget _buildPiPUI() {
@@ -2364,8 +2438,11 @@ class _TxaPlayerState extends State<TxaPlayer>
           children: [
             _isInitialized
                 ? (_isEmbed
-                    ? WebViewWidget(controller: _webViewController!)
-                    : BetterPlayer(controller: _betterPlayerController!))
+                      ? WebViewWidget(controller: _webViewController!)
+                      : BetterPlayer(
+                          key: _betterPlayerKey,
+                          controller: _betterPlayerController!,
+                        ))
                 : const SizedBox.shrink(),
             Positioned(
               top: 16,
@@ -2456,13 +2533,16 @@ class _TxaPlayerState extends State<TxaPlayer>
                               if (_introEnd > _introStart)
                                 Positioned(
                                   left: (_introStart / dur) * (barWidth - 24),
-                                  width: ((_introEnd - _introStart) / dur) *
+                                  width:
+                                      ((_introEnd - _introStart) / dur) *
                                       (barWidth - 24),
                                   top: 22,
                                   bottom: 22,
                                   child: Container(
                                     decoration: BoxDecoration(
-                                      color: Colors.amber.withValues(alpha: 0.7),
+                                      color: Colors.amber.withValues(
+                                        alpha: 0.7,
+                                      ),
                                       borderRadius: BorderRadius.circular(2),
                                     ),
                                   ),
@@ -3180,7 +3260,6 @@ class _TxaPlayerState extends State<TxaPlayer>
     }
     return '$mm:${ss.toString().padLeft(2, '0')}';
   }
-
 }
 
 class _CenterControlIcon extends StatelessWidget {

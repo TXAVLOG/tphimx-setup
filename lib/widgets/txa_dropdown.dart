@@ -52,8 +52,14 @@ class TxaDropdown<T> extends StatelessWidget {
                   items: items,
                   onChanged: onChanged,
                   isExpanded: true,
-                  dropdownColor: const Color(0xFF0F172A), // Dark surface for menu
-                  icon: const Icon(Icons.keyboard_arrow_down_rounded, color: TxaTheme.accent, size: 20),
+                  dropdownColor: const Color(
+                    0xFF0F172A,
+                  ), // Dark surface for menu
+                  icon: const Icon(
+                    Icons.keyboard_arrow_down_rounded,
+                    color: TxaTheme.accent,
+                    size: 20,
+                  ),
                   borderRadius: BorderRadius.circular(16),
                   style: const TextStyle(
                     color: TxaTheme.textPrimary,

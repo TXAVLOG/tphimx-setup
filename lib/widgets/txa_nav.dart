@@ -144,24 +144,28 @@ class _NavItem extends StatelessWidget {
               curve: Curves.elasticOut,
               padding: EdgeInsets.all(isActive ? 8 : 4),
               decoration: BoxDecoration(
-                color: isActive 
-                    ? TxaTheme.accent.withValues(alpha: 0.15) 
+                color: isActive
+                    ? TxaTheme.accent.withValues(alpha: 0.15)
                     : Colors.transparent,
                 shape: BoxShape.circle,
-                boxShadow: isActive ? [
-                  BoxShadow(
-                    color: TxaTheme.accent.withValues(alpha: 0.3),
-                    blurRadius: 12,
-                    spreadRadius: 1,
-                  )
-                ] : null,
+                boxShadow: isActive
+                    ? [
+                        BoxShadow(
+                          color: TxaTheme.accent.withValues(alpha: 0.3),
+                          blurRadius: 12,
+                          spreadRadius: 1,
+                        ),
+                      ]
+                    : null,
               ),
               child: Stack(
                 clipBehavior: Clip.none,
                 children: [
                   Icon(
                     icon,
-                    color: isActive ? TxaTheme.accent : Colors.white.withValues(alpha: 0.5),
+                    color: isActive
+                        ? TxaTheme.accent
+                        : Colors.white.withValues(alpha: 0.5),
                     size: isActive ? 24 : 22,
                   ),
                   if (badgeCount > 0)

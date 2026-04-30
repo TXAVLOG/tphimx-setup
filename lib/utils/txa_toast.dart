@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 import '../theme/txa_theme.dart';
 
 class TxaToast {
-  static void show(BuildContext context, String message, {bool isError = false}) {
+  static void show(
+    BuildContext context,
+    String message, {
+    bool isError = false,
+  }) {
     final overlay = Overlay.of(context);
     final overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
@@ -18,16 +22,15 @@ class TxaToast {
             builder: (context, value, child) {
               return Transform.translate(
                 offset: Offset(0, -20 * (1 - value)),
-                child: Opacity(
-                  opacity: value,
-                  child: child,
-                ),
+                child: Opacity(opacity: value, child: child),
               );
             },
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
               decoration: BoxDecoration(
-                color: isError ? Colors.red.withValues(alpha: 0.9) : TxaTheme.accent.withValues(alpha: 0.9),
+                color: isError
+                    ? Colors.red.withValues(alpha: 0.9)
+                    : TxaTheme.accent.withValues(alpha: 0.9),
                 borderRadius: BorderRadius.circular(16),
                 boxShadow: [
                   BoxShadow(
@@ -41,7 +44,9 @@ class TxaToast {
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Icon(
-                    isError ? Icons.error_outline_rounded : Icons.info_outline_rounded,
+                    isError
+                        ? Icons.error_outline_rounded
+                        : Icons.info_outline_rounded,
                     color: Colors.white,
                     size: 20,
                   ),

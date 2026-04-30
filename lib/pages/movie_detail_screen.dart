@@ -1134,95 +1134,98 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                               setModalState(() => _isDownloadingAll = true);
                               try {
                                 final currentServer = servers[tempServerIndex];
-                              final episodesList =
-                                  currentServer['server_data'] as List? ?? [];
+                                final episodesList =
+                                    currentServer['server_data'] as List? ?? [];
 
-                              TxaToast.show(
-                                context,
-                                TxaLanguage.t('downloading_all'),
-                              );
+                                TxaToast.show(
+                                  context,
+                                  TxaLanguage.t('downloading_all'),
+                                );
 
-                              int successCount = 0;
-                              int failCount = 0;
+                                int successCount = 0;
+                                int failCount = 0;
 
-                              for (var ep in episodesList) {
-                                try {
-                                  final epId = ep['id'].toString();
-
-                                  // Check if already in queue
-                                  final isTaskActive =
-                                      TxaDownloadManager().isTaskActive(
-                                    movieData['movie']['id'].toString(),
-                                    epId,
-                                  );
-
-                                  if (isTaskActive) continue;
-
-                                  // Standardize episode name
-                                  String epName = TxaFormat.formatEpisodeName(ep['name'].toString());
-
-                                  // Get link with fallback
-                                  String? downloadUrl;
+                                for (var ep in episodesList) {
                                   try {
-                                    final linkData = await TxaApi()
-                                        .getEpisodeLink(epId)
-                                        .timeout(const Duration(seconds: 5));
-                                    downloadUrl = linkData?['link'];
-                                  } catch (e) {
-                                    TxaLogger.log(
-                                      'API Link Fetch Failed for Ep $epId: $e',
-                                      isError: true,
-                                      tag: 'API',
-                                      type: 'api',
-                                    );
-                                  }
+                                    final epId = ep['id'].toString();
 
-                                  // Fallback to data already in the movieDetail response if API fails
-                                  if (downloadUrl == null ||
-                                      downloadUrl.isEmpty) {
-                                    downloadUrl = ep['link_m3u8'] ??
-                                        ep['link_embed'] ??
-                                        '';
-                                  }
-
-                                  if (downloadUrl != null &&
-                                      downloadUrl.isNotEmpty) {
-                                    TxaDownloadManager().addTask(
-                                      movieId:
+                                    // Check if already in queue
+                                    final isTaskActive = TxaDownloadManager()
+                                        .isTaskActive(
                                           movieData['movie']['id'].toString(),
-                                      movieTitle: movieData['movie']['name'],
-                                      episodeId: epId,
-                                      episodeTitle: epName,
-                                      url: downloadUrl,
-                                      poster: movieData['movie']['thumb_url'],
-                                      format: downloadUrl.contains('.m3u8')
-                                          ? 'm3u8'
-                                          : 'mp4',
+                                          epId,
+                                        );
+
+                                    if (isTaskActive) continue;
+
+                                    // Standardize episode name
+                                    String epName = TxaFormat.formatEpisodeName(
+                                      ep['name'].toString(),
                                     );
-                                    successCount++;
-                                  } else {
+
+                                    // Get link with fallback
+                                    String? downloadUrl;
+                                    try {
+                                      final linkData = await TxaApi()
+                                          .getEpisodeLink(epId)
+                                          .timeout(const Duration(seconds: 5));
+                                      downloadUrl = linkData?['link'];
+                                    } catch (e) {
+                                      TxaLogger.log(
+                                        'API Link Fetch Failed for Ep $epId: $e',
+                                        isError: true,
+                                        tag: 'API',
+                                        type: 'api',
+                                      );
+                                    }
+
+                                    // Fallback to data already in the movieDetail response if API fails
+                                    if (downloadUrl == null ||
+                                        downloadUrl.isEmpty) {
+                                      downloadUrl =
+                                          ep['link_m3u8'] ??
+                                          ep['link_embed'] ??
+                                          '';
+                                    }
+
+                                    if (downloadUrl != null &&
+                                        downloadUrl.isNotEmpty) {
+                                      TxaDownloadManager().addTask(
+                                        movieId: movieData['movie']['id']
+                                            .toString(),
+                                        movieTitle: movieData['movie']['name'],
+                                        episodeId: epId,
+                                        episodeTitle: epName,
+                                        url: downloadUrl,
+                                        poster: movieData['movie']['thumb_url'],
+                                        format: downloadUrl.contains('.m3u8')
+                                            ? 'm3u8'
+                                            : 'mp4',
+                                      );
+                                      successCount++;
+                                    } else {
+                                      failCount++;
+                                      TxaLogger.log(
+                                        'No link found for episode $epId (${movieData['movie']['slug']})',
+                                        type: 'download',
+                                        isError: true,
+                                      );
+                                    }
+                                  } catch (e) {
                                     failCount++;
                                     TxaLogger.log(
-                                      'No link found for episode $epId (${movieData['movie']['slug']})',
+                                      'Download All Loop Error: $e',
                                       type: 'download',
                                       isError: true,
                                     );
                                   }
-                                } catch (e) {
-                                  failCount++;
-                                  TxaLogger.log(
-                                    'Download All Loop Error: $e',
-                                    type: 'download',
-                                    isError: true,
+                                  // Small delay
+                                  await Future.delayed(
+                                    const Duration(milliseconds: 50),
                                   );
                                 }
-                                // Small delay
-                                await Future.delayed(
-                                  const Duration(milliseconds: 50),
-                                );
-                              }
 
-                              if (mounted) {
+                                if (mounted) {
                                   if (successCount > 0 && failCount == 0) {
                                     TxaLogger.log(
                                       'Started downloading all episodes for movie: ${movieData['movie']['name']}',
@@ -1236,30 +1239,32 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                         replace: {'n': successCount.toString()},
                                       ),
                                     );
-                                } else if (successCount > 0) {
-                                  TxaToast.show(
-                                    context,
-                                    TxaLanguage.t(
-                                      'download_all_partial',
-                                      replace: {
-                                        's': successCount.toString(),
-                                        't': (successCount + failCount)
-                                            .toString(),
-                                        'f': failCount.toString(),
-                                      },
-                                    ),
-                                  );
-                                } else {
-                                  TxaToast.show(
-                                    context,
-                                    TxaLanguage.t('download_all_failed'),
-                                    isError: true,
-                                  );
+                                  } else if (successCount > 0) {
+                                    TxaToast.show(
+                                      context,
+                                      TxaLanguage.t(
+                                        'download_all_partial',
+                                        replace: {
+                                          's': successCount.toString(),
+                                          't': (successCount + failCount)
+                                              .toString(),
+                                          'f': failCount.toString(),
+                                        },
+                                      ),
+                                    );
+                                  } else {
+                                    TxaToast.show(
+                                      context,
+                                      TxaLanguage.t('download_all_failed'),
+                                      isError: true,
+                                    );
+                                  }
                                 }
-                              }
                               } finally {
                                 if (mounted) {
-                                  setModalState(() => _isDownloadingAll = false);
+                                  setModalState(
+                                    () => _isDownloadingAll = false,
+                                  );
                                 }
                               }
 
@@ -1304,9 +1309,11 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                           const Divider(color: Colors.white10, height: 1),
                       itemBuilder: (ctx, i) {
                         final ep = episodes[i];
-                        
+
                         // Standardize episode name
-                        String epName = TxaFormat.formatEpisodeName(ep['name'].toString());
+                        String epName = TxaFormat.formatEpisodeName(
+                          ep['name'].toString(),
+                        );
 
                         // Check if already downloading in manager
                         final isDownloading = TxaDownloadManager().isTaskActive(
@@ -1392,7 +1399,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                   // Fallback to pre-loaded data
                                   if (downloadUrl == null ||
                                       downloadUrl.isEmpty) {
-                                    downloadUrl = ep['link_m3u8'] ??
+                                    downloadUrl =
+                                        ep['link_m3u8'] ??
                                         ep['link_embed'] ??
                                         '';
                                     if (downloadUrl != null &&
@@ -1407,8 +1415,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                   if (downloadUrl != null &&
                                       downloadUrl.isNotEmpty) {
                                     TxaDownloadManager().addTask(
-                                      movieId:
-                                          movieData['movie']['id'].toString(),
+                                      movieId: movieData['movie']['id']
+                                          .toString(),
                                       movieTitle: movieData['movie']['name'],
                                       episodeId: epId,
                                       episodeTitle: epName,

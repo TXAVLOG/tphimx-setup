@@ -652,8 +652,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.1.0';
-                  final buildNumber = snapshot.data?.buildNumber ?? '401';
+                  final version = snapshot.data?.version ?? '4.1.2';
+                  final buildNumber = snapshot.data?.buildNumber ?? '412';
                   return InkWell(
                     onTap: () => Navigator.push(
                       context,
@@ -724,9 +724,10 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   Widget _buildErrorCard(dynamic message) {
-    final is401 = message.toString().contains('401') || 
-                  message.toString().toLowerCase().contains('unauthenticated');
-    
+    final is401 =
+        message.toString().contains('401') ||
+        message.toString().toLowerCase().contains('unauthenticated');
+
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(12),
@@ -756,7 +757,9 @@ class _AccountScreenState extends State<AccountScreen> {
                   ),
                 ),
                 Text(
-                  is401 ? 'Vui lòng đăng nhập lại để tiếp tục' : (message?.toString() ?? 'Unknown Error'),
+                  is401
+                      ? 'Vui lòng đăng nhập lại để tiếp tục'
+                      : (message?.toString() ?? 'Unknown Error'),
                   style: const TextStyle(color: Colors.redAccent, fontSize: 11),
                 ),
               ],
@@ -772,11 +775,17 @@ class _AccountScreenState extends State<AccountScreen> {
               },
               style: TextButton.styleFrom(
                 backgroundColor: Colors.redAccent.withValues(alpha: 0.2),
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
               ),
               child: const Text(
                 'Đăng nhập',
-                style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             )
           else

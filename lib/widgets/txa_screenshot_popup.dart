@@ -34,10 +34,7 @@ class _TxaScreenshotPopupState extends State<TxaScreenshotPopup>
     _offsetAnimation = Tween<Offset>(
       begin: const Offset(-1.2, 0.0),
       end: Offset.zero,
-    ).animate(CurvedAnimation(
-      parent: _controller,
-      curve: Curves.easeOutQuart,
-    ));
+    ).animate(CurvedAnimation(parent: _controller, curve: Curves.easeOutQuart));
 
     _controller.forward();
 
@@ -112,9 +109,7 @@ class _TxaScreenshotPopupState extends State<TxaScreenshotPopup>
                     ElevatedButton.icon(
                       onPressed: () {
                         SharePlus.instance.share(
-                          ShareParams(
-                            files: [XFile(widget.imagePath)],
-                          ),
+                          ShareParams(files: [XFile(widget.imagePath)]),
                         );
                         _dismiss();
                       },

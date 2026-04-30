@@ -112,11 +112,6 @@ class _HomeScreenState extends State<HomeScreen> {
         localizedTitle: TxaLanguage.t('check_update'),
         icon: 'ic_launcher',
       ),
-      ShortcutItem(
-        type: 'action_app_version',
-        localizedTitle: "v${TxaLanguage.t('app_name')}: 4.0.1",
-        icon: 'ic_info_shortcut',
-      ),
     ]);
   }
 
@@ -125,12 +120,18 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: TxaTheme.secondaryBg,
-        title: Text(TxaLanguage.t('speed_test'), style: const TextStyle(color: Colors.white)),
+        title: Text(
+          TxaLanguage.t('speed_test'),
+          style: const TextStyle(color: Colors.white),
+        ),
         content: StatefulBuilder(
           builder: (context, setDialogState) => Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              _buildInfoRow(TxaLanguage.t('network'), TxaSpeedService.currentNetworkType),
+              _buildInfoRow(
+                TxaLanguage.t('network'),
+                TxaSpeedService.currentNetworkType,
+              ),
               const SizedBox(height: 12),
               _buildSpeedIndicator("Download", TxaSpeedService.currentDownload),
               const SizedBox(height: 12),
@@ -142,12 +143,19 @@ class _HomeScreenState extends State<HomeScreen> {
                 ElevatedButton(
                   onPressed: () {
                     setDialogState(() {});
-                    TxaSpeedService.checkSpeed(onProgress: (d, u) {
-                      setDialogState(() {});
-                    });
+                    TxaSpeedService.checkSpeed(
+                      onProgress: (d, u) {
+                        setDialogState(() {});
+                      },
+                    );
                   },
-                  style: ElevatedButton.styleFrom(backgroundColor: TxaTheme.accent),
-                  child: Text(TxaLanguage.t('start_test'), style: const TextStyle(color: Colors.black)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: TxaTheme.accent,
+                  ),
+                  child: Text(
+                    TxaLanguage.t('start_test'),
+                    style: const TextStyle(color: Colors.black),
+                  ),
                 ),
             ],
           ),
@@ -167,7 +175,13 @@ class _HomeScreenState extends State<HomeScreen> {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         Text(label, style: const TextStyle(color: TxaTheme.textMuted)),
-        Text(value, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        Text(
+          value,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
       ],
     );
   }
@@ -176,7 +190,10 @@ class _HomeScreenState extends State<HomeScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(label, style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12)),
+        Text(
+          label,
+          style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12),
+        ),
         const SizedBox(height: 4),
         Container(
           width: double.infinity,
@@ -186,8 +203,15 @@ class _HomeScreenState extends State<HomeScreen> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
-            TxaFormat.formatNetworkSpeed(value * 1000000, unit: TxaSettings.speedUnit),
-            style: const TextStyle(color: TxaTheme.accent, fontSize: 18, fontWeight: FontWeight.bold),
+            TxaFormat.formatNetworkSpeed(
+              value * 1000000,
+              unit: TxaSettings.speedUnit,
+            ),
+            style: const TextStyle(
+              color: TxaTheme.accent,
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
@@ -199,7 +223,10 @@ class _HomeScreenState extends State<HomeScreen> {
       context: context,
       builder: (context) => AlertDialog(
         backgroundColor: TxaTheme.secondaryBg,
-        title: Text(TxaLanguage.t('battery_optimization'), style: const TextStyle(color: Colors.white)),
+        title: Text(
+          TxaLanguage.t('battery_optimization'),
+          style: const TextStyle(color: Colors.white),
+        ),
         content: Text(
           TxaLanguage.t('ignore_battery_msg'),
           style: const TextStyle(color: TxaTheme.textMuted),
@@ -218,7 +245,10 @@ class _HomeScreenState extends State<HomeScreen> {
               if (mounted) setState(() {});
             },
             style: ElevatedButton.styleFrom(backgroundColor: TxaTheme.accent),
-            child: Text(TxaLanguage.t('grant'), style: const TextStyle(color: Colors.black)),
+            child: Text(
+              TxaLanguage.t('grant'),
+              style: const TextStyle(color: Colors.black),
+            ),
           ),
         ],
       ),
@@ -226,6 +256,9 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _checkUpdate({bool manual = false}) async {
+    // SUPPRESS UPDATE MODAL IF PLAYER IS ACTIVE
+    if (TxaPlayer.isPlayerActive && !manual) return;
+
     try {
       if (manual) TxaToast.show(context, TxaLanguage.t('checking_update'));
 
@@ -271,7 +304,9 @@ class _HomeScreenState extends State<HomeScreen> {
           minVersion.isNotEmpty && isNewer(minVersion, currentVersion);
       final bool shouldForce = forceUpdate || belowMinVersion;
 
-      if ((latestVersion.isNotEmpty && isNewer(latestVersion, currentVersion)) || shouldForce) {
+      if ((latestVersion.isNotEmpty &&
+              isNewer(latestVersion, currentVersion)) ||
+          shouldForce) {
         if (!mounted) return;
 
         final String rawDate = appData?['release_date'] ?? '';
@@ -905,8 +940,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.1.0';
-                  final build = snapshot.data?.buildNumber ?? '401';
+                  final version = snapshot.data?.version ?? '4.1.2';
+                  final build = snapshot.data?.buildNumber ?? '412';
                   return InkWell(
                     onTap: () => Navigator.push(
                       context,

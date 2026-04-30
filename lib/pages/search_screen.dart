@@ -40,7 +40,8 @@ class _SearchScreenState extends State<SearchScreen> {
     if (sp.categorySlug != null && sp.categorySlug != _query) {
       _query = sp.categorySlug!;
       _doCategorySearch(sp.categorySlug!);
-    } else if (sp.query.isNotEmpty && (sp.query != _controller.text || !_searched)) {
+    } else if (sp.query.isNotEmpty &&
+        (sp.query != _controller.text || !_searched)) {
       _controller.text = sp.query;
       _query = sp.query;
       _doSearch(sp.query);
@@ -70,35 +71,56 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Future<void> _doSearch(String keyword) async {
     if (keyword.trim().isEmpty) {
-      setState(() { _results = []; _searched = false; });
+      setState(() {
+        _results = [];
+        _searched = false;
+      });
       return;
     }
-    setState(() { _loading = true; _searched = true; _query = keyword; });
+    setState(() {
+      _loading = true;
+      _searched = true;
+      _query = keyword;
+    });
     try {
       final api = Provider.of<TxaApi>(context, listen: false);
       final res = await api.searchMovies(keyword.trim());
       final data = res['data'];
       setState(() {
-        _results = data is List ? data : (data?['data'] as List? ?? data?['items'] as List? ?? []);
+        _results = data is List
+            ? data
+            : (data?['data'] as List? ?? data?['items'] as List? ?? []);
         _loading = false;
       });
     } catch (e) {
-      setState(() { _results = []; _loading = false; });
+      setState(() {
+        _results = [];
+        _loading = false;
+      });
     }
   }
 
   Future<void> _doCategorySearch(String slug) async {
-    setState(() { _loading = true; _searched = true; _query = ''; });
+    setState(() {
+      _loading = true;
+      _searched = true;
+      _query = '';
+    });
     try {
       final api = Provider.of<TxaApi>(context, listen: false);
       final res = await api.getCategory(slug);
       final data = res['data'];
       setState(() {
-        _results = data is List ? data : (data?['data'] as List? ?? data?['items'] as List? ?? []);
+        _results = data is List
+            ? data
+            : (data?['data'] as List? ?? data?['items'] as List? ?? []);
         _loading = false;
       });
     } catch (e) {
-      setState(() { _results = []; _loading = false; });
+      setState(() {
+        _results = [];
+        _loading = false;
+      });
     }
   }
 
@@ -106,7 +128,10 @@ class _SearchScreenState extends State<SearchScreen> {
     _query = val;
     _debounce?.cancel();
     if (val.trim().isEmpty) {
-      setState(() { _results = []; _searched = false; });
+      setState(() {
+        _results = [];
+        _searched = false;
+      });
       return;
     }
     _debounce = Timer(const Duration(milliseconds: 500), () => _doSearch(val));
@@ -114,7 +139,11 @@ class _SearchScreenState extends State<SearchScreen> {
 
   void _clearSearch() {
     _controller.clear();
-    setState(() { _query = ''; _results = []; _searched = false; });
+    setState(() {
+      _query = '';
+      _results = [];
+      _searched = false;
+    });
   }
 
   @override
@@ -135,7 +164,11 @@ class _SearchScreenState extends State<SearchScreen> {
               ),
               child: Row(
                 children: [
-                  const Icon(Icons.search_rounded, color: TxaTheme.textMuted, size: 20),
+                  const Icon(
+                    Icons.search_rounded,
+                    color: TxaTheme.textMuted,
+                    size: 20,
+                  ),
                   const SizedBox(width: 8),
                   Expanded(
                     child: TextField(
@@ -143,12 +176,20 @@ class _SearchScreenState extends State<SearchScreen> {
                       focusNode: _focusNode,
                       onChanged: _onInputChanged,
                       onSubmitted: (val) => _doSearch(val),
-                      style: const TextStyle(color: TxaTheme.textPrimary, fontSize: 14),
+                      style: const TextStyle(
+                        color: TxaTheme.textPrimary,
+                        fontSize: 14,
+                      ),
                       decoration: InputDecoration(
                         hintText: TxaLanguage.t('search_hint'),
-                        hintStyle: const TextStyle(color: TxaTheme.textMuted, fontSize: 14),
+                        hintStyle: const TextStyle(
+                          color: TxaTheme.textMuted,
+                          fontSize: 14,
+                        ),
                         border: InputBorder.none,
-                        contentPadding: const EdgeInsets.symmetric(vertical: 12),
+                        contentPadding: const EdgeInsets.symmetric(
+                          vertical: 12,
+                        ),
                       ),
                     ),
                   ),
@@ -157,7 +198,11 @@ class _SearchScreenState extends State<SearchScreen> {
                       onTap: _clearSearch,
                       child: const Padding(
                         padding: EdgeInsets.all(4),
-                        child: Icon(Icons.close_rounded, color: TxaTheme.textMuted, size: 18),
+                        child: Icon(
+                          Icons.close_rounded,
+                          color: TxaTheme.textMuted,
+                          size: 18,
+                        ),
                       ),
                     ),
                 ],
@@ -183,9 +228,12 @@ class _SearchScreenState extends State<SearchScreen> {
 
   Widget _buildContent(SearchProvider sp) {
     // If provider state doesn't match our local state, and it was just set externally
-    if (sp.categorySlug != null && !_loading && !_results.isNotEmpty && _query == '') {
-       // This is a bit tricky with local state, usually we'd move all state to provider.
-       // For now, let's just trigger it if results are empty.
+    if (sp.categorySlug != null &&
+        !_loading &&
+        !_results.isNotEmpty &&
+        _query == '') {
+      // This is a bit tricky with local state, usually we'd move all state to provider.
+      // For now, let's just trigger it if results are empty.
     }
 
     // Loading
@@ -194,9 +242,15 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const CircularProgressIndicator(color: TxaTheme.accent, strokeWidth: 2),
+            const CircularProgressIndicator(
+              color: TxaTheme.accent,
+              strokeWidth: 2,
+            ),
             const SizedBox(height: 12),
-            Text(TxaLanguage.t('searching'), style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13)),
+            Text(
+              TxaLanguage.t('searching'),
+              style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13),
+            ),
           ],
         ),
       );
@@ -211,11 +265,19 @@ class _SearchScreenState extends State<SearchScreen> {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-               Text(
-                sp.categoryName != null 
-                  ? TxaLanguage.t('category_label').replaceAll('%name', sp.categoryName!) 
-                  : TxaLanguage.t('search_results').replaceAll('%count', _results.length.toString()),
-                style: const TextStyle(color: TxaTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600),
+              Text(
+                sp.categoryName != null
+                    ? TxaLanguage.t(
+                        'category_label',
+                      ).replaceAll('%name', sp.categoryName!)
+                    : TxaLanguage.t(
+                        'search_results',
+                      ).replaceAll('%count', _results.length.toString()),
+                style: const TextStyle(
+                  color: TxaTheme.textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w600,
+                ),
               ),
               if (sp.categorySlug != null)
                 GestureDetector(
@@ -223,15 +285,28 @@ class _SearchScreenState extends State<SearchScreen> {
                     sp.clear();
                     _clearSearch();
                   },
-                  child: Text(TxaLanguage.t('clear_filter'), style: const TextStyle(color: TxaTheme.accent, fontSize: 12)),
+                  child: Text(
+                    TxaLanguage.t('clear_filter'),
+                    style: const TextStyle(
+                      color: TxaTheme.accent,
+                      fontSize: 12,
+                    ),
+                  ),
                 ),
             ],
           ),
           const SizedBox(height: 10),
-          ..._results.map((m) => GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => MovieDetailScreen(slug: m['slug']))),
-            child: _SearchResultItem(movie: m, keyword: _query),
-          )),
+          ..._results.map(
+            (m) => GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (ctx) => MovieDetailScreen(slug: m['slug']),
+                ),
+              ),
+              child: _SearchResultItem(movie: m, keyword: _query),
+            ),
+          ),
         ],
       );
     }
@@ -242,9 +317,16 @@ class _SearchScreenState extends State<SearchScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.search_off_rounded, size: 48, color: TxaTheme.textMuted.withValues(alpha: 0.3)),
+            Icon(
+              Icons.search_off_rounded,
+              size: 48,
+              color: TxaTheme.textMuted.withValues(alpha: 0.3),
+            ),
             const SizedBox(height: 12),
-            Text(TxaLanguage.t('search_no_results').replaceAll('%query', _query), style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13)),
+            Text(
+              TxaLanguage.t('search_no_results').replaceAll('%query', _query),
+              style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13),
+            ),
           ],
         ),
       );
@@ -256,18 +338,37 @@ class _SearchScreenState extends State<SearchScreen> {
         physics: const BouncingScrollPhysics(),
         padding: const EdgeInsets.fromLTRB(16, 0, 16, 100),
         children: [
-          Text(TxaLanguage.t('search_hot_title'), style: const TextStyle(color: TxaTheme.textSecondary, fontSize: 13, fontWeight: FontWeight.w600)),
+          Text(
+            TxaLanguage.t('search_hot_title'),
+            style: const TextStyle(
+              color: TxaTheme.textSecondary,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
           const SizedBox(height: 10),
-          ...List.generate(_hotMovies.length, (i) => GestureDetector(
-            onTap: () => Navigator.push(context, MaterialPageRoute(builder: (ctx) => MovieDetailScreen(slug: _hotMovies[i]['slug']))),
-            child: _HotSearchItem(movie: _hotMovies[i], rank: i + 1),
-          )),
+          ...List.generate(
+            _hotMovies.length,
+            (i) => GestureDetector(
+              onTap: () => Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (ctx) =>
+                      MovieDetailScreen(slug: _hotMovies[i]['slug']),
+                ),
+              ),
+              child: _HotSearchItem(movie: _hotMovies[i], rank: i + 1),
+            ),
+          ),
         ],
       );
     }
 
     return Center(
-      child: Text(TxaLanguage.t('search_input_prompt'), style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13)),
+      child: Text(
+        TxaLanguage.t('search_input_prompt'),
+        style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13),
+      ),
     );
   }
 }
@@ -305,8 +406,18 @@ class _SearchResultItem extends StatelessWidget {
               width: 60,
               height: 85,
               fit: BoxFit.cover,
-              placeholder: (ctx, url) => Container(width: 60, height: 85, color: TxaTheme.secondaryBg),
-              errorWidget: (ctx, url, err) => Container(width: 60, height: 85, color: TxaTheme.secondaryBg, child: const Icon(Icons.movie, size: 20, color: TxaTheme.textMuted)),
+              placeholder: (ctx, url) =>
+                  Container(width: 60, height: 85, color: TxaTheme.secondaryBg),
+              errorWidget: (ctx, url, err) => Container(
+                width: 60,
+                height: 85,
+                color: TxaTheme.secondaryBg,
+                child: const Icon(
+                  Icons.movie,
+                  size: 20,
+                  color: TxaTheme.textMuted,
+                ),
+              ),
             ),
           ),
           const SizedBox(width: 10),
@@ -315,23 +426,50 @@ class _SearchResultItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(color: TxaTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(
+                  name,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: TxaTheme.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 if (originName.isNotEmpty)
-                  Text(originName, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: TxaTheme.textMuted, fontSize: 11)),
+                  Text(
+                    originName,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: const TextStyle(
+                      color: TxaTheme.textMuted,
+                      fontSize: 11,
+                    ),
+                  ),
                 const SizedBox(height: 4),
                 Wrap(
                   spacing: 4,
                   children: [
                     if (year.isNotEmpty) _SmallBadge(text: year),
-                    if (quality.isNotEmpty) _SmallBadge(text: quality, color: const Color(0xFF10B981)),
-                    if (type == 'series') _SmallBadge(text: TxaLanguage.t('movie_series')),
-                    if (type == 'single') _SmallBadge(text: TxaLanguage.t('movie_single')),
+                    if (quality.isNotEmpty)
+                      _SmallBadge(
+                        text: quality,
+                        color: const Color(0xFF10B981),
+                      ),
+                    if (type == 'series')
+                      _SmallBadge(text: TxaLanguage.t('movie_series')),
+                    if (type == 'single')
+                      _SmallBadge(text: TxaLanguage.t('movie_single')),
                   ],
                 ),
               ],
             ),
           ),
-          const Icon(Icons.chevron_right_rounded, color: TxaTheme.textMuted, size: 20),
+          const Icon(
+            Icons.chevron_right_rounded,
+            color: TxaTheme.textMuted,
+            size: 20,
+          ),
         ],
       ),
     );
@@ -383,8 +521,10 @@ class _HotSearchItem extends StatelessWidget {
               width: 42,
               height: 56,
               fit: BoxFit.cover,
-              placeholder: (ctx, url) => Container(width: 42, height: 56, color: TxaTheme.secondaryBg),
-              errorWidget: (ctx, url, err) => Container(width: 42, height: 56, color: TxaTheme.secondaryBg),
+              placeholder: (ctx, url) =>
+                  Container(width: 42, height: 56, color: TxaTheme.secondaryBg),
+              errorWidget: (ctx, url, err) =>
+                  Container(width: 42, height: 56, color: TxaTheme.secondaryBg),
             ),
           ),
           const SizedBox(width: 10),
@@ -393,11 +533,23 @@ class _HotSearchItem extends StatelessWidget {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(name, maxLines: 1, overflow: TextOverflow.ellipsis, style: const TextStyle(color: TxaTheme.textPrimary, fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(
+                  name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: TxaTheme.textPrimary,
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
                 const SizedBox(height: 2),
                 Text(
                   '$year • ${TxaLanguage.t('views_count').replaceAll('%count', TxaFormat.formatNumber(searchCount))}',
-                  style: const TextStyle(color: TxaTheme.textMuted, fontSize: 10),
+                  style: const TextStyle(
+                    color: TxaTheme.textMuted,
+                    fontSize: 10,
+                  ),
                 ),
               ],
             ),
@@ -421,7 +573,14 @@ class _SmallBadge extends StatelessWidget {
         color: (color ?? TxaTheme.accent).withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(4),
       ),
-      child: Text(text, style: TextStyle(color: color ?? TxaTheme.accent, fontSize: 9, fontWeight: FontWeight.w600)),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: color ?? TxaTheme.accent,
+          fontSize: 9,
+          fontWeight: FontWeight.w600,
+        ),
+      ),
     );
   }
 }

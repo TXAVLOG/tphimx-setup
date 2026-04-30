@@ -7,7 +7,8 @@ import '../utils/txa_logger.dart';
 import '../widgets/txa_screenshot_popup.dart';
 
 class TxaScreenshotService {
-  static final TxaScreenshotService _instance = TxaScreenshotService._internal();
+  static final TxaScreenshotService _instance =
+      TxaScreenshotService._internal();
   factory TxaScreenshotService() => _instance;
   TxaScreenshotService._internal();
 
@@ -20,13 +21,16 @@ class TxaScreenshotService {
     if (_isListening) return;
     _isListening = true;
 
-    _subscription = FlutterScreenshotDetect().onScreenshot.listen((event) async {
+    _subscription = FlutterScreenshotDetect().onScreenshot.listen((
+      event,
+    ) async {
       TxaLogger.log('Screenshot detected! ${DateTime.now()}');
-      
+
       // Capture current widget tree (including our watermark)
       try {
         final directory = await getTemporaryDirectory();
-        final String fileName = 'screenshot_${DateTime.now().millisecondsSinceEpoch}.png';
+        final String fileName =
+            'screenshot_${DateTime.now().millisecondsSinceEpoch}.png';
         final path = await screenshotController.captureAndSave(
           directory.path,
           fileName: fileName,

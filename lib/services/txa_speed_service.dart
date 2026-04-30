@@ -8,9 +8,11 @@ import '../services/txa_settings.dart';
 import '../services/txa_language.dart';
 
 class TxaSpeedService {
-  static const MethodChannel _channel = MethodChannel('com.tphimx/speed_service');
+  static const MethodChannel _channel = MethodChannel(
+    'com.tphimx/speed_service',
+  );
   static final _speedChecker = SpeedCheckerPlugin();
-  
+
   static double _currentDownload = 0;
   static double _currentUpload = 0;
   static String _currentNetworkType = 'Unknown';
@@ -23,7 +25,7 @@ class TxaSpeedService {
 
   static Future<void> init() async {
     await updateNetworkType();
-    
+
     if (TxaSettings.showSpeedInNotification) {
       await startService();
     }
@@ -61,32 +63,38 @@ class TxaSpeedService {
     }
   }
 
-  static Future<void> checkSpeed({Function(double down, double up)? onProgress}) async {
+  static Future<void> checkSpeed({
+    Function(double down, double up)? onProgress,
+  }) async {
     if (_isTesting) return;
     _isTesting = true;
-    
+
     await updateNetworkType();
     _currentDownload = 0;
     _currentUpload = 0;
-    
+
     StreamSubscription? subscription;
-    
+
     try {
-      subscription = _speedChecker.speedTestResultStream.listen((result) {
-        // Use dynamic to access properties safely across different plugin versions
-        final res = result as dynamic;
-        _currentDownload = (res.download as num?)?.toDouble() ?? 0;
-        _currentUpload = (res.upload as num?)?.toDouble() ?? 0;
-        
-        if (onProgress != null) onProgress(_currentDownload, _currentUpload);
-      }, onError: (e) {
-        TxaLogger.log('Speed test stream error: $e');
-      }, onDone: () {
-        _isTesting = false;
-      });
+      subscription = _speedChecker.speedTestResultStream.listen(
+        (result) {
+          // Use dynamic to access properties safely across different plugin versions
+          final res = result as dynamic;
+          _currentDownload = (res.download as num?)?.toDouble() ?? 0;
+          _currentUpload = (res.upload as num?)?.toDouble() ?? 0;
+
+          if (onProgress != null) onProgress(_currentDownload, _currentUpload);
+        },
+        onError: (e) {
+          TxaLogger.log('Speed test stream error: $e');
+        },
+        onDone: () {
+          _isTesting = false;
+        },
+      );
 
       _speedChecker.startSpeedTest();
-      
+
       // Wait for a reasonable time or until done
       await Future.delayed(const Duration(seconds: 30));
     } catch (e) {
@@ -119,8 +127,11 @@ class TxaSpeedService {
         'txtTotal': TxaLanguage.t('total'),
         'fontWeight': 900,
       };
-      
-      final bool? result = await _channel.invokeMethod('startSpeedService', translations);
+
+      final bool? result = await _channel.invokeMethod(
+        'startSpeedService',
+        translations,
+      );
       TxaLogger.log('Native Speed Service started with translations: $result');
     } on PlatformException catch (e) {
       TxaLogger.log('Failed to start native speed service: ${e.message}');

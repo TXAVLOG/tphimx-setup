@@ -70,19 +70,22 @@ class TxaSettings {
     _notify();
   }
 
-  static bool get miracastEnabled => _prefs.getBool('player_miracast_enabled') ?? false;
+  static bool get miracastEnabled =>
+      _prefs.getBool('player_miracast_enabled') ?? false;
   static set miracastEnabled(bool v) {
     _prefs.setBool('player_miracast_enabled', v);
     _notify();
   }
 
-  static bool get autoQualityByNetwork => _prefs.getBool('app_auto_quality_network') ?? true;
+  static bool get autoQualityByNetwork =>
+      _prefs.getBool('app_auto_quality_network') ?? true;
   static set autoQualityByNetwork(bool v) {
     _prefs.setBool('app_auto_quality_network', v);
     _notify();
   }
 
-  static bool get showSpeedInNotification => _prefs.getBool('app_show_speed_notif') ?? false;
+  static bool get showSpeedInNotification =>
+      _prefs.getBool('app_show_speed_notif') ?? false;
   static set showSpeedInNotification(bool v) {
     _prefs.setBool('app_show_speed_notif', v);
     _notify();
@@ -94,7 +97,8 @@ class TxaSettings {
     _notify();
   }
 
-  static String get defaultQuality => _prefs.getString('app_default_quality') ?? '1080p';
+  static String get defaultQuality =>
+      _prefs.getString('app_default_quality') ?? '1080p';
   static set defaultQuality(String v) {
     _prefs.setString('app_default_quality', v);
     _notify();
@@ -197,14 +201,19 @@ class TxaSettings {
   static set udid(String v) => _prefs.setString('ios_device_udid', v);
 
   // --- App State flags for Background Tasks ---
-  static bool get isUpdateDownloading => _prefs.getBool('is_update_downloading') ?? false;
-  static set isUpdateDownloading(bool v) => _prefs.setBool('is_update_downloading', v);
+  static bool get isUpdateDownloading =>
+      _prefs.getBool('is_update_downloading') ?? false;
+  static set isUpdateDownloading(bool v) =>
+      _prefs.setBool('is_update_downloading', v);
 
-  static bool get isAppForeground => _prefs.getBool('is_app_foreground') ?? false;
+  static bool get isAppForeground =>
+      _prefs.getBool('is_app_foreground') ?? false;
   static set isAppForeground(bool v) => _prefs.setBool('is_app_foreground', v);
 
-  static String get lastNotifiedUpdateVersion => _prefs.getString('last_notified_update_version') ?? '';
-  static set lastNotifiedUpdateVersion(String v) => _prefs.setString('last_notified_update_version', v);
+  static String get lastNotifiedUpdateVersion =>
+      _prefs.getString('last_notified_update_version') ?? '';
+  static set lastNotifiedUpdateVersion(String v) =>
+      _prefs.setString('last_notified_update_version', v);
 
   // --- Watch History ---
   static void saveLocalHistory(int episodeId, double position) {
@@ -232,13 +241,16 @@ class TxaSettings {
 
   static List<Map<String, dynamic>> getPendingSync() {
     List<String> pending = _prefs.getStringList('pending_history_sync') ?? [];
-    return pending.map((e) {
-      try {
-        return jsonDecode(e) as Map<String, dynamic>;
-      } catch (_) {
-        return <String, dynamic>{};
-      }
-    }).where((m) => m.isNotEmpty).toList();
+    return pending
+        .map((e) {
+          try {
+            return jsonDecode(e) as Map<String, dynamic>;
+          } catch (_) {
+            return <String, dynamic>{};
+          }
+        })
+        .where((m) => m.isNotEmpty)
+        .toList();
   }
 
   static void clearPendingSync() {

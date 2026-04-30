@@ -6,11 +6,7 @@ class TxaWatermark extends StatelessWidget {
   final Widget child;
   final bool show;
 
-  const TxaWatermark({
-    super.key,
-    required this.child,
-    this.show = true,
-  });
+  const TxaWatermark({super.key, required this.child, this.show = true});
 
   @override
   Widget build(BuildContext context) {
@@ -42,7 +38,8 @@ class TxaWatermark extends StatelessWidget {
                   Image.asset(
                     'assets/logo.png',
                     width: 60,
-                    errorBuilder: (context, error, stackTrace) => const SizedBox(),
+                    errorBuilder: (context, error, stackTrace) =>
+                        const SizedBox(),
                   ),
                   if (userIdentifier != null)
                     Text(

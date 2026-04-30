@@ -78,10 +78,7 @@ class TxaModal extends StatelessWidget {
             ],
             if (actions != null && actions!.isNotEmpty) ...[
               const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.end,
-                children: actions!,
-              ),
+              Row(mainAxisAlignment: MainAxisAlignment.end, children: actions!),
             ],
           ],
         ),

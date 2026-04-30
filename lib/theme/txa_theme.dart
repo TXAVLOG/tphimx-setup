@@ -9,7 +9,7 @@ class TxaTheme {
   static const Color accent = Color(0xFF737DFD);
   static const Color purple = Color(0xFFA855F7);
   static const Color pink = Color(0xFFEC4899);
-  
+
   static const Gradient brandGradient = LinearGradient(
     colors: [accent, purple],
     begin: Alignment.topLeft,
@@ -32,7 +32,9 @@ class TxaTheme {
   // Glass Effect Config
   static const Color glassBg = Color(0x990F172A); // rgba(15, 23, 42, 0.6)
   static const double glassBlur = 24.0;
-  static const Color glassBorder = Color(0x14FFFFFF); // rgba(255, 255, 255, 0.08)
+  static const Color glassBorder = Color(
+    0x14FFFFFF,
+  ); // rgba(255, 255, 255, 0.08)
 
   static ThemeData get darkTheme {
     return ThemeData(

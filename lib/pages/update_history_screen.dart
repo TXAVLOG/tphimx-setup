@@ -25,13 +25,25 @@ class _UpdateHistoryScreenState extends State<UpdateHistoryScreen> {
 
   void _loadChangelog() {
     setState(() {
-      _changelogFuture = TxaApi().getChangelog().then((data) {
-        TxaLogger.log('Successfully fetched ${data.length} update entries', tag: 'UPDATE', type: 'update');
-        return data;
-      }).catchError((e) {
-        TxaLogger.log('Failed to fetch changelog: $e', isError: true, tag: 'UPDATE', type: 'update');
-        throw e;
-      });
+      _changelogFuture = TxaApi()
+          .getChangelog()
+          .then((data) {
+            TxaLogger.log(
+              'Successfully fetched ${data.length} update entries',
+              tag: 'UPDATE',
+              type: 'update',
+            );
+            return data;
+          })
+          .catchError((e) {
+            TxaLogger.log(
+              'Failed to fetch changelog: $e',
+              isError: true,
+              tag: 'UPDATE',
+              type: 'update',
+            );
+            throw e;
+          });
     });
   }
 
@@ -52,7 +64,7 @@ class _UpdateHistoryScreenState extends State<UpdateHistoryScreen> {
             left: -150,
             child: _buildBlob(TxaTheme.accent.withValues(alpha: 0.08)),
           ),
-          
+
           CustomScrollView(
             physics: const BouncingScrollPhysics(),
             slivers: [
@@ -101,7 +113,11 @@ class _UpdateHistoryScreenState extends State<UpdateHistoryScreen> {
                   ),
                 ),
                 leading: IconButton(
-                  icon: const Icon(Icons.arrow_back_ios_new, color: TxaTheme.accent, size: 20),
+                  icon: const Icon(
+                    Icons.arrow_back_ios_new,
+                    color: TxaTheme.accent,
+                    size: 20,
+                  ),
                   onPressed: () => Navigator.pop(context),
                 ),
               ),
@@ -127,16 +143,13 @@ class _UpdateHistoryScreenState extends State<UpdateHistoryScreen> {
                     }
 
                     return SliverList(
-                      delegate: SliverChildBuilderDelegate(
-                        (context, index) {
-                          return _buildPremiumTimelineItem(
-                            logs[index],
-                            isFirst: index == 0,
-                            isLast: index == logs.length - 1,
-                          );
-                        },
-                        childCount: logs.length,
-                      ),
+                      delegate: SliverChildBuilderDelegate((context, index) {
+                        return _buildPremiumTimelineItem(
+                          logs[index],
+                          isFirst: index == 0,
+                          isLast: index == logs.length - 1,
+                        );
+                      }, childCount: logs.length),
                     );
                   },
                 ),
@@ -154,9 +167,7 @@ class _UpdateHistoryScreenState extends State<UpdateHistoryScreen> {
       height: 500,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        gradient: RadialGradient(
-          colors: [color, Colors.transparent],
-        ),
+        gradient: RadialGradient(colors: [color, Colors.transparent]),
       ),
     );
   }
@@ -166,11 +177,19 @@ class _UpdateHistoryScreenState extends State<UpdateHistoryScreen> {
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(Icons.cloud_off_rounded, color: Colors.red.withValues(alpha: 0.3), size: 80),
+          Icon(
+            Icons.cloud_off_rounded,
+            color: Colors.red.withValues(alpha: 0.3),
+            size: 80,
+          ),
           const SizedBox(height: 16),
           Text(
             TxaLanguage.t('error_loading_data'),
-            style: const TextStyle(color: Colors.white70, fontSize: 16, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.white70,
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+            ),
           ),
           const SizedBox(height: 24),
           TextButton.icon(
@@ -207,26 +226,36 @@ class _UpdateHistoryScreenState extends State<UpdateHistoryScreen> {
     );
   }
 
-  Widget _buildPremiumTimelineItem(Map<String, dynamic> log, {required bool isFirst, required bool isLast}) {
+  Widget _buildPremiumTimelineItem(
+    Map<String, dynamic> log, {
+    required bool isFirst,
+    required bool isLast,
+  }) {
     final String version = log['version'] ?? '?.?.?';
     final String dateStr = log['date'] ?? '';
     final String title = log['title'] ?? '';
     final String content = log['content'] ?? '';
-    
+
     // Logic to determine update type (just for visual flair)
     Color typeColor = TxaTheme.accent;
     IconData typeIcon = Icons.auto_awesome;
-    
+
     final lowerTitle = title.toLowerCase();
     final lowerContent = content.toLowerCase();
 
-    if (lowerTitle.contains('fix') || lowerContent.contains('sửa') || lowerTitle.contains('lỗi')) {
+    if (lowerTitle.contains('fix') ||
+        lowerContent.contains('sửa') ||
+        lowerTitle.contains('lỗi')) {
       typeColor = Colors.orangeAccent;
       typeIcon = Icons.bug_report_rounded;
-    } else if (lowerTitle.contains('feature') || lowerTitle.contains('mới') || lowerContent.contains('tính năng')) {
+    } else if (lowerTitle.contains('feature') ||
+        lowerTitle.contains('mới') ||
+        lowerContent.contains('tính năng')) {
       typeColor = Colors.greenAccent;
       typeIcon = Icons.add_circle_outline_rounded;
-    } else if (lowerTitle.contains('performance') || lowerTitle.contains('hiệu năng') || lowerTitle.contains('tối ưu')) {
+    } else if (lowerTitle.contains('performance') ||
+        lowerTitle.contains('hiệu năng') ||
+        lowerTitle.contains('tối ưu')) {
       typeColor = Colors.blueAccent;
       typeIcon = Icons.speed_rounded;
     }
@@ -279,7 +308,7 @@ class _UpdateHistoryScreenState extends State<UpdateHistoryScreen> {
               ],
             ),
           ),
-          
+
           // Card Column
           Expanded(
             child: Container(
@@ -292,7 +321,9 @@ class _UpdateHistoryScreenState extends State<UpdateHistoryScreen> {
                     decoration: BoxDecoration(
                       color: Colors.white.withValues(alpha: 0.03),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: Colors.white.withValues(alpha: 0.05)),
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.05),
+                      ),
                     ),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -332,7 +363,7 @@ class _UpdateHistoryScreenState extends State<UpdateHistoryScreen> {
                             ],
                           ),
                         ),
-                        
+
                         // Body
                         Padding(
                           padding: const EdgeInsets.fromLTRB(16, 4, 16, 20),

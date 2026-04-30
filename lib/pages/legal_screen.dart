@@ -5,11 +5,7 @@ class LegalScreen extends StatelessWidget {
   final String title;
   final List<LegalSection> sections;
 
-  const LegalScreen({
-    super.key,
-    required this.title,
-    required this.sections,
-  });
+  const LegalScreen({super.key, required this.title, required this.sections});
 
   @override
   Widget build(BuildContext context) {
@@ -30,7 +26,7 @@ class LegalScreen extends StatelessWidget {
               ),
             ),
           ),
-          
+
           SafeArea(
             child: CustomScrollView(
               physics: const BouncingScrollPhysics(),
@@ -39,7 +35,11 @@ class LegalScreen extends StatelessWidget {
                   backgroundColor: Colors.transparent,
                   elevation: 0,
                   leading: IconButton(
-                    icon: const Icon(Icons.arrow_back_ios_rounded, color: Colors.white, size: 20),
+                    icon: const Icon(
+                      Icons.arrow_back_ios_rounded,
+                      color: Colors.white,
+                      size: 20,
+                    ),
                     onPressed: () => Navigator.pop(context),
                   ),
                   title: Text(
@@ -56,13 +56,10 @@ class LegalScreen extends StatelessWidget {
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(20, 10, 20, 40),
                   sliver: SliverList(
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final section = sections[index];
-                        return _buildSection(section, index + 1);
-                      },
-                      childCount: sections.length,
-                    ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final section = sections[index];
+                      return _buildSection(section, index + 1);
+                    }, childCount: sections.length),
                   ),
                 ),
               ],
@@ -133,28 +130,34 @@ class LegalScreen extends StatelessWidget {
           ),
           if (section.points != null) ...[
             const SizedBox(height: 12),
-            ...section.points!.map((p) => Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Row(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Padding(
-                    padding: EdgeInsets.only(top: 6),
-                    child: Icon(Icons.circle, color: TxaTheme.accent, size: 6),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: Text(
-                      p,
-                      style: const TextStyle(
-                        color: TxaTheme.textMuted,
-                        fontSize: 13,
+            ...section.points!.map(
+              (p) => Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Padding(
+                      padding: EdgeInsets.only(top: 6),
+                      child: Icon(
+                        Icons.circle,
+                        color: TxaTheme.accent,
+                        size: 6,
                       ),
                     ),
-                  ),
-                ],
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        p,
+                        style: const TextStyle(
+                          color: TxaTheme.textMuted,
+                          fontSize: 13,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
-            )),
+            ),
           ],
         ],
       ),

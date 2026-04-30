@@ -25,21 +25,23 @@ class TxaHistorySyncService {
         _sync();
       }
     });
-    
+
     // Initial sync
     _sync();
   }
 
   Future<void> _sync() async {
     if (_isSyncing) return;
-    
+
     final pending = TxaSettings.getPendingSync();
     if (pending.isEmpty) return;
 
     if (!(await _network.isConnected())) return;
 
     _isSyncing = true;
-    TxaLogger.log("Starting sync of ${pending.length} pending history items...");
+    TxaLogger.log(
+      "Starting sync of ${pending.length} pending history items...",
+    );
 
     int successCount = 0;
     final List<Map<String, dynamic>> failed = [];
@@ -54,7 +56,10 @@ class TxaHistorySyncService {
         );
         successCount++;
       } catch (e) {
-        TxaLogger.log("Sync item failed: ${item['episode_id']} - $e", isError: true);
+        TxaLogger.log(
+          "Sync item failed: ${item['episode_id']} - $e",
+          isError: true,
+        );
         failed.add(item);
       }
     }
@@ -66,7 +71,9 @@ class TxaHistorySyncService {
       }
     }
 
-    TxaLogger.log("History sync finished. Success: $successCount, Failed: ${failed.length}");
+    TxaLogger.log(
+      "History sync finished. Success: $successCount, Failed: ${failed.length}",
+    );
     _isSyncing = false;
   }
 

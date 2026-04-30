@@ -151,10 +151,16 @@ class TxaFormat {
     final diff = now.difference(date);
     if (diff.inSeconds < 30) return TxaLanguage.t('time_just_now');
     if (diff.inSeconds < 60) {
-      return TxaLanguage.t('time_seconds_ago', replace: {'n': '${diff.inSeconds}'});
+      return TxaLanguage.t(
+        'time_seconds_ago',
+        replace: {'n': '${diff.inSeconds}'},
+      );
     }
     if (diff.inMinutes < 60) {
-      return TxaLanguage.t('time_minutes_ago', replace: {'n': '${diff.inMinutes}'});
+      return TxaLanguage.t(
+        'time_minutes_ago',
+        replace: {'n': '${diff.inMinutes}'},
+      );
     }
     if (diff.inHours < 24) {
       return TxaLanguage.t('time_hours_ago', replace: {'n': '${diff.inHours}'});
@@ -223,8 +229,10 @@ class TxaFormat {
 
     // Vietnamese "Tập" and English "Episode" / "Ep" / "Part" / "P"
     // Also handle cases like "Tập1" or "Ep.1" (no space or with dot)
-    final prefixPattern = RegExp(r'^(tập|episode|ep\.?|part|p\.?)\s?\d+',
-        caseSensitive: false);
+    final prefixPattern = RegExp(
+      r'^(tập|episode|ep\.?|part|p\.?)\s?\d+',
+      caseSensitive: false,
+    );
 
     if (prefixPattern.hasMatch(trimmed)) return trimmed;
 
@@ -239,7 +247,7 @@ class TxaFormat {
       'hoàn thành',
       'final',
       'tập cuối',
-      'hồi kết'
+      'hồi kết',
     ];
 
     for (var keyword in specialKeywords) {

@@ -84,9 +84,16 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
           _buildSectionTitle(TxaLanguage.t('network_speed')),
           SwitchListTile(
             value: TxaSettings.autoQualityByNetwork,
-            onChanged: (v) => setState(() => TxaSettings.autoQualityByNetwork = v),
-            title: Text(TxaLanguage.t('auto_quality'), style: const TextStyle(color: Colors.white)),
-            subtitle: Text(TxaLanguage.t('auto_quality_desc'), style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12)),
+            onChanged: (v) =>
+                setState(() => TxaSettings.autoQualityByNetwork = v),
+            title: Text(
+              TxaLanguage.t('auto_quality'),
+              style: const TextStyle(color: Colors.white),
+            ),
+            subtitle: Text(
+              TxaLanguage.t('auto_quality_desc'),
+              style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12),
+            ),
             activeThumbColor: TxaTheme.accent,
           ),
           SwitchListTile(
@@ -96,16 +103,39 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
               TxaSpeedService.toggleSpeedNotification(v);
               setState(() {});
             },
-            title: Text(TxaLanguage.t('show_speed_notif'), style: const TextStyle(color: Colors.white)),
-            subtitle: Text(TxaLanguage.t('show_speed_notif_desc'), style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12)),
+            title: Text(
+              TxaLanguage.t('show_speed_notif'),
+              style: const TextStyle(color: Colors.white),
+            ),
+            subtitle: Text(
+              TxaLanguage.t('show_speed_notif_desc'),
+              style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12),
+            ),
             activeThumbColor: TxaTheme.accent,
           ),
           ListTile(
-            title: Text(TxaLanguage.t('speed_unit'), style: const TextStyle(color: Colors.white)),
-            subtitle: Text(TxaSettings.speedUnit, style: const TextStyle(color: TxaTheme.textMuted)),
-            trailing: const Icon(Icons.chevron_right_rounded, color: TxaTheme.textMuted),
+            title: Text(
+              TxaLanguage.t('speed_unit'),
+              style: const TextStyle(color: Colors.white),
+            ),
+            subtitle: Text(
+              TxaSettings.speedUnit,
+              style: const TextStyle(color: TxaTheme.textMuted),
+            ),
+            trailing: const Icon(
+              Icons.chevron_right_rounded,
+              color: TxaTheme.textMuted,
+            ),
             onTap: () {
-              final units = ['Auto', 'KB/s', 'MB/s', 'GB/s', 'B/s', 'Mb/s', 'Gb/s'];
+              final units = [
+                'Auto',
+                'KB/s',
+                'MB/s',
+                'GB/s',
+                'B/s',
+                'Mb/s',
+                'Gb/s',
+              ];
               showModalBottomSheet(
                 context: context,
                 backgroundColor: TxaTheme.secondaryBg,
@@ -143,8 +173,20 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
                                     }
                                     Navigator.pop(ctx);
                                   },
-                                  title: Text(u, style: TextStyle(color: isSelected ? TxaTheme.accent : Colors.white)),
-                                  trailing: isSelected ? const Icon(Icons.check_circle_rounded, color: TxaTheme.accent) : null,
+                                  title: Text(
+                                    u,
+                                    style: TextStyle(
+                                      color: isSelected
+                                          ? TxaTheme.accent
+                                          : Colors.white,
+                                    ),
+                                  ),
+                                  trailing: isSelected
+                                      ? const Icon(
+                                          Icons.check_circle_rounded,
+                                          color: TxaTheme.accent,
+                                        )
+                                      : null,
                                 );
                               }).toList(),
                             ),
@@ -268,16 +310,21 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
                       child: ListView(
                         shrinkWrap: true,
                         children: fonts.map((f) {
-                          final isSelected = TxaSettings.fontFamily == f['name'];
+                          final isSelected =
+                              TxaSettings.fontFamily == f['name'];
                           return ListTile(
                             onTap: () {
-                              setState(() => TxaSettings.fontFamily = f['name']!);
+                              setState(
+                                () => TxaSettings.fontFamily = f['name']!,
+                              );
                               Navigator.pop(ctx);
                             },
                             title: Text(
                               f['label']!,
                               style: TextStyle(
-                                color: isSelected ? TxaTheme.accent : Colors.white,
+                                color: isSelected
+                                    ? TxaTheme.accent
+                                    : Colors.white,
                                 fontWeight: isSelected
                                     ? FontWeight.bold
                                     : FontWeight.normal,

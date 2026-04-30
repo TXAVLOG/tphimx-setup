@@ -6,6 +6,8 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:ffmpeg_kit_flutter_new/ffmpeg_kit.dart';
+import 'package:ffmpeg_kit_flutter_new/return_code.dart';
 import 'package:tphimx_setup/utils/txa_format.dart';
 import '../utils/txa_logger.dart';
 import 'txa_language.dart';
@@ -202,14 +204,8 @@ class TxaDownloadManager extends ChangeNotifier {
       type: 'download',
     );
     await _saveTasks();
-    _processQueue();
     notifyListeners();
-
-    if (isHls) {
-      _startDownloadTask(task);
-    } else {
-      _processQueue();
-    }
+    _processQueue();
   }
 
   void _processQueue() {
@@ -256,7 +252,14 @@ class TxaDownloadManager extends ChangeNotifier {
     notifyListeners();
 
     try {
-      final appDir = await getApplicationDocumentsDirectory();
+      Directory? baseDir;
+      if (Platform.isAndroid) {
+        baseDir = Directory('/storage/emulated/0/TPHIMX/Videos');
+      } else {
+        final appDir = await getApplicationDocumentsDirectory();
+        baseDir = Directory('${appDir.path}/TPHIMX/Videos');
+      }
+
       final safeMovieName = task.movieTitle.replaceAll(
         RegExp(r'[<>:"/\\|?*]'),
         '_',
@@ -265,10 +268,11 @@ class TxaDownloadManager extends ChangeNotifier {
         RegExp(r'[<>:"/\\|?*]'),
         '_',
       );
-      final dirPath = "${appDir.path}/movies/$safeMovieName/$safeEpName";
+      final dirPath = "${baseDir.path}/$safeMovieName/$safeEpName";
       await Directory(dirPath).create(recursive: true);
 
-      final fileName = "txa_${task.id}.${task.format}";
+      final ext = task.isHls ? 'mp4' : task.format;
+      final fileName = "txa_${task.id}.$ext";
       final filePath = "$dirPath/$fileName";
       task.savePath = filePath;
 
@@ -333,7 +337,165 @@ class TxaDownloadManager extends ChangeNotifier {
   }
 
   Future<void> _downloadM3U8(DownloadTask task) async {
-    await _downloadChunked(task);
+    final cancelToken = CancelToken();
+    _cancelTokens[task.id] = cancelToken;
+
+    Directory? appDir;
+    if (Platform.isAndroid) {
+      appDir = await getExternalStorageDirectory();
+      appDir ??= await getApplicationDocumentsDirectory();
+    } else {
+      appDir = await getApplicationDocumentsDirectory();
+    }
+
+    final tempDir = Directory("${appDir.path}/temp_hls/${task.id}");
+    if (!await tempDir.exists()) await tempDir.create(recursive: true);
+
+    try {
+      // 1. Fetch Master Playlist
+      final masterRes = await _dio.get<String>(
+        task.url,
+        cancelToken: cancelToken,
+      );
+      final masterContent = masterRes.data ?? '';
+
+      // 2. Extract Variant
+      final lines = masterContent.split('\n');
+      String variantUrl = '';
+      for (int i = 0; i < lines.length; i++) {
+        if (lines[i].contains('#EXT-X-STREAM-INF')) {
+          if (i + 1 < lines.length) {
+            variantUrl = lines[i + 1].trim();
+            break;
+          }
+        }
+      }
+
+      String variantContent = masterContent;
+      if (variantUrl.isNotEmpty) {
+        if (!variantUrl.startsWith('http')) {
+          final uri = Uri.parse(task.url);
+          variantUrl = '${uri.scheme}://${uri.host}$variantUrl';
+        }
+        final variantRes = await _dio.get<String>(
+          variantUrl,
+          cancelToken: cancelToken,
+        );
+        variantContent = variantRes.data ?? '';
+      }
+
+      // 3. Extract Segments
+      final vLines = variantContent.split('\n');
+      final segments = <String>[];
+      for (var line in vLines) {
+        final l = line.trim();
+        if (l.isNotEmpty && !l.startsWith('#')) {
+          segments.add(l);
+        }
+      }
+
+      if (segments.isEmpty) {
+        throw Exception("No segments found in m3u8");
+      }
+
+      task.totalSegments = segments.length;
+      task.downloadedSegments = 0;
+      notifyListeners();
+
+      // 4. Download Segments
+      final playlistUri = Uri.parse(task.url);
+      final baseUri = playlistUri.resolve('.');
+      final concatListPath = "${tempDir.path}/concat.txt";
+      final concatFile = File(concatListPath);
+      final sink = concatFile.openWrite();
+
+      final maxWorkers = 5;
+      int currentIndex = 0;
+
+      Future<void> downloadWorker() async {
+        while (currentIndex < segments.length) {
+          if (task.status != DownloadStatus.downloading) {
+            cancelToken.cancel("User paused");
+            return;
+          }
+          final idx = currentIndex++;
+          final segPath = segments[idx];
+          final segUrl = segPath.startsWith('http')
+              ? segPath
+              : baseUri.resolve(segPath).toString();
+          final tsPath = "${tempDir.path}/seg_$idx.ts";
+
+          bool success = false;
+          int retries = 3;
+          while (!success && retries > 0) {
+            try {
+              final file = File(tsPath);
+              if (!await file.exists() || await file.length() == 0) {
+                await _dio.download(segUrl, tsPath, cancelToken: cancelToken);
+              }
+              success = true;
+            } catch (e) {
+              if (e is DioException && CancelToken.isCancel(e)) rethrow;
+              retries--;
+              if (retries == 0) {
+                throw Exception("Failed to download segment $idx");
+              }
+              await Future.delayed(const Duration(seconds: 1));
+            }
+          }
+
+          task.downloadedSegments++;
+          if (task.downloadedSegments % 5 == 0 ||
+              task.downloadedSegments == task.totalSegments) {
+            _updateNotification(task);
+            notifyListeners();
+          }
+        }
+      }
+
+      final workers = List.generate(maxWorkers, (_) => downloadWorker());
+      await Future.wait(workers);
+
+      // Write to concat file
+      for (int i = 0; i < segments.length; i++) {
+        sink.writeln("file 'seg_$i.ts'");
+      }
+      await sink.close();
+
+      // 5. Merge with FFmpeg
+      // Double check task status hasn't changed to paused/removed during download
+      if (task.status == DownloadStatus.downloading) {
+        task.progress = 99.9;
+        _updateNotification(task);
+        notifyListeners();
+
+        final outputMp4 = task.savePath!;
+        if (await File(outputMp4).exists()) {
+          await File(outputMp4).delete();
+        }
+
+        final command =
+            "-f concat -safe 0 -i \"$concatListPath\" -c copy -metadata copyright=\"TPhimX Premium\" -metadata comment=\"Downloaded from TPhimX App\" \"$outputMp4\"";
+        final session = await FFmpegKit.execute(command);
+        final returnCode = await session.getReturnCode();
+
+        if (ReturnCode.isSuccess(returnCode)) {
+          // Cleanup
+          await tempDir.delete(recursive: true);
+        } else {
+          final logs = await session.getLogsAsString();
+          throw Exception("FFmpeg merge failed: $logs");
+        }
+      }
+    } catch (e) {
+      if (e is DioException && CancelToken.isCancel(e)) {
+        TxaLogger.log("Download cancelled/paused: ${task.id}");
+      } else {
+        rethrow;
+      }
+    } finally {
+      _cancelTokens.remove(task.id);
+    }
   }
 
   void _checkMovieCompletion(String movieId) {
@@ -344,7 +506,7 @@ class TxaDownloadManager extends ChangeNotifier {
 
     if (allDone && movieTasks.isNotEmpty) {
       _currentMovieDownloading = '';
-      _showMovieDoneNotification(movieTasks.first.movieTitle);
+      _showMovieDoneNotification(movieTasks.first.movieTitle, movieTasks);
     }
   }
 
@@ -360,7 +522,7 @@ class TxaDownloadManager extends ChangeNotifier {
     String countInfo = "";
     if (total > 1) {
       countInfo =
-          "${TxaLanguage.t('episodes_count').replaceAll('%c%', (done + 1).toString()).replaceAll('%t%', total.toString())} • ";
+          "${TxaLanguage.t('episodes_count', replace: {'c': (done + 1).toString(), 't': total.toString()})} • ";
     }
 
     final android = AndroidNotificationDetails(
@@ -375,16 +537,34 @@ class TxaDownloadManager extends ChangeNotifier {
       ongoing: true, // Keep it ongoing while downloading
     );
 
-    String sizeInfo = "";
-    if (task.totalBytes > 0) {
-      sizeInfo = " (${TxaFormat.formatFileSize(task.downloadedBytes)} / ${TxaFormat.formatFileSize(task.totalBytes)})";
+    String body = "";
+    if (task.isHls) {
+      if (task.totalSegments > 0) {
+        if (task.downloadedSegments == task.totalSegments) {
+          body =
+              "$countInfo${task.episodeTitle}: ${TxaLanguage.t('download_merging_video')}";
+        } else {
+          body =
+              "$countInfo${task.episodeTitle}: ${TxaLanguage.t('download_downloading_segments', replace: {'c': task.downloadedSegments.toString(), 't': task.totalSegments.toString()})}";
+        }
+      } else {
+        body =
+            "$countInfo${task.episodeTitle}: ${TxaLanguage.t('download_fetching_playlist')}";
+      }
+    } else {
+      String sizeInfo = "";
+      if (task.totalBytes > 0) {
+        sizeInfo =
+            " (${TxaFormat.formatFileSize(task.downloadedBytes)} / ${TxaFormat.formatFileSize(task.totalBytes)})";
+      }
+      body =
+          "$countInfo${task.episodeTitle}: ${task.progress.toInt()}%$sizeInfo • $_currentSpeed";
     }
 
     await _notifications.show(
       id: task.id.hashCode,
       title: task.movieTitle,
-      body:
-          "$countInfo${task.episodeTitle}: ${task.progress.toInt()}%$sizeInfo • $_currentSpeed",
+      body: body,
       notificationDetails: NotificationDetails(android: android),
     );
   }
@@ -416,17 +596,27 @@ class TxaDownloadManager extends ChangeNotifier {
     }
   }
 
-  void _showMovieDoneNotification(String title) {
+  void _showMovieDoneNotification(String title, List<DownloadTask> tasks) {
     final android = AndroidNotificationDetails(
       'txa_downloads_done',
       TxaLanguage.t('download_completed'),
       importance: Importance.high,
       priority: Priority.high,
     );
+
+    String body;
+    if (tasks.length == 1) {
+      body =
+          "$title: ${TxaLanguage.t('download_single_completed', replace: {'ep': tasks.first.episodeTitle})}";
+    } else {
+      body =
+          "$title: ${TxaLanguage.t('download_all_completed', replace: {'n': tasks.length.toString()})}";
+    }
+
     _notifications.show(
       id: title.hashCode,
       title: TxaLanguage.t('download_completed'),
-      body: "$title: ${TxaLanguage.t('download_all_completed')}",
+      body: body,
       notificationDetails: NotificationDetails(android: android),
     );
   }
@@ -485,18 +675,18 @@ class TxaDownloadManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  void pauseTask(String taskId) {
+  Future<void> pauseTask(String taskId) async {
     final task = _tasks.firstWhere((t) => t.id == taskId);
     if (task.status == DownloadStatus.downloading) {
       task.status = DownloadStatus.paused;
       _cancelTokens[taskId]?.cancel("User paused");
       _cancelTokens.remove(taskId);
+      await _saveTasks();
       notifyListeners();
-      _saveTasks();
     }
   }
 
-  void priorityTask(String taskId) {
+  Future<void> priorityTask(String taskId) async {
     final idx = _tasks.indexWhere((t) => t.id == taskId);
     if (idx == -1) return;
 
@@ -511,24 +701,24 @@ class TxaDownloadManager extends ChangeNotifier {
     // Stop current downloading if different
     for (var t in _tasks) {
       if (t.id != taskId && t.status == DownloadStatus.downloading) {
-        pauseTask(t.id);
+        await pauseTask(t.id);
         t.status = DownloadStatus.pending; // Back to queue
       }
     }
 
     _processQueue();
     notifyListeners();
-    _saveTasks();
+    await _saveTasks();
   }
 
-  void resumeTask(String taskId) {
+  Future<void> resumeTask(String taskId) async {
     final task = _tasks.firstWhere((t) => t.id == taskId);
     if (task.status == DownloadStatus.paused ||
         task.status == DownloadStatus.error) {
       task.status = DownloadStatus.pending;
+      await _saveTasks();
       _processQueue();
       notifyListeners();
-      _saveTasks();
     }
   }
 }
