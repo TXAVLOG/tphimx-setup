@@ -12,7 +12,13 @@ import android.os.Build
 import android.os.Handler
 import android.os.IBinder
 import android.os.Looper
+import android.graphics.Bitmap
+import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.Paint
+import android.graphics.Typeface
 import androidx.core.app.NotificationCompat
+import androidx.core.graphics.drawable.IconCompat
 import com.tphimx.tphimx_setup.R
 import java.util.Locale
 import kotlin.math.floor
@@ -188,10 +194,10 @@ class SpeedNotificationService : Service() {
         // Format daily usage
         val totalUsageStr = formatWithUnit((totalDailyRx + totalDailyTx).toDouble(), "Auto", false)
 
-        val contentTitle = "▼ $downSpeedStr  ▲ $upSpeedStr"
-        val contentText = "$txtNetwork: $networkInfo | $txtTotal: $totalUsageStr"
+        val contentTitle = "▼ $downSpeedStr   ▲ $upSpeedStr"
+        val contentText = "$txtNetwork: $networkInfo  •  $txtTotal: $totalUsageStr"
 
-        val notification = buildNotification(contentTitle, contentText)
+        val notification = buildNotification(contentTitle, contentText, downSpeedStr)
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID, notification)
         
@@ -239,7 +245,7 @@ class SpeedNotificationService : Service() {
         }
     }
 
-    private fun buildNotification(title: String, text: String): Notification {
+    private fun buildNotification(title: String, text: String, rxSpeedStr: String = "0 KB/s"): Notification {
         // Intent to open app
         val openAppIntent = packageManager.getLaunchIntentForPackage(packageName)
         val openAppPendingIntent = PendingIntent.getActivity(
@@ -247,10 +253,17 @@ class SpeedNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
-        return NotificationCompat.Builder(this, CHANNEL_ID)
+        val builder = NotificationCompat.Builder(this, CHANNEL_ID)
             .setContentTitle(title)
             .setContentText(text)
-            .setSmallIcon(R.drawable.ic_speed_notification)
+            .setSubText("$txtUsage • $txtTitle")
+            .setStyle(
+                NotificationCompat.BigTextStyle()
+                    .setBigContentTitle(title)
+                    .bigText(text)
+            )
+            .setColor(0xFF737DFD.toInt())
+            .setColorized(true)
             .setContentIntent(openAppPendingIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
@@ -262,26 +275,73 @@ class SpeedNotificationService : Service() {
             .setGroup("com.tphimx.speed_status") // Unique group to avoid stacking with other notifications
             .setGroupSummary(false)
             .setShowWhen(false)
-            .build()
+
+        try {
+            builder.setSmallIcon(createSpeedIcon(rxSpeedStr))
+        } catch (e: Exception) {
+            builder.setSmallIcon(R.drawable.ic_speed_notification)
+        }
+
+        return builder.build()
+    }
+
+    private fun createSpeedIcon(speedText: String): IconCompat {
+        val parts = speedText.split(" ")
+        var valueStr = "0"
+        var unitStr = "KB/s"
+        if (parts.size >= 2) {
+            valueStr = parts[0]
+            unitStr = parts[1]
+        }
+        
+        val valueFloat = valueStr.toFloatOrNull() ?: 0f
+        val displayValue = if (valueFloat >= 100 || valueFloat == 0f || valueFloat % 1 == 0f) {
+            valueFloat.toInt().toString()
+        } else {
+            String.format(Locale.US, "%.1f", valueFloat)
+        }
+
+        val size = 96
+        val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(bitmap)
+
+        val paintValue = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = if (displayValue.length > 3) 40f else 55f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+
+        val paintUnit = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+            color = Color.WHITE
+            textSize = 28f
+            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textAlign = Paint.Align.CENTER
+        }
+
+        // Draw text vertically centered. The Android status bar uses the alpha channel.
+        canvas.drawText(displayValue, size / 2f, size * 0.50f, paintValue)
+        canvas.drawText(unitStr, size / 2f, size * 0.90f, paintUnit)
+
+        return IconCompat.createWithBitmap(bitmap)
     }
 
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(NotificationManager::class.java)
-            
-            // Delete old channel if exists to apply new settings
-            // manager.deleteNotificationChannel(CHANNEL_ID)
+            manager.deleteNotificationChannel(CHANNEL_ID)
 
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
                 txtTitle,
-                NotificationManager.IMPORTANCE_HIGH
+                NotificationManager.IMPORTANCE_MAX
             ).apply {
                 description = "Hiển thị tốc độ mạng thời gian thực"
                 setShowBadge(false)
                 enableLights(false)
                 enableVibration(false)
                 setSound(null, null)
+                setBypassDnd(true)
                 lockscreenVisibility = Notification.VISIBILITY_PUBLIC
             }
             manager.createNotificationChannel(serviceChannel)

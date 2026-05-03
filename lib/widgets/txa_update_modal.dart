@@ -71,14 +71,22 @@ class TxaUpdateModal extends StatelessWidget {
                   vertical: 4,
                 ),
                 decoration: BoxDecoration(
-                  color: Colors.blue.withValues(alpha: 0.1),
-                  borderRadius: BorderRadius.circular(4),
+                  gradient: LinearGradient(
+                    colors: [
+                      Colors.blueAccent.withValues(alpha: 0.22),
+                      Colors.purpleAccent.withValues(alpha: 0.2),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                    color: Colors.white.withValues(alpha: 0.18),
+                  ),
                 ),
                 child: Text(
                   TxaLanguage.t('version_label', replace: {'version': version}),
                   style: const TextStyle(
-                    color: Colors.blue,
-                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
                 ),
@@ -106,18 +114,19 @@ class TxaUpdateModal extends StatelessWidget {
           Text(
             TxaLanguage.t('whats_new'),
             style: const TextStyle(
-              color: Colors.white70,
+              color: Colors.white,
               fontSize: 14,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
             ),
           ),
           const SizedBox(height: 8),
           Container(
             constraints: const BoxConstraints(maxHeight: 200),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(8),
+              color: Colors.white.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.1)),
             ),
             child: Scrollbar(
               thumbVisibility: true,
@@ -125,7 +134,7 @@ class TxaUpdateModal extends StatelessWidget {
                 child: Text(
                   changelog,
                   style: const TextStyle(
-                    color: Colors.grey,
+                    color: Colors.white70,
                     fontSize: 13,
                     height: 1.5,
                   ),
@@ -141,8 +150,14 @@ class TxaUpdateModal extends StatelessWidget {
                   child: OutlinedButton(
                     onPressed: onCancel ?? () => Navigator.of(context).pop(),
                     style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white24),
-                      foregroundColor: Colors.white70,
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.25),
+                      ),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: Text(TxaLanguage.t('later')),
                   ),
@@ -152,8 +167,13 @@ class TxaUpdateModal extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: onUpdate,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blue,
+                    backgroundColor: Colors.blueAccent,
                     foregroundColor: Colors.white,
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
                   ),
                   child: Text(TxaLanguage.t('update_now')),
                 ),

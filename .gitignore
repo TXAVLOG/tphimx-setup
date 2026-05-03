@@ -4,6 +4,8 @@
 *.pyc
 *.swp
 .DS_Store
+*.hprof
+*.apk
 .atom/
 .build/
 build/
@@ -20,6 +22,7 @@ migrate_working_dir/
 *.iws
 .idea/
 *.kotlin
+analyze_output.txt
 
 # Visual Studio Code related
 .vscode/

@@ -21,6 +21,7 @@ import 'package:cached_network_image/cached_network_image.dart';
 import '../utils/txa_format.dart';
 import 'download_manager_screen.dart';
 import 'update_history_screen.dart';
+import '../widgets/txa_modal.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -30,6 +31,22 @@ class AccountScreen extends StatefulWidget {
 }
 
 class _AccountScreenState extends State<AccountScreen> {
+  @override
+  void initState() {
+    super.initState();
+    TxaSettings().addListener(_onSettingsChanged);
+  }
+
+  @override
+  void dispose() {
+    TxaSettings().removeListener(_onSettingsChanged);
+    super.dispose();
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
+  }
+
   void _handleDev(BuildContext context, String label) {
     TxaToast.show(
       context,
@@ -50,9 +67,7 @@ class _AccountScreenState extends State<AccountScreen> {
     final Uri url = Uri.parse(urlStr);
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(TxaLanguage.t('not_open_link'))));
+      TxaToast.show(context, TxaLanguage.t('not_open_link'), isError: true);
     }
   }
 
@@ -291,357 +306,71 @@ class _AccountScreenState extends State<AccountScreen> {
             ),
           ),
 
-          // Auth Section
-          Builder(
-            builder: (context) {
-              final token = TxaSettings.authToken;
-              if (token.isEmpty) {
-                return Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: ElevatedButton.icon(
-                          onPressed: () =>
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (ctx) => const AuthScreen(),
-                                ),
-                              ).then((val) {
-                                if (val == true) setState(() {});
-                              }),
-                          icon: const Icon(
-                            Icons.person_outline_rounded,
-                            size: 18,
-                          ),
-                          label: Text(
-                            TxaLanguage.t('login'),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: TxaTheme.accent,
-                            foregroundColor: Colors.white,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            elevation: 0,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: ElevatedButton(
-                          onPressed: () =>
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (ctx) => const AuthScreen(),
-                                ),
-                              ).then((val) {
-                                if (val == true) setState(() {});
-                              }),
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: TxaTheme.cardBg,
-                            foregroundColor: TxaTheme.textPrimary,
-                            padding: const EdgeInsets.symmetric(vertical: 10),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(10),
-                              side: const BorderSide(
-                                color: TxaTheme.glassBorder,
-                              ),
-                            ),
-                            elevation: 0,
-                          ),
-                          child: Text(
-                            TxaLanguage.t('register'),
-                            style: const TextStyle(fontSize: 13),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }
+          // Profile content is now inside the ListView via _PremiumProfileCard
 
-              // Logged in state
-              Map<String, dynamic>? initialUser;
-              try {
-                if (TxaSettings.userData.isNotEmpty) {
-                  initialUser = {'data': jsonDecode(TxaSettings.userData)};
-                }
-              } catch (_) {}
-
-              // Profile Header
-              // Always use cached data for immediate visual consistency
-              return FutureBuilder<Map<String, dynamic>>(
-                future: Provider.of<TxaApi>(context, listen: false).getAuthMe(),
-                builder: (context, snapshot) {
-                  Map<String, dynamic>? updatedUser;
-                  if (snapshot.hasData) {
-                    updatedUser = snapshot.data?['data'];
-                  }
-
-                  // Priority: API result > Cache
-                  final user =
-                      updatedUser ??
-                      (initialUser != null ? initialUser['data'] : null);
-
-                  if (updatedUser != null) {
-                    WidgetsBinding.instance.addPostFrameCallback((_) {
-                      TxaSettings.userData = jsonEncode(updatedUser);
-                    });
-                  }
-
-                  if (user == null) {
-                    if (snapshot.hasError) {
-                      return _buildErrorCard(snapshot.error?.toString());
-                    }
-                    return const Center(child: CircularProgressIndicator());
-                  }
-
-                  final name = user['name'] ?? 'TPhimX User';
-                  final email = user['email'] ?? '...';
-                  final isVerified = user['email_verified_at'] != null;
-                  final initial = name.isNotEmpty ? name[0].toUpperCase() : 'U';
-
-                  // Check for session expiration quietly
-                  bool isExpired = false;
-                  if (snapshot.hasError) {
-                    final err = snapshot.error;
-                    if (err is DioException &&
-                        err.response?.statusCode == 401) {
-                      isExpired = true;
-                    } else if (err.toString().contains('401')) {
-                      isExpired = true;
-                    }
-                  }
-
-                  return Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 20,
-                    ),
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      color: TxaTheme.cardBg,
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: isExpired
-                            ? Colors.red.withValues(alpha: 0.3)
-                            : TxaTheme.glassBorder,
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        user['avatar'] != null &&
-                                user['avatar'].toString().isNotEmpty
-                            ? CircleAvatar(
-                                radius: 30,
-                                backgroundImage: CachedNetworkImageProvider(
-                                  user['avatar'],
-                                ),
-                              )
-                            : CircleAvatar(
-                                radius: 30,
-                                backgroundColor: TxaTheme.accent,
-                                child: Text(
-                                  initial,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                        const SizedBox(width: 16),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Expanded(
-                                    child: Text(
-                                      name,
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 18,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ),
-                                  if (isExpired)
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 6,
-                                        vertical: 2,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Colors.red.withValues(
-                                          alpha: 0.1,
-                                        ),
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(
-                                          color: Colors.red.withValues(
-                                            alpha: 0.3,
-                                          ),
-                                        ),
-                                      ),
-                                      child: const Text(
-                                        'Hết hạn!',
-                                        style: TextStyle(
-                                          color: Colors.redAccent,
-                                          fontSize: 9,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ),
-                                ],
-                              ),
-                              const SizedBox(height: 2),
-                              Text(
-                                email,
-                                style: const TextStyle(
-                                  color: TxaTheme.textMuted,
-                                  fontSize: 13,
-                                ),
-                              ),
-                              const SizedBox(height: 6),
-                              if (isVerified)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 3,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.green.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(6),
-                                    border: Border.all(
-                                      color: Colors.green.withValues(
-                                        alpha: 0.3,
-                                      ),
-                                    ),
-                                  ),
-                                  child: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      const Icon(
-                                        Icons.verified_rounded,
-                                        color: Colors.greenAccent,
-                                        size: 14,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        TxaLanguage.t('email_verified'),
-                                        style: const TextStyle(
-                                          color: Colors.greenAccent,
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                )
-                              else
-                                Text(
-                                  TxaLanguage.t('email_not_verified'),
-                                  style: TextStyle(
-                                    color: Colors.redAccent.withValues(
-                                      alpha: 0.7,
-                                    ),
-                                    fontSize: 11,
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                        IconButton(
-                          onPressed: () {
-                            _showLogoutConfirm(context);
-                          },
-                          icon: const Icon(
-                            Icons.logout_rounded,
-                            color: Colors.redAccent,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-              );
-            },
-          ),
-
-          const SizedBox(height: 16),
-
-          // Watching List (History Preview)
-          if (TxaSettings.authToken.isNotEmpty) _buildWatchingSection(),
-
-          const SizedBox(height: 16),
-
-          // Menu Items - Compact Grid Layout
           Expanded(
-            child: ListView.builder(
+            child: ListView(
               physics: const BouncingScrollPhysics(),
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 80),
-              itemCount: menuItems.length,
-              itemBuilder: (context, index) {
-                final item = menuItems[index];
-                return Padding(
-                  padding: const EdgeInsets.only(bottom: 6),
-                  child: InkWell(
-                    onTap: item['action'] as VoidCallback,
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 10,
-                      ),
-                      decoration: BoxDecoration(
-                        color: TxaTheme.cardBg,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: TxaTheme.glassBorder),
-                      ),
-                      child: Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(8),
-                            decoration: BoxDecoration(
-                              color: TxaTheme.glassBg,
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: Icon(
-                              item['icon'] as IconData,
-                              color: TxaTheme.textPrimary,
-                              size: 18,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Text(
-                              item['label'] as String,
-                              style: const TextStyle(
-                                color: TxaTheme.textPrimary,
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                              ),
-                            ),
-                          ),
-                          const Icon(
-                            Icons.chevron_right_rounded,
-                            color: TxaTheme.textMuted,
-                            size: 18,
-                          ),
-                        ],
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              children: [
+                // Profile Card (Premium Glass)
+                const _PremiumProfileCard(),
+                const SizedBox(height: 24),
+
+                // Watching List (History Preview)
+                if (TxaSettings.authToken.isNotEmpty) _buildWatchingSection(),
+                if (TxaSettings.authToken.isNotEmpty) const SizedBox(height: 24),
+                
+                // Settings Groups
+                _buildMenuSection(TxaLanguage.t('general_settings'), ['favorites', 'downloads', 'history'], menuItems),
+                const SizedBox(height: 24),
+                _buildMenuSection(TxaLanguage.t('app_settings'), ['global_settings', 'player_settings', 'tv_login'], menuItems),
+                const SizedBox(height: 24),
+                _buildMenuSection(TxaLanguage.t('community_support'), ['fb_fanpage', 'tg_channel', 'tg_group'], menuItems),
+                const SizedBox(height: 24),
+                _buildMenuSection(TxaLanguage.t('legal'), ['terms', 'privacy', 'update_history'], menuItems),
+
+                const SizedBox(height: 32),
+                
+                // Logout / Cache Actions
+                if (TxaSettings.authToken.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: ElevatedButton.icon(
+                      onPressed: () => _showLogoutConfirm(context),
+                      icon: const Icon(Icons.logout_rounded, size: 18),
+                      label: Text(TxaLanguage.t('logout')),
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.red.withValues(alpha: 0.1),
+                        foregroundColor: Colors.redAccent,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                          side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3)),
+                        ),
+                        elevation: 0,
                       ),
                     ),
                   ),
-                );
-              },
+                
+                ElevatedButton.icon(
+                  onPressed: () => _showClearCacheConfirm(context),
+                  icon: const Icon(Icons.delete_sweep_rounded, size: 18),
+                  label: Text(TxaLanguage.t('clear_cache')),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white.withValues(alpha: 0.05),
+                    foregroundColor: TxaTheme.textSecondary,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                      side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                    ),
+                    elevation: 0,
+                  ),
+                ),
+                
+                const SizedBox(height: 100),
+              ],
             ),
           ),
 
@@ -652,8 +381,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.1.2';
-                  final buildNumber = snapshot.data?.buildNumber ?? '412';
+                  final version = snapshot.data?.version ?? '4.2.5';
+                  final buildNumber = snapshot.data?.buildNumber ?? '425';
                   return InkWell(
                     onTap: () => Navigator.push(
                       context,
@@ -687,120 +416,131 @@ class _AccountScreenState extends State<AccountScreen> {
   }
 
   void _showLogoutConfirm(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: TxaTheme.cardBg,
-        title: Text(
-          TxaLanguage.t('logout'),
-          style: const TextStyle(color: Colors.white),
-        ),
-        content: Text(
-          TxaLanguage.t('logout_confirm'),
-          style: const TextStyle(color: TxaTheme.textSecondary),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: Text(TxaLanguage.t('cancel')),
-          ),
-          TextButton(
-            onPressed: () {
-              Navigator.pop(ctx);
-              TxaSettings.authToken = '';
-              TxaSettings.userData = '';
-              Provider.of<TxaApi>(context, listen: false).setToken('');
-              setState(() {});
-              TxaToast.show(context, TxaLanguage.t('logout_success'));
-            },
-            child: Text(
-              TxaLanguage.t('logout'),
-              style: const TextStyle(color: Colors.redAccent),
-            ),
-          ),
-        ],
+    TxaModal.show(
+      context,
+      title: TxaLanguage.t('logout'),
+      content: Text(
+        TxaLanguage.t('logout_confirm'),
+        style: const TextStyle(color: TxaTheme.textSecondary),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(TxaLanguage.t('cancel'), style: const TextStyle(color: Colors.white70)),
+        ),
+        ElevatedButton(
+          onPressed: () {
+            Navigator.pop(context);
+            TxaSettings.authToken = '';
+            TxaSettings.userData = '';
+            Provider.of<TxaApi>(context, listen: false).setToken('');
+            setState(() {});
+            TxaToast.show(context, TxaLanguage.t('logout_success'));
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.redAccent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: Text(
+            TxaLanguage.t('logout'),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
     );
   }
 
-  Widget _buildErrorCard(dynamic message) {
-    final is401 =
-        message.toString().contains('401') ||
-        message.toString().toLowerCase().contains('unauthenticated');
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: Colors.red.withValues(alpha: 0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+  void _showClearCacheConfirm(BuildContext context) {
+    TxaModal.show(
+      context,
+      title: TxaLanguage.t('clear_cache'),
+      content: Text(
+        TxaLanguage.t('clear_cache_msg'),
+        style: const TextStyle(color: TxaTheme.textSecondary),
       ),
-      child: Row(
-        children: [
-          Icon(
-            is401 ? Icons.vpn_key_rounded : Icons.error_outline_rounded,
-            color: Colors.redAccent,
-            size: 20,
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(TxaLanguage.t('cancel'), style: const TextStyle(color: Colors.white70)),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.pop(context);
+            TxaToast.show(context, TxaLanguage.t('cache_cleared'));
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: TxaTheme.accent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  is401 ? 'Phiên đăng nhập hết hạn' : 'Lỗi tải thông tin',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 13,
-                    fontWeight: FontWeight.bold,
+          child: Text(
+            TxaLanguage.t('clear'),
+            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMenuSection(String title, List<String> itemIds, List<Map<String, dynamic>> allItems) {
+    final items = allItems.where((i) => itemIds.contains(i['id'])).toList();
+    if (items.isEmpty) return const SizedBox.shrink();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          title.toUpperCase(),
+          style: const TextStyle(
+            color: TxaTheme.textMuted,
+            fontSize: 11,
+            fontWeight: FontWeight.w900,
+            letterSpacing: 1.2,
+          ),
+        ),
+        const SizedBox(height: 10),
+        Container(
+          decoration: BoxDecoration(
+            color: TxaTheme.cardBg,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: TxaTheme.glassBorder),
+          ),
+          child: ListView.separated(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            padding: EdgeInsets.zero,
+            itemCount: items.length,
+            separatorBuilder: (context, index) => Divider(
+              color: Colors.white.withValues(alpha: 0.05),
+              height: 1,
+              indent: 48,
+            ),
+            itemBuilder: (context, index) {
+              final item = items[index];
+              return ListTile(
+                onTap: item['action'] as VoidCallback,
+                leading: Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: TxaTheme.glassBg,
+                    borderRadius: BorderRadius.circular(10),
                   ),
+                  child: Icon(item['icon'] as IconData, color: TxaTheme.textPrimary, size: 18),
                 ),
-                Text(
-                  is401
-                      ? 'Vui lòng đăng nhập lại để tiếp tục'
-                      : (message?.toString() ?? 'Unknown Error'),
-                  style: const TextStyle(color: Colors.redAccent, fontSize: 11),
+                title: Text(
+                  item['label'] as String,
+                  style: const TextStyle(color: TxaTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
                 ),
-              ],
-            ),
+                trailing: const Icon(Icons.chevron_right_rounded, color: TxaTheme.textMuted, size: 18),
+                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+              );
+            },
           ),
-          if (is401)
-            TextButton(
-              onPressed: () {
-                TxaSettings.authToken = '';
-                TxaSettings.userData = '';
-                Provider.of<TxaApi>(context, listen: false).setToken('');
-                setState(() {});
-              },
-              style: TextButton.styleFrom(
-                backgroundColor: Colors.redAccent.withValues(alpha: 0.2),
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(8),
-                ),
-              ),
-              child: const Text(
-                'Đăng nhập',
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 12,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            )
-          else
-            IconButton(
-              onPressed: () => setState(() {}),
-              icon: const Icon(
-                Icons.refresh_rounded,
-                color: Colors.redAccent,
-                size: 20,
-              ),
-            ),
-        ],
-      ),
+        ),
+      ],
     );
   }
+
+
 
   Widget _buildWatchingSection() {
     return Column(
@@ -974,38 +714,48 @@ class _PlayerSettingsBottomSheetState
     });
   }
 
-  // Future<void> _requestOverlayPermission() async {
-  //   final status = await Permission.systemAlertWindow.request();
-  //   if (status.isGranted) {
-  //     setState(() {
-  //       _hasOverlayPermission = true;
-  //       TxaSettings.autoPiP = true;
-  //     });
-  //   } else {
-  //     if (mounted) {
-  //       showDialog(
-  //         context: context,
-  //         builder: (ctx) => AlertDialog(
-  //           title: Text(TxaLanguage.t('permission_overlay_label')),
-  //           content: Text(TxaLanguage.t('permission_overlay_desc')),
-  //           actions: [
-  //             TextButton(
-  //               onPressed: () => Navigator.pop(ctx),
-  //               child: Text(TxaLanguage.t('close')),
-  //             ),
-  //             TextButton(
-  //               onPressed: () {
-  //                 Navigator.pop(ctx);
-  //                 openAppSettings();
-  //               },
-  //               child: Text(TxaLanguage.t('go_to_settings')),
-  //             ),
-  //           ],
-  //         ),
-  //       );
-  //     }
-  //   }
-  // }
+  Future<void> _requestOverlayPermission() async {
+    final status = await Permission.systemAlertWindow.request();
+    if (status.isGranted) {
+      if (mounted) {
+        setState(() {
+          _hasOverlayPermission = true;
+          TxaSettings.autoPiP = true;
+        });
+      }
+    } else {
+      if (mounted) {
+        TxaModal.show(
+          context,
+          title: TxaLanguage.t('permission_overlay_label'),
+          content: Text(
+            TxaLanguage.t('permission_overlay_desc'),
+            style: const TextStyle(color: TxaTheme.textSecondary),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: Text(TxaLanguage.t('close'), style: const TextStyle(color: Colors.white70)),
+            ),
+            ElevatedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                openAppSettings();
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: TxaTheme.accent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+              ),
+              child: Text(
+                TxaLanguage.t('go_to_settings'),
+                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -1085,7 +835,13 @@ class _PlayerSettingsBottomSheetState
             _SettingToggle(
               label: TxaLanguage.t('auto_pip_label'),
               value: TxaSettings.autoPiP,
-              onChanged: (v) => setState(() => TxaSettings.autoPiP = v),
+              onChanged: (v) {
+                if (v && !_hasOverlayPermission) {
+                  _requestOverlayPermission();
+                } else {
+                  setState(() => TxaSettings.autoPiP = v);
+                }
+              },
             ),
           if (Platform.isAndroid) const SizedBox(height: 8),
           if (Platform.isAndroid)
@@ -1198,3 +954,324 @@ class _SettingToggle extends StatelessWidget {
     );
   }
 }
+
+class _PremiumProfileCard extends StatelessWidget {
+  const _PremiumProfileCard();
+
+  @override
+  Widget build(BuildContext context) {
+    final token = TxaSettings.authToken;
+    if (token.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(20),
+        decoration: BoxDecoration(
+          gradient: TxaTheme.brandGradient,
+          borderRadius: BorderRadius.circular(24),
+          boxShadow: [
+            BoxShadow(
+              color: TxaTheme.accent.withValues(alpha: 0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
+            ),
+          ],
+        ),
+        child: Column(
+          children: [
+            const Icon(Icons.stars_rounded, color: Colors.white, size: 48),
+            const SizedBox(height: 12),
+            Text(
+              TxaLanguage.t('app_slogan'),
+              textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 20),
+            Row(
+              children: [
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (ctx) => const AuthScreen()),
+                      );
+                      if (result == true) {
+                        // AccountScreen listener will handle the rebuild
+                      }
+                    },
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.white,
+                      foregroundColor: Colors.black,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      elevation: 0,
+                    ),
+                    child: Text(TxaLanguage.t('login'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (ctx) => const AuthScreen(isRegister: true)),
+                      );
+                      if (result == true) {
+                        // AccountScreen listener will handle the rebuild
+                      }
+                    },
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Colors.white24),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                    child: Text(TxaLanguage.t('register')),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      );
+    }
+
+    return FutureBuilder<Map<String, dynamic>>(
+      future: Provider.of<TxaApi>(context, listen: false).getAuthMe(),
+      builder: (context, snapshot) {
+        // Priority: API result > Cache
+        Map<String, dynamic>? user = snapshot.data?['data'];
+        if (user == null && TxaSettings.userData.isNotEmpty) {
+          try {
+            user = jsonDecode(TxaSettings.userData);
+          } catch (_) {}
+        }
+
+        if (user == null) {
+          if (snapshot.hasError) {
+            return _buildErrorCard(context, snapshot.error?.toString(), () {
+              final state = context.findAncestorStateOfType<_AccountScreenState>();
+              (state as dynamic)?.setState(() {});
+            });
+          }
+          return const Center(
+            child: Padding(
+              padding: EdgeInsets.all(20),
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          );
+        }
+
+        final name = user['name'] ?? 'TPhimX User';
+        final email = user['email'] ?? '...';
+        final isVerified = user['email_verified_at'] != null;
+        final avatar = user['avatar'];
+
+        // Check for session expiration quietly
+        bool isExpired = false;
+        if (snapshot.hasError) {
+          final err = snapshot.error;
+          if (err is DioException && err.response?.statusCode == 401) {
+            isExpired = true;
+          } else if (err.toString().contains('401')) {
+            isExpired = true;
+          }
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: TxaTheme.cardBg,
+            borderRadius: BorderRadius.circular(24),
+            border: Border.all(color: TxaTheme.glassBorder),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.2),
+                blurRadius: 20,
+                offset: const Offset(0, 10),
+              ),
+            ],
+          ),
+          child: Row(
+            children: [
+              Stack(
+                children: [
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: TxaTheme.accent, width: 2),
+                    ),
+                    child: CircleAvatar(
+                      radius: 35,
+                      backgroundColor: TxaTheme.accent.withValues(alpha: 0.2),
+                      backgroundImage: (avatar != null && avatar.toString().isNotEmpty)
+                          ? CachedNetworkImageProvider(avatar)
+                          : null,
+                      child: (avatar == null || avatar.toString().isEmpty)
+                          ? Text(
+                              name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                            )
+                          : null,
+                    ),
+                  ),
+                  Positioned(
+                    bottom: 0,
+                    right: 0,
+                    child: Container(
+                      padding: const EdgeInsets.all(4),
+                      decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
+                      child: const Icon(Icons.check, color: Colors.white, size: 10),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            name,
+                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        if (isExpired)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.red.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(4),
+                              border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                            ),
+                            child: const Text(
+                              '!',
+                              style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ),
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      email,
+                      style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13),
+                    ),
+                    const SizedBox(height: 8),
+                    if (isVerified)
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        decoration: BoxDecoration(
+                          color: Colors.green.withValues(alpha: 0.1),
+                          borderRadius: BorderRadius.circular(6),
+                          border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                        ),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.verified_rounded, color: Colors.greenAccent, size: 12),
+                            const SizedBox(width: 4),
+                            Text(
+                              TxaLanguage.t('email_verified'),
+                              style: const TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                            ),
+                          ],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+Widget _buildErrorCard(BuildContext context, dynamic message, VoidCallback onRetry) {
+  final is401 =
+      message.toString().contains('401') ||
+      message.toString().toLowerCase().contains('unauthenticated');
+
+  return Container(
+    margin: const EdgeInsets.symmetric(horizontal: 16),
+    padding: const EdgeInsets.all(12),
+    decoration: BoxDecoration(
+      color: Colors.red.withValues(alpha: 0.1),
+      borderRadius: BorderRadius.circular(12),
+      border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+    ),
+    child: Row(
+      children: [
+        Icon(
+          is401 ? Icons.vpn_key_rounded : Icons.error_outline_rounded,
+          color: Colors.redAccent,
+          size: 20,
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                is401 ? 'Phiên đăng nhập hết hạn' : 'Lỗi tải thông tin',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 13,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              Text(
+                is401
+                    ? 'Vui lòng đăng nhập lại để tiếp tục'
+                    : (message?.toString() ?? 'Unknown Error'),
+                style: const TextStyle(color: Colors.redAccent, fontSize: 11),
+              ),
+            ],
+          ),
+        ),
+        if (is401)
+          TextButton(
+            onPressed: () {
+              TxaSettings.authToken = '';
+              TxaSettings.userData = '';
+              Provider.of<TxaApi>(context, listen: false).setToken('');
+              onRetry();
+            },
+            style: TextButton.styleFrom(
+              backgroundColor: Colors.redAccent.withValues(alpha: 0.2),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(8),
+              ),
+            ),
+            child: const Text(
+              'Đăng nhập',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          )
+        else
+          IconButton(
+            onPressed: onRetry,
+            icon: const Icon(
+              Icons.refresh_rounded,
+              color: Colors.redAccent,
+              size: 20,
+            ),
+          ),
+      ],
+    ),
+  );
+}
+
+

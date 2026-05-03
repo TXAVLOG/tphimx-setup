@@ -8,6 +8,8 @@ import '../services/txa_api.dart';
 import '../services/txa_settings.dart';
 import 'txa_player.dart';
 import 'dart:async';
+import 'dart:io';
+import 'package:floating/floating.dart';
 
 class TxaMiniPlayer extends StatefulWidget {
   const TxaMiniPlayer({super.key});
@@ -16,7 +18,7 @@ class TxaMiniPlayer extends StatefulWidget {
   State<TxaMiniPlayer> createState() => _TxaMiniPlayerState();
 }
 
-class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
+class _TxaMiniPlayerState extends State<TxaMiniPlayer> with WidgetsBindingObserver {
   // Mini-player dimensions - Optimized for 16:9
   static const double miniWidth = 300;
   static const double miniHeight = 168;
@@ -25,16 +27,71 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
   Offset _offset = const Offset(-1, -1);
   bool _isDragging = false;
   Timer? _historySyncTimer;
+  final Floating _floating = Floating();
+  final GlobalKey _miniPlayerKey = GlobalKey();
 
   @override
   void initState() {
     super.initState();
     _startHistorySync();
+    WidgetsBinding.instance.addObserver(this);
+    _enableAutoPiP();
+
+    TxaSettings().addListener(_onSettingsChanged);
+  }
+
+  void _onSettingsChanged() {
+    if (!mounted) return;
+    if (TxaSettings.autoPiP) {
+      _enableAutoPiP();
+    } else {
+      _floating.cancelOnLeavePiP();
+    }
+    setState(() {});
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+      if (!Platform.isAndroid) return;
+      
+      final provider = Provider.of<TxaMiniPlayerProvider>(context, listen: false);
+      if (provider.isClosed || !provider.isMini || provider.controller == null) return;
+      
+      final isPlaying = provider.controller!.videoPlayerController?.value.isPlaying ?? false;
+      
+      if (TxaSettings.autoPiP && isPlaying) {
+        try {
+          provider.controller!.enablePictureInPicture(_miniPlayerKey);
+        } catch (e) {
+          debugPrint('Mini PiP Error: $e');
+        }
+      } else {
+        _floating.cancelOnLeavePiP();
+      }
+    } else if (state == AppLifecycleState.resumed) {
+      _enableAutoPiP();
+    }
+  }
+
+  void _enableAutoPiP() {
+    if (!Platform.isAndroid || !TxaSettings.autoPiP) return;
+    final provider = Provider.of<TxaMiniPlayerProvider>(context, listen: false);
+    if (provider.isClosed || !provider.isMini) return;
+
+    try {
+      _floating.enable(OnLeavePiP(aspectRatio: const Rational(16, 9)));
+    } catch (e) {
+      TxaLogger.log('Mini Auto PiP enable error: $e', isError: true);
+    }
   }
 
   @override
   void dispose() {
+    TxaSettings().removeListener(_onSettingsChanged);
+    WidgetsBinding.instance.removeObserver(this);
     _historySyncTimer?.cancel();
+    _floating.cancelOnLeavePiP();
     super.dispose();
   }
 
@@ -165,7 +222,10 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                         // Video Content — NO glass overlay so video is fully visible
                         Positioned.fill(
                           child: provider.controller != null
-                              ? BetterPlayer(controller: provider.controller!)
+                              ? BetterPlayer(
+                                  key: _miniPlayerKey,
+                                  controller: provider.controller!,
+                                )
                               : Container(
                                   color: TxaTheme.cardBg,
                                   child: const Center(
@@ -177,9 +237,10 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                                 ),
                         ),
 
-                        // Darker Gradient Overlay for Text Readability
-                        Positioned.fill(
-                          child: Container(
+                        // Darker Gradient Overlay for Text Readability - HIDE IN PIP
+                        if (!provider.isPip)
+                          Positioned.fill(
+                            child: Container(
                             decoration: BoxDecoration(
                               gradient: LinearGradient(
                                 begin: Alignment.topCenter,
@@ -195,9 +256,10 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                           ),
                         ),
 
-                        // Title Bar
-                        Positioned(
-                          top: 10,
+                        // Title Bar - HIDE IN PIP
+                        if (!provider.isPip)
+                          Positioned(
+                            top: 10,
                           left: 12,
                           right: 12,
                           child: Row(
@@ -275,9 +337,10 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                           ),
                         ),
 
-                        // Center Controls (Pulse on hover effect logic would go here if web)
-                        Center(
-                          child: Row(
+                        // Center Controls - HIDE IN PIP
+                        if (!provider.isPip)
+                          Center(
+                            child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
                               _MiniControlButton(
@@ -333,9 +396,10 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
                           ),
                         ),
 
-                        // Progress Indicator
-                        Positioned(
-                          bottom: 0,
+                        // Progress Bar - HIDE IN PIP
+                        if (!provider.isPip)
+                          Positioned(
+                            bottom: 0,
                           left: 0,
                           right: 0,
                           child: _MiniProgressBar(
@@ -355,6 +419,10 @@ class _TxaMiniPlayerState extends State<TxaMiniPlayer> {
   }
 
   void _restoreToFull(BuildContext context, TxaMiniPlayerProvider provider) {
+    if (provider.isPip) {
+      provider.isPip = false;
+      return;
+    }
     final movie = provider.movie;
     final controller = provider.controller;
     if (controller == null) return;

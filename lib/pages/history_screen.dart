@@ -261,7 +261,7 @@ class _HistoryScreenState extends State<HistoryScreen>
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          '${TxaLanguage.t('watching')}: ${item['episode_name'] ?? '...'}',
+                          '${TxaLanguage.t('watching')}: ${TxaFormat.formatEpisodeName(item['episode_name'])}',
                           style: const TextStyle(
                             color: TxaTheme.textSecondary,
                             fontSize: 12,

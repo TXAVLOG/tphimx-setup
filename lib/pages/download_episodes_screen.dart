@@ -210,7 +210,7 @@ class DownloadEpisodesScreen extends StatelessWidget {
 
   Widget _buildEpisodeTile(
     BuildContext context,
-    DownloadTask task,
+    TxaDownloadTask task,
     TxaDownloadManager manager,
   ) {
     final isDone = task.status == DownloadStatus.completed;
@@ -322,7 +322,7 @@ class DownloadEpisodesScreen extends StatelessWidget {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(2),
                           child: LinearProgressIndicator(
-                            value: task.progress / 100,
+                            value: task.progress,
                             backgroundColor: Colors.white10,
                             valueColor: const AlwaysStoppedAnimation<Color>(
                               TxaTheme.accent,
@@ -332,11 +332,13 @@ class DownloadEpisodesScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          "${task.progress.toInt()}%${task.totalBytes > 0 ? ' • ${TxaFormat.formatFileSize(task.downloadedBytes)}/${TxaFormat.formatFileSize(task.totalBytes)}' : ''}",
+                          task.statusDisplay,
                           style: const TextStyle(
                             color: TxaTheme.textMuted,
                             fontSize: 10,
                           ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ],
                     ],

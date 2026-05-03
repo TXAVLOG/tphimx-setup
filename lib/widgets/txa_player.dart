@@ -14,7 +14,6 @@ import 'package:provider/provider.dart';
 import '../services/txa_api.dart';
 import '../utils/txa_toast.dart';
 import '../widgets/txa_modal.dart';
-import 'package:floating/floating.dart';
 import '../utils/txa_logger.dart';
 import 'package:battery_plus/battery_plus.dart';
 import 'package:share_plus/share_plus.dart';
@@ -25,6 +24,9 @@ import 'package:no_screen_mirror/no_screen_mirror.dart';
 import 'package:cast_plus/cast.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_settings/app_settings.dart' as app_settings_lib;
+import 'package:floating/floating.dart';
+import 'package:permission_handler/permission_handler.dart';
+import '../services/txa_permission.dart';
 import 'txa_watermark.dart';
 
 class TxaPlayer extends StatefulWidget {
@@ -59,6 +61,7 @@ class _TxaPlayerState extends State<TxaPlayer>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   BetterPlayerController? _betterPlayerController;
   final GlobalKey _betterPlayerKey = GlobalKey();
+  final Floating _floating = Floating();
   bool _error = false;
   bool _isInitialized = false;
   bool _isRefreshing = false;
@@ -66,6 +69,9 @@ class _TxaPlayerState extends State<TxaPlayer>
   double? _manualResumeTime;
   WebViewController? _webViewController;
   String? _detailedError;
+  List<Map<String, String>> _activeSources = [];
+  dynamic _activeEpisode;
+  int _activeSourceIndex = 0;
 
   late int _currentServerIndex;
   late int _currentEpisodeIndex;
@@ -133,9 +139,6 @@ class _TxaPlayerState extends State<TxaPlayer>
   ];
   int _currentRatioIndex = 0;
 
-  // PiP via floating package
-  final Floating _floating = Floating();
-
   // Battery monitoring
   final Battery _battery = Battery();
   int _batteryLevel = 100;
@@ -181,14 +184,17 @@ class _TxaPlayerState extends State<TxaPlayer>
     WidgetsBinding.instance.addObserver(this);
 
     // Listen for settings changes to reactively update PiP registration
-    TxaSettings.onSettingsChanged = () {
-      if (!mounted) return;
-      if (TxaSettings.autoPiP) {
-        _enableAutoPiP();
-      } else {
-        _floating.cancelOnLeavePiP();
-      }
-    };
+    TxaSettings().addListener(_onSettingsChanged);
+  }
+
+  void _onSettingsChanged() {
+    if (!mounted) return;
+    if (TxaSettings.autoPiP) {
+      _enableAutoPiP();
+    } else {
+      _floating.cancelOnLeavePiP();
+    }
+    setState(() {});
   }
 
   void _startHistorySync() {
@@ -249,6 +255,7 @@ class _TxaPlayerState extends State<TxaPlayer>
 
   @override
   void dispose() {
+    TxaSettings().removeListener(_onSettingsChanged);
     TxaPlayer.isPlayerActive = false;
     _toggleDND(false);
     _historySyncTimer?.cancel();
@@ -312,9 +319,11 @@ class _TxaPlayerState extends State<TxaPlayer>
       }
 
       if (TxaSettings.autoPiP && isPlaying) {
-        // Enable native PiP via floating package
+        // Enable native BetterPlayer PiP
         try {
-          _floating.enable(ImmediatePiP(aspectRatio: const Rational(16, 9)));
+          if (!_isEmbed && _betterPlayerController != null) {
+            _betterPlayerController!.enablePictureInPicture(_betterPlayerKey);
+          }
         } catch (e) {
           debugPrint('PiP Error: $e');
         }
@@ -504,6 +513,7 @@ class _TxaPlayerState extends State<TxaPlayer>
       _error = false;
       _autoNextTriggered = false;
       _isEmbed = false;
+      _isRefreshing = false;
     });
 
     // Force landscapeLeft for consistent rotation on both iOS and Android
@@ -596,6 +606,9 @@ class _TxaPlayerState extends State<TxaPlayer>
       return;
     }
 
+    _activeSources = sources;
+    _activeEpisode = episode;
+    _activeSourceIndex = 0;
     await _trySource(sources, 0, episode);
   }
 
@@ -613,6 +626,7 @@ class _TxaPlayerState extends State<TxaPlayer>
     final url = source['url']!;
     final type = source['type']!;
     final isLast = index == sources.length - 1;
+    _activeSourceIndex = index;
 
     if (type == 'embed') {
       _initializeEmbed(url);
@@ -704,13 +718,19 @@ class _TxaPlayerState extends State<TxaPlayer>
           _isInitialized = true;
           _isEmbed = false;
           _error = false;
+          _isRefreshing = false;
         });
         _enableAutoPiP();
       }
     } catch (e) {
       if (isLast) {
         _detailedError = "${TxaLanguage.t('all_sources_failed')}\n$e";
-        if (mounted) setState(() => _error = true);
+        if (mounted) {
+          setState(() {
+            _error = true;
+            _isRefreshing = false;
+          });
+        }
       } else {
         await _trySource(sources, index + 1, episode);
       }
@@ -832,6 +852,29 @@ class _TxaPlayerState extends State<TxaPlayer>
     }
 
     setState(() => _isRefreshing = true);
+
+    final nextIndex = _activeSourceIndex + 1;
+    if (_activeSources.isNotEmpty &&
+        _activeEpisode != null &&
+        nextIndex < _activeSources.length) {
+      TxaToast.show(
+        context,
+        TxaLanguage.t(
+          'player_source_fallback',
+          replace: {
+            'current': '${nextIndex + 1}',
+            'total': '${_activeSources.length}',
+          },
+        ),
+      );
+      TxaLogger.log(
+        "Player fallback source: ${_activeSourceIndex + 1}/${_activeSources.length} -> ${nextIndex + 1}",
+      );
+      await _trySource(_activeSources, nextIndex, _activeEpisode);
+      return;
+    }
+
+    TxaLogger.log("No fallback source left, reinitializing player");
     _initializePlayer();
   }
 
@@ -970,6 +1013,23 @@ class _TxaPlayerState extends State<TxaPlayer>
   }
 
   void _openCastDialog() async {
+    // 0. Check and request Nearby Devices permission for Android 13+
+    if (Platform.isAndroid) {
+      final nearbyStatus = await Permission.nearbyWifiDevices.status;
+      if (!nearbyStatus.isGranted) {
+        final result = await Permission.nearbyWifiDevices.request();
+        if (!result.isGranted) {
+          if (mounted) {
+            TxaToast.show(
+              context,
+              TxaLanguage.t('permission_nearby_devices_denied'),
+            );
+          }
+          return;
+        }
+      }
+    }
+
     // 1. Pause player
     _betterPlayerController?.pause();
 
@@ -1160,6 +1220,14 @@ class _TxaPlayerState extends State<TxaPlayer>
   }
 
   void _startChromecastDiscovery() async {
+    // 1. Request Nearby Devices permission (Android only)
+    final hasNearby = await TxaPermission.requestNearby();
+    if (!hasNearby && mounted) {
+      TxaToast.show(context, TxaLanguage.t('permission_nearby_devices_denied'),
+          isError: true);
+      return;
+    }
+
     TxaToast.show(context, TxaLanguage.t('searching_chromecast'));
     try {
       final devices = await CastDiscoveryService().search();
@@ -1313,6 +1381,11 @@ class _TxaPlayerState extends State<TxaPlayer>
       });
       _loadMarkers();
       _initializePlayer();
+      // Sync with MiniPlayerProvider if active
+      final mini = Provider.of<TxaMiniPlayerProvider>(context, listen: false);
+      if (!mini.isClosed) {
+        mini.updateEpisode(_currentEpisodeIndex);
+      }
     }
   }
 
@@ -1327,8 +1400,38 @@ class _TxaPlayerState extends State<TxaPlayer>
       });
       _loadMarkers();
       _initializePlayer();
+      // Sync with MiniPlayerProvider if active
+      final mini = Provider.of<TxaMiniPlayerProvider>(context, listen: false);
+      if (!mini.isClosed) {
+        mini.updateEpisode(_currentEpisodeIndex);
+      }
     } else {
       _syncHistory(); // Final sync on exit
+      _handleBack();
+    }
+  }
+
+  void _handleBack() async {
+    await _syncHistory();
+
+    if (_betterPlayerController != null &&
+        _isInitialized &&
+        TxaSettings.autoPiP &&
+        !_isEmbed) {
+      final mini = Provider.of<TxaMiniPlayerProvider>(context, listen: false);
+      mini.switchToMini(
+        controller: _betterPlayerController!,
+        movie: widget.movie,
+        servers: widget.servers,
+        serverIndex: _currentServerIndex,
+        episodeIndex: _currentEpisodeIndex,
+      );
+    }
+
+    if (mounted) {
+      // Restore orientation
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
       Navigator.pop(context);
     }
   }
@@ -1471,6 +1574,12 @@ class _TxaPlayerState extends State<TxaPlayer>
     });
     _loadMarkers();
     _initializePlayer();
+    // Sync with MiniPlayerProvider if active
+    final mini = Provider.of<TxaMiniPlayerProvider>(context, listen: false);
+    if (!mini.isClosed) {
+      mini.updateServer(_currentServerIndex);
+      mini.updateEpisode(_currentEpisodeIndex);
+    }
   }
 
   // --- ASPECT RATIO ---
@@ -1629,9 +1738,7 @@ class _TxaPlayerState extends State<TxaPlayer>
           SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
         }
       },
-      child: PiPSwitcher(
-        childWhenEnabled: _buildPiPUI(),
-        childWhenDisabled: Scaffold(
+      child: Scaffold(
           backgroundColor: Colors.black,
           body: GestureDetector(
             onTapUp: (d) => _handleTap(d, width),
@@ -1666,20 +1773,7 @@ class _TxaPlayerState extends State<TxaPlayer>
                         : _buildLoadingUI(),
                   ),
 
-                  // 2.1 LOGO (Bottom-Left)
-                  Positioned(
-                    bottom: 20,
-                    left: 20,
-                    child: Opacity(
-                      opacity: 0.5,
-                      child: Image.asset(
-                        'assets/images/logo_mini.png',
-                        width: 40,
-                        height: 40,
-                        errorBuilder: (ctx, e, st) => const SizedBox.shrink(),
-                      ),
-                    ),
-                  ),
+
 
                   // 2.5 CLOCK (Top-Left)
                   if (TxaSettings.showClock)
@@ -1867,8 +1961,7 @@ class _TxaPlayerState extends State<TxaPlayer>
             ),
           ),
         ),
-      ),
-    );
+      );
   }
 
   Widget _buildAutoNextOverlay() {
@@ -2060,19 +2153,7 @@ class _TxaPlayerState extends State<TxaPlayer>
                       color: Colors.white,
                       size: 28,
                     ),
-                    onPressed: () async {
-                      // Save history BEFORE exiting
-                      await _syncHistory();
-
-                      // PiP handling if needed
-                      if (_betterPlayerController != null &&
-                          TxaSettings.autoPiP) {
-                        // Optionally trigger native PiP here if desired,
-                        // but user hates the "ugly" mini-player so we stop it.
-                      }
-
-                      if (mounted) Navigator.pop(context);
-                    },
+                    onPressed: _handleBack,
                   ),
                   const SizedBox(width: 8),
                   _HeaderIcon(
@@ -2118,16 +2199,10 @@ class _TxaPlayerState extends State<TxaPlayer>
                     onTap: () async {
                       if (_betterPlayerController != null && _isInitialized) {
                         await _syncHistory(); // Sync before PiP
-                        if (_isEmbed) {
-                          _floating.enable(
-                            ImmediatePiP(aspectRatio: const Rational(16, 9)),
-                          );
-                        } else {
-                          // Use BetterPlayer's native PiP for the actual video source
+                          // Native BetterPlayer PiP
                           _betterPlayerController!.enablePictureInPicture(
                             _betterPlayerKey,
                           );
-                        }
                       }
                     },
                   ),
@@ -2306,6 +2381,7 @@ class _TxaPlayerState extends State<TxaPlayer>
                                 onTap: () => setState(() {
                                   _showServerDrawer = true;
                                   _showEpisodeDrawer = false;
+                                  _manualResumeTime = null;
                                 }),
                                 isActive: true,
                               ),
@@ -2426,45 +2502,6 @@ class _TxaPlayerState extends State<TxaPlayer>
             ),
           ),
       ],
-    );
-  }
-
-  Widget _buildPiPUI() {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: Center(
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            _isInitialized
-                ? (_isEmbed
-                      ? WebViewWidget(controller: _webViewController!)
-                      : BetterPlayer(
-                          key: _betterPlayerKey,
-                          controller: _betterPlayerController!,
-                        ))
-                : const SizedBox.shrink(),
-            Positioned(
-              top: 16,
-              left: 16,
-              right: 16,
-              child: IgnorePointer(
-                child: Text(
-                  widget.movie['name'] ?? '',
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                    shadows: [Shadow(blurRadius: 10, color: Colors.black)],
-                  ),
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
     );
   }
 
@@ -2851,9 +2888,15 @@ class _TxaPlayerState extends State<TxaPlayer>
                                 setState(() {
                                   _currentEpisodeIndex = i;
                                   _showEpisodeDrawer = false;
+                                  _manualResumeTime = null;
                                 });
                                 _loadMarkers();
                                 _initializePlayer();
+                                  // Sync with MiniPlayerProvider if active
+                                  final mini = Provider.of<TxaMiniPlayerProvider>(context, listen: false);
+                                  if (!mini.isClosed) {
+                                    mini.updateEpisode(i);
+                                  }
                               },
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),

@@ -128,7 +128,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
               initialTime: initialTime,
             ),
           ),
-        );
+        ).then((_) {
+          if (mounted) _loadDetail();
+        });
       }
     });
   }
@@ -419,7 +421,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                   initialTime: initialTime,
                                 ),
                               ),
-                            );
+                            ).then((_) {
+                              if (mounted) _loadDetail();
+                            });
                           } else {
                             TxaToast.show(
                               context,
@@ -833,7 +837,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                 : 0,
                           ),
                         ),
-                      );
+                      ).then((_) {
+                        if (mounted) _loadDetail();
+                      });
                     }
                   },
                   child: Container(
@@ -1303,149 +1309,157 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                   ),
                   const SizedBox(height: 20),
                   Expanded(
-                    child: ListView.separated(
-                      itemCount: episodes.length,
-                      separatorBuilder: (ctx, i) =>
-                          const Divider(color: Colors.white10, height: 1),
-                      itemBuilder: (ctx, i) {
-                        final ep = episodes[i];
+                    child: Consumer<TxaDownloadManager>(
+                      builder: (ctx, manager, _) {
+                        return ListView.separated(
+                          itemCount: episodes.length,
+                          separatorBuilder: (ctx, i) =>
+                              const Divider(color: Colors.white10, height: 1),
+                          itemBuilder: (ctx, i) {
+                            final ep = episodes[i];
+                            final epId = ep['id'].toString();
+                            final mId = movieData['movie']['id'].toString();
 
-                        // Standardize episode name
-                        String epName = TxaFormat.formatEpisodeName(
-                          ep['name'].toString(),
-                        );
+                            // Standardize episode name
+                            String epName = TxaFormat.formatEpisodeName(
+                              ep['name'].toString(),
+                            );
 
-                        // Check if already downloading in manager
-                        final isDownloading = TxaDownloadManager().isTaskActive(
-                          movieData['movie']['id'].toString(),
-                          ep['id'].toString(),
-                        );
+                            // Find task in manager
+                            final txaTask = manager.tasks.firstWhere(
+                              (t) => t.movieId == mId && t.episodeId == epId,
+                              orElse: () => TxaDownloadTask(
+                                id: '',
+                                movieId: '',
+                                episodeId: '',
+                                movieTitle: '',
+                                episodeTitle: '',
+                                url: '',
+                                poster: '',
+                                format: '',
+                              ),
+                            );
 
-                        return ListTile(
-                          contentPadding: EdgeInsets.zero,
-                          title: Text(
-                            epName,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          subtitle: Text(
-                            currentServer['server_name'],
-                            style: const TextStyle(
-                              color: TxaTheme.textMuted,
-                              fontSize: 11,
-                            ),
-                          ),
-                          trailing: isDownloading
-                              ? Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 10,
-                                    vertical: 4,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: TxaTheme.accent.withValues(
-                                      alpha: 0.1,
-                                    ),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Text(
-                                    'Downloading...',
-                                    style: TextStyle(
-                                      color: TxaTheme.accent,
-                                      fontSize: 11,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                )
-                              : Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: Colors.white.withValues(alpha: 0.05),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.download_rounded,
-                                    color: TxaTheme.accent,
-                                    size: 18,
-                                  ),
+                            final isDownloading = txaTask.id.isNotEmpty && 
+                                (txaTask.status == DownloadStatus.downloading || 
+                                 txaTask.status == DownloadStatus.pending);
+                            final isDone = txaTask.id.isNotEmpty && txaTask.status == DownloadStatus.completed;
+
+                            return ListTile(
+                              contentPadding: EdgeInsets.zero,
+                              title: Text(
+                                epName,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
                                 ),
-                          onTap: isDownloading
-                              ? null
-                              : () async {
-                                  // Find the episode object in servers list
-                                  final epId = ep['id'].toString();
+                              ),
+                              subtitle: Text(
+                                txaTask.id.isNotEmpty
+                                    ? txaTask.statusDisplay
+                                    : currentServer['server_name'],
+                                style: TextStyle(
+                                  color: isDownloading ? TxaTheme.accent : TxaTheme.textMuted,
+                                  fontSize: 10,
+                                ),
+                              ),
+                              trailing: txaTask.id.isNotEmpty
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 10,
+                                        vertical: 4,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: (isDone ? Colors.green : TxaTheme.accent).withValues(
+                                          alpha: 0.1,
+                                        ),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Text(
+                                        isDone 
+                                            ? TxaLanguage.t('downloaded')
+                                            : isDownloading 
+                                                ? TxaLanguage.t('downloading')
+                                                : TxaLanguage.t('paused'),
+                                        style: TextStyle(
+                                          color: isDone ? Colors.green : TxaTheme.accent,
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                    )
+                                  : Container(
+                                      padding: const EdgeInsets.all(8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.white.withValues(alpha: 0.05),
+                                        shape: BoxShape.circle,
+                                      ),
+                                      child: const Icon(
+                                        Icons.download_rounded,
+                                        color: TxaTheme.accent,
+                                        size: 18,
+                                      ),
+                                    ),
+                              onTap: isDownloading || isDone
+                                  ? null
+                                  : () async {
+                                      // Find the episode object in servers list
+                                      final epId = ep['id'].toString();
 
-                                  TxaLogger.log(
-                                    'Manual download triggered for Ep $epId',
-                                    type: 'download',
-                                  );
-
-                                  String? downloadUrl;
-                                  try {
-                                    final linkData = await TxaApi()
-                                        .getEpisodeLink(epId)
-                                        .timeout(const Duration(seconds: 10));
-                                    downloadUrl = linkData?['link'];
-                                  } catch (e) {
-                                    TxaLogger.log(
-                                      'Single Link Fetch Error: $e',
-                                      type: 'download',
-                                      isError: true,
-                                    );
-                                  }
-
-                                  // Fallback to pre-loaded data
-                                  if (downloadUrl == null ||
-                                      downloadUrl.isEmpty) {
-                                    downloadUrl =
-                                        ep['link_m3u8'] ??
-                                        ep['link_embed'] ??
-                                        '';
-                                    if (downloadUrl != null &&
-                                        downloadUrl.isNotEmpty) {
                                       TxaLogger.log(
-                                        'Using fallback link for Ep $epId',
+                                        'Manual download triggered for Ep $epId',
                                         type: 'download',
                                       );
-                                    }
-                                  }
 
-                                  if (downloadUrl != null &&
-                                      downloadUrl.isNotEmpty) {
-                                    TxaDownloadManager().addTask(
-                                      movieId: movieData['movie']['id']
-                                          .toString(),
-                                      movieTitle: movieData['movie']['name'],
-                                      episodeId: epId,
-                                      episodeTitle: epName,
-                                      url: downloadUrl,
-                                      poster: movieData['movie']['thumb_url'],
-                                      format: downloadUrl.contains('.m3u8')
-                                          ? 'm3u8'
-                                          : 'mp4',
-                                    );
+                                      String? downloadUrl;
+                                      try {
+                                        final linkData = await TxaApi()
+                                            .getEpisodeLink(epId)
+                                            .timeout(const Duration(seconds: 10));
+                                        downloadUrl = linkData?['link'];
+                                      } catch (e) {
+                                        TxaLogger.log(
+                                          'Single Link Fetch Error: $e',
+                                          type: 'download',
+                                          isError: true,
+                                        );
+                                      }
 
-                                    if (mounted) {
-                                      TxaToast.show(
-                                        context,
-                                        TxaLanguage.t('added_to_download'),
-                                      );
-                                    }
-                                    setModalState(() {});
-                                  } else {
-                                    if (mounted) {
-                                      TxaToast.show(
-                                        context,
-                                        TxaLanguage.t(
-                                          'cannot_download_episode',
-                                        ),
-                                        isError: true,
-                                      );
-                                    }
-                                  }
-                                },
+                                      if (downloadUrl != null) {
+                                        await TxaDownloadManager().addTask(
+                                          movieId: movieData['movie']['id'].toString(),
+                                          movieTitle: movieData['movie']['name'],
+                                          episodeId: epId,
+                                          episodeTitle: epName,
+                                          url: downloadUrl,
+                                          poster: movieData['movie']['thumb_url'],
+                                          format: downloadUrl.contains('.m3u8')
+                                              ? 'm3u8'
+                                              : 'mp4',
+                                        );
+
+                                        if (mounted) {
+                                          TxaToast.show(
+                                            context,
+                                            TxaLanguage.t('added_to_download'),
+                                          );
+                                        }
+                                        setModalState(() {});
+                                      } else {
+                                        if (mounted) {
+                                          TxaToast.show(
+                                            context,
+                                            TxaLanguage.t(
+                                              'cannot_download_episode',
+                                            ),
+                                            isError: true,
+                                          );
+                                        }
+                                      }
+                                    },
+                            );
+                          },
                         );
                       },
                     ),

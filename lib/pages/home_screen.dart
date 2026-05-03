@@ -1,3 +1,4 @@
+// ignore_for_file: use_build_context_synchronously
 import 'dart:async';
 import 'dart:io';
 import 'dart:ui';
@@ -11,10 +12,11 @@ import '../theme/txa_theme.dart';
 import '../widgets/txa_nav.dart';
 import '../pages/search_screen.dart';
 import '../pages/schedule_screen.dart';
+import '../pages/premium_screen.dart';
 import '../pages/update_history_screen.dart';
 import '../pages/account_screen.dart';
 import '../pages/notification_screen.dart';
-import '../pages/premium_screen.dart';
+import '../pages/log_viewer_screen.dart';
 import '../pages/category_list_screen.dart';
 import '../pages/movie_detail_screen.dart';
 import '../pages/global_settings_screen.dart';
@@ -38,6 +40,7 @@ import '../services/notification_provider.dart';
 import '../services/txa_network.dart';
 import '../services/txa_download_manager.dart';
 import 'download_manager_screen.dart';
+import '../widgets/txa_modal.dart';
 
 import 'package:url_launcher/url_launcher.dart';
 import 'package:flutter/foundation.dart';
@@ -58,15 +61,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
   DateTime? _lastBackPressTime;
   final GlobalKey<ScaffoldState> _scaffoldKey = GlobalKey<ScaffoldState>();
+  final ScrollController _homeScrollController = ScrollController();
+  double _headerOpacity = 0.0;
 
-  List<Widget> get _tabs => [
-    const _HomeTab(),
-    const SearchScreen(),
-    const ScheduleScreen(),
-    const NotificationScreen(),
-    const AccountScreen(),
-    if (Platform.isIOS) const PremiumScreen(),
-  ];
+  late List<Widget> _tabs;
 
   @override
   void didChangeDependencies() {
@@ -78,11 +76,32 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
+    _homeScrollController.addListener(_onHomeScroll);
     _initQuickActions();
+    _tabs = [
+      _HomeTab(scrollController: _homeScrollController),
+      const SearchScreen(),
+      const ScheduleScreen(),
+      const LogViewerScreen(),
+      const NotificationScreen(),
+      const AccountScreen(),
+      if (Platform.isIOS) const PremiumScreen(),
+    ];
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _checkUpdate();
       _startUpdateTimer();
     });
+  }
+
+  void _onHomeScroll() {
+    if (!_homeScrollController.hasClients) return;
+    final double offset = _homeScrollController.offset;
+    final double newOpacity = (offset / 150).clamp(0.0, 1.0);
+    if (newOpacity != _headerOpacity) {
+      setState(() {
+        _headerOpacity = newOpacity;
+      });
+    }
   }
 
   void _startUpdateTimer() {
@@ -95,6 +114,8 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _updateTimer?.cancel();
+    _homeScrollController.removeListener(_onHomeScroll);
+    _homeScrollController.dispose();
     super.dispose();
   }
 
@@ -116,56 +137,59 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showSpeedTestDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: TxaTheme.secondaryBg,
-        title: Text(
-          TxaLanguage.t('speed_test'),
-          style: const TextStyle(color: Colors.white),
-        ),
-        content: StatefulBuilder(
-          builder: (context, setDialogState) => Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              _buildInfoRow(
-                TxaLanguage.t('network'),
-                TxaSpeedService.currentNetworkType,
-              ),
-              const SizedBox(height: 12),
-              _buildSpeedIndicator("Download", TxaSpeedService.currentDownload),
-              const SizedBox(height: 12),
-              _buildSpeedIndicator("Upload", TxaSpeedService.currentUpload),
-              const SizedBox(height: 20),
-              if (TxaSpeedService.isTesting)
-                const CircularProgressIndicator(color: TxaTheme.accent)
-              else
-                ElevatedButton(
-                  onPressed: () {
+    TxaModal.show(
+      context,
+      title: TxaLanguage.t('speed_test'),
+      content: StatefulBuilder(
+        builder: (context, setDialogState) => Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _buildInfoRow(
+              TxaLanguage.t('network'),
+              TxaSpeedService.currentNetworkType,
+            ),
+            _buildSpeedIndicator(
+              TxaLanguage.t('download_label'),
+              TxaSpeedService.currentDownload,
+            ),
+            const SizedBox(height: 12),
+            _buildSpeedIndicator(
+              TxaLanguage.t('upload_label'),
+              TxaSpeedService.currentUpload,
+            ),
+            const SizedBox(height: 20),
+            if (TxaSpeedService.isTesting)
+              const Center(
+                child: CircularProgressIndicator(color: TxaTheme.accent),
+              )
+            else
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () async {
                     setDialogState(() {});
-                    TxaSpeedService.checkSpeed(
+                    final success = await TxaSpeedService.checkSpeed(
                       onProgress: (d, u) {
                         setDialogState(() {});
                       },
                     );
+                    if (!success && mounted) {
+                      TxaToast.show(context, TxaLanguage.t('speed_test_error'), isError: true);
+                    }
+                    setDialogState(() {});
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: TxaTheme.accent,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                   child: Text(
                     TxaLanguage.t('start_test'),
-                    style: const TextStyle(color: Colors.black),
+                    style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(TxaLanguage.t('cancel')),
-          ),
-        ],
       ),
     );
   }
@@ -219,39 +243,35 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showBatteryOptimizationWarning() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        backgroundColor: TxaTheme.secondaryBg,
-        title: Text(
-          TxaLanguage.t('battery_optimization'),
-          style: const TextStyle(color: Colors.white),
-        ),
-        content: Text(
-          TxaLanguage.t('ignore_battery_msg'),
-          style: const TextStyle(color: TxaTheme.textMuted),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text(TxaLanguage.t('cancel')),
-          ),
-          ElevatedButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await TxaPermission.requestIgnoreBatteryOptimizations();
-              // Small delay to allow system to update status
-              await Future.delayed(const Duration(milliseconds: 500));
-              if (mounted) setState(() {});
-            },
-            style: ElevatedButton.styleFrom(backgroundColor: TxaTheme.accent),
-            child: Text(
-              TxaLanguage.t('grant'),
-              style: const TextStyle(color: Colors.black),
-            ),
-          ),
-        ],
+    TxaModal.show(
+      context,
+      title: TxaLanguage.t('battery_optimization'),
+      content: Text(
+        TxaLanguage.t('ignore_battery_msg'),
+        style: const TextStyle(color: TxaTheme.textMuted, height: 1.5),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(TxaLanguage.t('cancel'), style: const TextStyle(color: Colors.white70)),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.pop(context);
+            await TxaPermission.requestIgnoreBatteryOptimizations();
+            await Future.delayed(const Duration(milliseconds: 500));
+            if (mounted) setState(() {});
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: TxaTheme.accent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: Text(
+            TxaLanguage.t('grant'),
+            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
     );
   }
 
@@ -530,8 +550,8 @@ class _HomeScreenState extends State<HomeScreen> {
         key: _scaffoldKey,
         backgroundColor: TxaTheme.primaryBg,
         drawer: _buildDrawer(),
-        body: Consumer2<TxaNetwork, TxaDownloadManager>(
-          builder: (context, network, dm, child) {
+        body: Consumer3<TxaNetwork, TxaDownloadManager, TxaSettings>(
+          builder: (context, network, dm, settings, child) {
             final isOffline = network.isOffline;
             final hasDownloads = dm.tasks.any(
               (t) => t.status == DownloadStatus.completed,
@@ -617,16 +637,22 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (_currentIndex == 0) _buildHomeHeader(),
 
                 // TxaNav
-                Consumer<NotificationProvider>(
-                  builder: (context, notif, child) {
-                    return TxaNav(
-                      currentIndex: _currentIndex,
-                      unreadNotifications: notif.unreadCount,
-                      onTap: (index) {
-                        setState(() => _currentIndex = index);
-                      },
-                    );
-                  },
+                Positioned(
+                  bottom: 0,
+                  left: 0,
+                  right: 0,
+                  child: Consumer<NotificationProvider>(
+                    builder: (context, notif, child) {
+                      return TxaNav(
+                        currentIndex: _currentIndex,
+                        unreadNotifications: notif.unreadCount,
+                        isLoggedIn: TxaSettings.authToken.isNotEmpty,
+                        onTap: (index) {
+                          setState(() => _currentIndex = index);
+                        },
+                      );
+                    },
+                  ),
                 ),
               ],
             );
@@ -642,98 +668,118 @@ class _HomeScreenState extends State<HomeScreen> {
       left: 0,
       right: 0,
       child: Container(
-        padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top),
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Colors.black.withValues(alpha: 0.8), Colors.transparent],
-          ),
-        ),
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              GestureDetector(
-                onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                child: const Icon(
-                  Icons.menu_rounded,
-                  color: Colors.white,
-                  size: 28,
+        padding: EdgeInsets.only(top: MediaQuery.of(context).padding.top + 8),
+        child: ClipRect(
+          child: BackdropFilter(
+            filter: ImageFilter.blur(
+              sigmaX: (15.0 * _headerOpacity).toDouble(),
+              sigmaY: (15.0 * _headerOpacity).toDouble(),
+            ),
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.black.withValues(alpha: 0.85 * _headerOpacity + 0.35),
+                    Colors.black.withValues(alpha: 0.6 * _headerOpacity),
+                  ],
+                ),
+                border: Border(
+                  bottom: BorderSide(
+                    color: Colors.white.withValues(alpha: 0.12 * _headerOpacity),
+                    width: 0.5,
+                  ),
                 ),
               ),
-              Row(
-                children: [
-                  Image.asset('assets/logo.png', height: 24),
-                  const SizedBox(width: 8),
-                  Text(
-                    TxaLanguage.t('app_name'),
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      letterSpacing: 0.5,
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                      child: const Icon(
+                        Icons.menu_rounded,
+                        color: Colors.white,
+                        size: 28,
+                      ),
                     ),
-                  ),
-                ],
-              ),
-              Row(
-                children: [
-                  _GlassIconBtn(
-                    icon: Icons.speed_rounded,
-                    tooltip: TxaLanguage.t('network_speed'),
-                    onTap: _showSpeedTestDialog,
-                  ),
-                  const SizedBox(width: 8),
-                  FutureBuilder<bool>(
-                    future: TxaPermission.isIgnoringBatteryOptimizations(),
-                    builder: (context, snapshot) {
-                      if (snapshot.data == false && Platform.isAndroid) {
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8),
-                          child: _GlassIconBtn(
-                            icon: Icons.battery_alert_rounded,
-                            color: Colors.orangeAccent,
-                            tooltip: TxaLanguage.t('battery_optimization'),
-                            onTap: () async {
-                              _showBatteryOptimizationWarning();
+                    Row(
+                      children: [
+                        Image.asset('assets/logo.png', height: 24),
+                        const SizedBox(width: 8),
+                        Text(
+                          TxaLanguage.t('app_name'),
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            letterSpacing: 0.5,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Row(
+                      children: [
+                        _GlassIconBtn(
+                          icon: Icons.speed_rounded,
+                          tooltip: TxaLanguage.t('network_speed'),
+                          onTap: _showSpeedTestDialog,
+                        ),
+                        const SizedBox(width: 8),
+                        FutureBuilder<bool>(
+                          future: TxaPermission.isIgnoringBatteryOptimizations(),
+                          builder: (context, snapshot) {
+                            if (snapshot.data == false && Platform.isAndroid) {
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: _GlassIconBtn(
+                                  icon: Icons.battery_alert_rounded,
+                                  color: Colors.orangeAccent,
+                                  tooltip: TxaLanguage.t('battery_optimization'),
+                                  onTap: () async {
+                                    _showBatteryOptimizationWarning();
+                                  },
+                                ),
+                              );
+                            }
+                            return const SizedBox.shrink();
+                          },
+                        ),
+                        _GlassIconBtn(
+                          icon: Icons.search_rounded,
+                          onTap: () => setState(() => _currentIndex = 1),
+                        ),
+                        const SizedBox(width: 8),
+                        if (TxaSettings.authToken.isNotEmpty)
+                          Consumer<NotificationProvider>(
+                            builder: (context, notif, child) {
+                              return _GlassIconBadge(
+                                icon: Icons.notifications_rounded,
+                                badgeCount: notif.unreadCount,
+                                onTap: () => setState(() => _currentIndex = 3),
+                              );
                             },
                           ),
-                        );
-                      }
-                      return const SizedBox.shrink();
-                    },
-                  ),
-                  _GlassIconBtn(
-                    icon: Icons.search_rounded,
-                    onTap: () => setState(() => _currentIndex = 1),
-                  ),
-                  const SizedBox(width: 8),
-                  Consumer<NotificationProvider>(
-                    builder: (context, notif, child) {
-                      return _GlassIconBadge(
-                        icon: Icons.notifications_rounded,
-                        badgeCount: notif.unreadCount,
-                        onTap: () => setState(() => _currentIndex = 3),
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 8),
-                  _GlassIconBtn(
-                    icon: Icons.settings_rounded,
-                    onTap: () {
-                      Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (ctx) => const GlobalSettingsScreen(),
+                        const SizedBox(width: 8),
+                        _GlassIconBtn(
+                          icon: Icons.settings_rounded,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (ctx) => const GlobalSettingsScreen(),
+                              ),
+                            );
+                          },
                         ),
-                      );
-                    },
-                  ),
-                ],
+                      ],
+                    ),
+                  ],
+                ),
               ),
-            ],
+            ),
           ),
         ),
       ),
@@ -940,8 +986,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.1.2';
-                  final build = snapshot.data?.buildNumber ?? '412';
+                  final version = snapshot.data?.version ?? '4.2.5';
+                  final build = snapshot.data?.buildNumber ?? '425';
                   return InkWell(
                     onTap: () => Navigator.push(
                       context,
@@ -975,7 +1021,8 @@ class _HomeScreenState extends State<HomeScreen> {
 // HOME TAB — Trang Chủ (Ported from Ionic Home.jsx)
 // =====================================================
 class _HomeTab extends StatefulWidget {
-  const _HomeTab();
+  final ScrollController scrollController;
+  const _HomeTab({required this.scrollController});
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -1147,6 +1194,7 @@ class _HomeTabState extends State<_HomeTab> {
         onRefresh: _loadHome,
         color: TxaTheme.accent,
         child: CustomScrollView(
+          controller: widget.scrollController,
           physics: const BouncingScrollPhysics(
             parent: AlwaysScrollableScrollPhysics(),
           ),
@@ -1468,10 +1516,10 @@ class _GlassIconBtn extends StatelessWidget {
     Widget child = GestureDetector(
       onTap: onTap,
       child: Container(
-        padding: const EdgeInsets.all(8),
+        padding: const EdgeInsets.all(6),
         decoration: BoxDecoration(
           color: TxaTheme.glassBg,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(10),
           border: Border.all(color: TxaTheme.glassBorder),
         ),
         child: Icon(icon, color: color ?? TxaTheme.textPrimary, size: 20),
@@ -1504,10 +1552,10 @@ class _GlassIconBadge extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Container(
-            padding: const EdgeInsets.all(8),
+            padding: const EdgeInsets.all(6),
             decoration: BoxDecoration(
               color: TxaTheme.glassBg,
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(10),
               border: Border.all(color: TxaTheme.glassBorder),
             ),
             child: Icon(icon, color: TxaTheme.textPrimary, size: 20),
@@ -1693,18 +1741,39 @@ class _HeroSliderState extends State<_HeroSlider> {
               child: Container(color: Colors.black.withValues(alpha: 0.4)),
             ),
           ),
-          // Bottom gradient
+          // Bottom gradient & Side gradients for depth
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                gradient: RadialGradient(
+                  center: Alignment.bottomCenter,
+                  radius: 1.2,
+                  colors: [
+                    Colors.transparent,
+                    TxaTheme.primaryBg.withValues(alpha: 0.5),
+                    TxaTheme.primaryBg,
+                  ],
+                  stops: const [0.0, 0.6, 1.0],
+                ),
+              ),
+            ),
+          ),
           Positioned(
             bottom: -1,
             left: 0,
             right: 0,
-            height: 250,
+            height: 350,
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
-                  colors: [Colors.transparent, TxaTheme.primaryBg],
+                  colors: [
+                    Colors.transparent,
+                    TxaTheme.primaryBg.withValues(alpha: 0.8),
+                    TxaTheme.primaryBg,
+                  ],
+                  stops: const [0.0, 0.5, 1.0],
                 ),
               ),
             ),
@@ -1778,6 +1847,21 @@ class _HeroSliderState extends State<_HeroSlider> {
                         ),
                       ),
                     const SizedBox(height: 16),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _HeroBadge(
+                          text: currentMovie['quality'] ?? 'HD',
+                          color: TxaTheme.accent,
+                        ),
+                        const SizedBox(width: 8),
+                        _HeroBadge(
+                          text: currentMovie['year']?.toString() ?? '2024',
+                          color: Colors.white10,
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 20),
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [

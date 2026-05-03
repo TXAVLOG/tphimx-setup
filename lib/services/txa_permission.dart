@@ -4,8 +4,28 @@ import 'package:optimize_battery/optimize_battery.dart';
 import 'txa_language.dart';
 
 class TxaPermission {
-  // Define permissions used for general UI display
-  static List<Map<String, dynamic>> get permissions {
+  // Mandatory permissions for the app to function
+  static List<Map<String, dynamic>> get mandatoryPermissions {
+    final List<Map<String, dynamic>> perms = [];
+    if (Platform.isAndroid) {
+      perms.add({
+        'id': 'storage',
+        'label': TxaLanguage.t('permission_storage_label'),
+        'desc': TxaLanguage.t('permission_storage_desc'),
+        'permission': Permission.manageExternalStorage,
+      });
+      perms.add({
+        'id': 'install_packages',
+        'label': TxaLanguage.t('permission_install_label'),
+        'desc': TxaLanguage.t('permission_install_desc'),
+        'permission': Permission.requestInstallPackages,
+      });
+    }
+    return perms;
+  }
+
+  // Optional permissions that enhance the experience
+  static List<Map<String, dynamic>> get optionalPermissions {
     final List<Map<String, dynamic>> perms = [
       {
         'id': 'notifications',
@@ -14,14 +34,7 @@ class TxaPermission {
         'permission': Permission.notification,
       },
     ];
-    // manageExternalStorage is Android-only — crashes on iOS
     if (Platform.isAndroid) {
-      perms.add({
-        'id': 'storage',
-        'label': TxaLanguage.t('permission_storage_label'),
-        'desc': TxaLanguage.t('permission_storage_desc'),
-        'permission': Permission.manageExternalStorage,
-      });
       perms.add({
         'id': 'overlay',
         'label': TxaLanguage.t('permission_overlay_label'),
@@ -46,6 +59,18 @@ class TxaPermission {
         'desc': TxaLanguage.t('ignore_battery_msg'),
         'permission': Permission.ignoreBatteryOptimizations,
       });
+      perms.add({
+        'id': 'location',
+        'label': TxaLanguage.t('permission_location_label'),
+        'desc': TxaLanguage.t('permission_location_desc'),
+        'permission': Permission.location,
+      });
+      perms.add({
+        'id': 'nearby',
+        'label': TxaLanguage.t('permission_nearby_label'),
+        'desc': TxaLanguage.t('permission_nearby_desc'),
+        'permission': Permission.nearbyWifiDevices,
+      });
     }
     return perms;
   }
@@ -61,43 +86,68 @@ class TxaPermission {
     }
   }
 
-  static Future<bool> checkAllRequired() async {
-    // Storage permission is Android-only; on iOS we skip this check
+  static Future<bool> checkAllMandatory() async {
     if (!Platform.isAndroid) return true;
-    final statuses = await getAllStatus();
-    final storageStatus = statuses['storage'] ?? PermissionStatus.denied;
-    return storageStatus.isGranted;
+    for (var p in mandatoryPermissions) {
+      try {
+        final status = await (p['permission'] as Permission).status.timeout(
+          const Duration(milliseconds: 500),
+          onTimeout: () => PermissionStatus.denied,
+        );
+        if (!status.isGranted) return false;
+      } catch (e) {
+        return false;
+      }
+    }
+    return true;
   }
+
+  static Future<bool> checkAllRequired() async {
+    return await checkAllMandatory();
+  }
+
+  static Future<void> requestInitial() async {
+    if (!Platform.isAndroid) return;
+    final List<Permission> toRequest = [];
+    for (var p in mandatoryPermissions) {
+      toRequest.add(p['permission'] as Permission);
+    }
+    await toRequest.request();
+  }
+
+  static Future<bool> requestInstall() async {
+    if (!Platform.isAndroid) return true;
+    final status = await Permission.requestInstallPackages.request();
+    return status.isGranted;
+  }
+
+  static List<Map<String, dynamic>> get permissions => [...mandatoryPermissions, ...optionalPermissions];
 
   static Future<Map<String, PermissionStatus>> getAllStatus() async {
     Map<String, PermissionStatus> statuses = {};
-    for (var p in permissions) {
-      statuses[p['id']] = await (p['permission'] as Permission).status;
+    final all = permissions;
+    for (var p in all) {
+      try {
+        if (p['id'] == 'battery') {
+          final isIgnored = await isIgnoringBatteryOptimizations();
+          statuses[p['id']] = isIgnored ? PermissionStatus.granted : PermissionStatus.denied;
+        } else {
+          statuses[p['id']] = await (p['permission'] as Permission).status.timeout(
+            const Duration(milliseconds: 500),
+            onTimeout: () => PermissionStatus.denied,
+          );
+        }
+      } catch (e) {
+        statuses[p['id']] = PermissionStatus.denied;
+      }
     }
     return statuses;
   }
 
-  static Future<void> requestInitial() async {
-    // 1. Notification (Simple dialog/box)
-    await Permission.notification.request();
-
-    // 2. Storage Management (Android Only)
-    if (Platform.isAndroid) {
-      // On Android 11+ this opens the "Manage All Files" screen correctly.
-      // For earlier versions, it acts as a storage request.
-      await Permission.manageExternalStorage.request();
-
-      // 3. Do Not Disturb Access
-      await Permission.accessNotificationPolicy.request();
-    }
-  }
-
-  // Request all (Legacy compatibility for SplashScreen)
-  static Future<void> requestAll() async => requestInitial();
-
-  // Install Permission - EXPLICITLY triggered ONLY during update to avoid unknown source setting at startup
-  static Future<bool> requestInstall() async {
-    final status = await Permission.requestInstallPackages.request();
+  // Request Nearby Devices only when needed
+  static Future<bool> requestNearby() async {
+    if (!Platform.isAndroid) return true;
+    final status = await Permission.nearbyWifiDevices.request();
     return status.isGranted;
   }
 

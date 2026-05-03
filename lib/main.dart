@@ -1,16 +1,15 @@
+// ignore_for_file: avoid_print
+
 import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
-import 'package:timezone/data/latest.dart' as tz;
-import 'package:timezone/timezone.dart' as tz;
 import 'package:device_info_plus/device_info_plus.dart';
 import 'package:app_links/app_links.dart';
 import 'pages/email_verification_screen.dart';
 import 'package:google_fonts/google_fonts.dart';
-import 'package:intl/date_symbol_data_local.dart';
 import 'package:provider/provider.dart';
 import 'widgets/splash_screen.dart';
 import 'services/txa_api.dart';
@@ -34,67 +33,122 @@ import 'services/txa_history_sync_service.dart';
 import 'pages/download_manager_screen.dart';
 import 'widgets/txa_watermark.dart';
 import 'services/txa_screenshot_service.dart';
+import 'services/txa_permission.dart';
 import 'package:screenshot/screenshot.dart';
 
+import 'package:flutter_native_splash/flutter_native_splash.dart';
+
 void main() async {
-  WidgetsFlutterBinding.ensureInitialized();
-  await TxaSettings.init();
-  await TxaLanguage.init();
-  await TxaBackgroundService.init();
-  await TxaBackgroundService.registerUpdateTask();
-  await TxaSpeedService.init();
-  TxaSpeedService.toggleSpeedNotification(TxaSettings.showSpeedInNotification);
-  await TxaDownloadManager().init();
-  await initializeDateFormatting('vi', null);
+  print('TXA_BOOT: main() started');
+  final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
+  print('TXA_BOOT: WidgetsBinding initialized');
+  
+  TxaLogger.init();
+  print('TXA_BOOT: TxaLogger.init() called');
+  
+  FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
+  print('TXA_BOOT: NativeSplash preserved');
 
   try {
-    tz.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('Asia/Ho_Chi_Minh'));
-  } catch (e) {
-    debugPrint('Timezone Init Error: $e');
+    print('TXA_BOOT: Initializing Settings...');
+    await TxaSettings.init().timeout(const Duration(seconds: 5), onTimeout: () {
+      print('TXA_BOOT: Settings Init TIMEOUT!');
+      throw Exception('Settings Init Timeout');
+    });
+    print('TXA_BOOT: Settings initialized.');
+
+    // TxaLanguage.init(), TxaDownloadManager().init() and Timezone moved to SplashScreen for faster initial boot
+    
+    print('TXA_BOOT: Initializing Background Service...');
+    TxaBackgroundService.init()
+        .then((_) {
+          print('TXA_BOOT: Background Service initialized.');
+          TxaBackgroundService.registerUpdateTask();
+        })
+        .catchError((e) {
+          print('TXA_BOOT: Background Service Init Error: $e');
+        });
+
+    print('TXA_BOOT: Initializing Speed Service...');
+    TxaSpeedService.init()
+        .then((_) {
+          print('TXA_BOOT: Speed Service initialized.');
+          TxaSpeedService.toggleSpeedNotification(
+            TxaSettings.isInitialized ? TxaSettings.showSpeedInNotification : false,
+          );
+        })
+        .catchError((e) {
+          print('TXA_BOOT: Speed Service Init Error: $e');
+        });
+  } catch (e, stack) {
+    print('TXA_BOOT_ERROR: $e');
+    print(stack);
   }
 
   // Check Android TV
   bool isTV = false;
-  if (!kIsWeb && Platform.isAndroid) {
-    final deviceInfo = DeviceInfoPlugin();
-    final androidInfo = await deviceInfo.androidInfo;
-    isTV = androidInfo.systemFeatures.contains('android.software.leanback');
+  try {
+    if (!kIsWeb && Platform.isAndroid) {
+      final deviceInfo = DeviceInfoPlugin();
+      final androidInfo = await deviceInfo.androidInfo.timeout(
+        const Duration(seconds: 3),
+        onTimeout: () => throw TimeoutException('Device info timeout'),
+      );
+      isTV = androidInfo.systemFeatures.contains('android.software.leanback');
+    }
+  } catch (e) {
+    print('TXA_BOOT: TV Check Error: $e');
   }
 
-  TxaLogger.log('TPhimX Premium: Application startup sequence completed.');
-
-  // Initialize Local Notifications (handled in _TPhimXAppState for navigation)
+  print('TXA_BOOT: Sequence completed. Launching app...');
 
   // Handle Deep Links
   final appLinks = AppLinks();
 
-  runApp(
-    MultiProvider(
-      providers: [
-        Provider<TxaApi>(create: (_) => TxaApi()),
-        ChangeNotifierProvider<TxaNetwork>(create: (_) => TxaNetwork()),
-        ProxyProvider2<TxaApi, TxaNetwork, TxaHistorySyncService>(
-          update: (_, api, network, _) => TxaHistorySyncService(api, network),
+  try {
+    runApp(
+      MultiProvider(
+        providers: [
+          ChangeNotifierProvider<TxaSettings>.value(value: TxaSettings()),
+          ChangeNotifierProvider<TxaLanguage>.value(value: TxaLanguage()),
+          Provider<TxaApi>(create: (_) => TxaApi()),
+          ChangeNotifierProvider<TxaNetwork>(create: (_) => TxaNetwork()),
+          ProxyProvider2<TxaApi, TxaNetwork, TxaHistorySyncService>(
+            update: (_, api, network, _) => TxaHistorySyncService(api, network),
+          ),
+          ChangeNotifierProvider<SearchProvider>(create: (_) => SearchProvider()),
+          ChangeNotifierProvider<FavoriteProvider>(
+            create: (context) => FavoriteProvider(context.read<TxaApi>()),
+          ),
+          ChangeNotifierProvider<NotificationProvider>(
+            create: (context) => NotificationProvider(context.read<TxaApi>()),
+          ),
+          ChangeNotifierProvider<TxaMiniPlayerProvider>(
+            create: (_) => TxaMiniPlayerProvider(),
+          ),
+          ChangeNotifierProvider<TxaDownloadManager>.value(
+            value: TxaDownloadManager(),
+          ),
+          Provider<AppLinks>.value(value: appLinks),
+        ],
+        child: TPhimXApp(isTV: isTV),
+      ),
+    );
+  } catch (e) {
+    TxaLogger.log('Fatal Error in runApp: $e', isError: true, tag: 'FATAL');
+    // Ensure we at least show something
+    runApp(MaterialApp(
+      home: Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Text(
+            'Fatal Startup Error: $e',
+            style: const TextStyle(color: Colors.redAccent),
+          ),
         ),
-        ChangeNotifierProvider<SearchProvider>(create: (_) => SearchProvider()),
-        ChangeNotifierProvider<FavoriteProvider>(
-          create: (context) => FavoriteProvider(context.read<TxaApi>()),
-        ),
-        ChangeNotifierProvider<NotificationProvider>(
-          create: (context) => NotificationProvider(context.read<TxaApi>()),
-        ),
-        ChangeNotifierProvider<TxaMiniPlayerProvider>(
-          create: (_) => TxaMiniPlayerProvider(),
-        ),
-        ChangeNotifierProvider<TxaDownloadManager>.value(
-          value: TxaDownloadManager(),
-        ),
-        Provider<AppLinks>.value(value: appLinks),
-      ],
-      child: TPhimXApp(isTV: isTV),
-    ),
-  );
+      ),
+    ));
+  }
 }
 
 class TPhimXApp extends StatefulWidget {
@@ -123,20 +177,56 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
       TxaScreenshotService().init(context);
     });
 
-    TxaSettings.onSettingsChanged = () {
-      if (mounted) setState(() {});
-    };
-    TxaLanguage.onLanguageChanged = () {
-      if (mounted) setState(() {});
-    };
+    TxaSettings().addListener(_onSettingsChanged);
+    TxaLanguage().addListener(_onSettingsChanged);
+  }
+
+  void _onSettingsChanged() {
+    if (mounted) setState(() {});
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.resumed) {
       TxaSettings.isAppForeground = true;
+      _checkMandatoryPermissions();
     } else {
       TxaSettings.isAppForeground = false;
+    }
+  }
+
+  Future<void> _checkMandatoryPermissions() async {
+    // Only check mandatory device permissions, connection check is handled in MainEntry
+    final hasAll = await TxaPermission.checkAllMandatory();
+    if (!hasAll && mounted) {
+      // Check if we are already on a route that is SplashScreen
+      // (This prevents infinite push loops)
+      bool alreadyOnSplash = false;
+      _navigatorKey.currentState?.popUntil((route) {
+        if (route.settings.name == 'SplashScreen') {
+          alreadyOnSplash = true;
+        }
+        return true; 
+      });
+
+      if (alreadyOnSplash) return;
+
+      TxaLogger.log('[Permission] Mandatory permission revoked, returning to Splash');
+
+      _navigatorKey.currentState?.pushAndRemoveUntil(
+        MaterialPageRoute(
+          settings: const RouteSettings(name: 'SplashScreen'),
+          builder: (ctx) => SplashScreen(
+            onFinish: () {
+              _navigatorKey.currentState?.pushAndRemoveUntil(
+                MaterialPageRoute(builder: (ctx) => const MainEntry()),
+                (route) => false,
+              );
+            },
+          ),
+        ),
+        (route) => false,
+      );
     }
   }
 
@@ -235,6 +325,7 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
 
   @override
   void dispose() {
+    TxaSettings().removeListener(_onSettingsChanged);
     WidgetsBinding.instance.removeObserver(this);
     _linkSubscription?.cancel();
     super.dispose();
@@ -242,7 +333,7 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final String fontFamily = TxaSettings.fontFamily;
+    final String fontFamily = TxaSettings.isInitialized ? TxaSettings.fontFamily : 'Outfit';
     TextTheme? textTheme;
 
     switch (fontFamily) {
@@ -265,6 +356,42 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
         textTheme = GoogleFonts.playfairDisplayTextTheme(
           ThemeData.dark().textTheme,
         );
+        break;
+      case 'Poppins':
+        textTheme = GoogleFonts.poppinsTextTheme(ThemeData.dark().textTheme);
+        break;
+      case 'Lato':
+        textTheme = GoogleFonts.latoTextTheme(ThemeData.dark().textTheme);
+        break;
+      case 'Nunito':
+        textTheme = GoogleFonts.nunitoTextTheme(ThemeData.dark().textTheme);
+        break;
+      case 'Merriweather':
+        textTheme = GoogleFonts.merriweatherTextTheme(
+          ThemeData.dark().textTheme,
+        );
+        break;
+      case 'Manrope':
+        textTheme = GoogleFonts.manropeTextTheme(ThemeData.dark().textTheme);
+        break;
+      case 'Rubik':
+        textTheme = GoogleFonts.rubikTextTheme(ThemeData.dark().textTheme);
+        break;
+      case 'Fira Sans':
+        textTheme = GoogleFonts.firaSansTextTheme(ThemeData.dark().textTheme);
+        break;
+      case 'Source Sans 3':
+        textTheme = GoogleFonts.sourceSans3TextTheme(
+          ThemeData.dark().textTheme,
+        );
+        break;
+      case 'Plus Jakarta Sans':
+        textTheme = GoogleFonts.plusJakartaSansTextTheme(
+          ThemeData.dark().textTheme,
+        );
+        break;
+      case 'Bebas Neue':
+        textTheme = GoogleFonts.bebasNeueTextTheme(ThemeData.dark().textTheme);
         break;
       default:
         textTheme = GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme);

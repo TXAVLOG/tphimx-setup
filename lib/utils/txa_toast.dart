@@ -2,63 +2,83 @@ import 'package:flutter/material.dart';
 import '../theme/txa_theme.dart';
 
 class TxaToast {
+  static final List<OverlayEntry> _entries = [];
+
   static void show(
     BuildContext context,
     String message, {
     bool isError = false,
   }) {
     final overlay = Overlay.of(context);
+    final topInset = MediaQuery.of(context).padding.top;
+    final bgColor = isError
+        ? const Color(0xFFD74A4A).withValues(alpha: 0.9)
+        : TxaTheme.accent.withValues(alpha: 0.88);
+    final icon = isError
+        ? Icons.error_outline_rounded
+        : Icons.check_circle_rounded;
+    final borderColor = isError
+        ? const Color(0xFFFFB4B4).withValues(alpha: 0.45)
+        : Colors.white.withValues(alpha: 0.25);
+
     final overlayEntry = OverlayEntry(
       builder: (context) => Positioned(
-        top: MediaQuery.of(context).padding.top + 20,
-        left: 32,
-        right: 32,
+        top: topInset + 14,
+        left: 20,
+        right: 20,
         child: Material(
           color: Colors.transparent,
           child: TweenAnimationBuilder<double>(
             tween: Tween(begin: 0.0, end: 1.0),
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOutBack,
+            duration: const Duration(milliseconds: 260),
+            curve: Curves.easeOutCubic,
             builder: (context, value, child) {
               return Transform.translate(
-                offset: Offset(0, -20 * (1 - value)),
+                offset: Offset(0, -16 * (1 - value)),
                 child: Opacity(opacity: value, child: child),
               );
             },
             child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+              constraints: const BoxConstraints(maxWidth: 520),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
               decoration: BoxDecoration(
-                color: isError
-                    ? Colors.red.withValues(alpha: 0.9)
-                    : TxaTheme.accent.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(16),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [bgColor, bgColor.withValues(alpha: 0.72)],
+                ),
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: borderColor, width: 1.2),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.black.withValues(alpha: 0.2),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
+                    color: Colors.black.withValues(alpha: 0.32),
+                    blurRadius: 18,
+                    offset: const Offset(0, 8),
                   ),
                 ],
               ),
               child: Row(
-                mainAxisSize: MainAxisSize.min,
                 children: [
-                  Icon(
-                    isError
-                        ? Icons.error_outline_rounded
-                        : Icons.info_outline_rounded,
-                    color: Colors.white,
-                    size: 20,
+                  Container(
+                    width: 30,
+                    height: 30,
+                    decoration: BoxDecoration(
+                      color: Colors.white.withValues(alpha: 0.2),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: Colors.white, size: 18),
                   ),
-                  const SizedBox(width: 12),
+                  const SizedBox(width: 10),
                   Expanded(
                     child: Text(
                       message,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 14,
-                        fontWeight: FontWeight.w500,
+                        fontWeight: FontWeight.w600,
                       ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
@@ -69,8 +89,10 @@ class TxaToast {
       ),
     );
 
+    _entries.add(overlayEntry);
     overlay.insert(overlayEntry);
-    Future.delayed(const Duration(seconds: 3), () {
+    Future.delayed(const Duration(milliseconds: 2800), () {
+      _entries.remove(overlayEntry);
       overlayEntry.remove();
     });
   }

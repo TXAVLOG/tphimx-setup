@@ -9,7 +9,8 @@ import '../theme/txa_theme.dart';
 import '../utils/txa_toast.dart';
 
 class AuthScreen extends StatefulWidget {
-  const AuthScreen({super.key});
+  final bool isRegister;
+  const AuthScreen({super.key, this.isRegister = false});
 
   @override
   State<AuthScreen> createState() => _AuthScreenState();
@@ -44,7 +45,11 @@ class _AuthScreenState extends State<AuthScreen>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(
+      length: 2,
+      vsync: this,
+      initialIndex: widget.isRegister ? 1 : 0,
+    );
   }
 
   @override
@@ -115,12 +120,10 @@ class _AuthScreenState extends State<AuthScreen>
             _loginPasswordError = e.response?.data['message'];
           } else {
             if (!mounted) return;
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(
-                content: Text(
-                  e.response?.data['message'] ?? TxaLanguage.t('error_login'),
-                ),
-              ),
+            TxaToast.show(
+              context,
+              e.response?.data['message'] ?? TxaLanguage.t('error_login'),
+              isError: true,
             );
           }
         });

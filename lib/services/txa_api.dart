@@ -7,8 +7,8 @@ class TxaApi {
   static const String baseUrl = 'https://film.nrotxa.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '4.1.2';
-  static const String buildNumber = '412';
+  static const String apiVersion = '4.2.5';
+  static const String buildNumber = '425';
 
   // Community Links
   static const String facebookFanpage =
@@ -351,12 +351,37 @@ class TxaApi {
           'type': type,
           'message': message,
           'extra': extra,
-          'device_info': 'TPhimX-App-V4.0',
+          'device_info': 'TPhimX-App-V4.2',
           'timestamp': DateTime.now().toIso8601String(),
         },
       );
     } catch (_) {
       // Ignore logger errors to avoid infinite loops
+    }
+  }
+
+  /// Kiểm tra trạng thái bảo trì hoặc app bị khóa
+  Future<bool> checkMaintenance() async {
+    try {
+      // 1. Kiểm tra qua check-update (Chính xác nhất cho việc khóa app/bảo trì)
+      final updateInfo = await getCheckUpdate();
+      final isActive = Platform.isIOS
+          ? (updateInfo['ios_active'] ?? true)
+          : (updateInfo['is_active'] ?? true);
+
+      if (!isActive) return true;
+
+      // 2. Kiểm tra qua home (Nếu server trả về 503)
+      await get(home);
+      return false;
+    } on DioException catch (e) {
+      if (e.response?.statusCode == 503) return true;
+      // Nếu lỗi 403/500 có message bảo trì cũng tính
+      final msg = e.response?.data?['message']?.toString().toLowerCase() ?? '';
+      if (msg.contains('maintenance') || msg.contains('bảo trì')) return true;
+      return false;
+    } catch (_) {
+      return false;
     }
   }
 }

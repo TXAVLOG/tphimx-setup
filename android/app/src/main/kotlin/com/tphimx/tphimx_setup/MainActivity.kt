@@ -57,6 +57,8 @@ class MainActivity : FlutterFragmentActivity() {
                         putExtra("txtMobile", call.argument<String>("txtMobile"))
                         putExtra("txtEthernet", call.argument<String>("txtEthernet"))
                         putExtra("txtUnknown", call.argument<String>("txtUnknown"))
+                        putExtra("txtUsage", call.argument<String>("txtUsage"))
+                        putExtra("txtTotal", call.argument<String>("txtTotal"))
                     }
                     if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
                         startForegroundService(intent)

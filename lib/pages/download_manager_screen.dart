@@ -59,7 +59,7 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
       body: Consumer<TxaDownloadManager>(
         builder: (context, manager, child) {
           // Group tasks by movieId
-          final Map<String, List<DownloadTask>> grouped = {};
+          final Map<String, List<TxaDownloadTask>> grouped = {};
           for (var task in manager.tasks) {
             grouped.putIfAbsent(task.movieId, () => []).add(task);
           }
@@ -110,8 +110,13 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
               if (totalCount > 0) {
                 overallProgress =
                     (movieTasks.fold(0.0, (sum, t) => sum + t.progress)) /
-                    (totalCount * 100);
+                    totalCount;
               }
+
+              final activeTask = movieTasks.firstWhere(
+                (t) => t.status == DownloadStatus.downloading,
+                orElse: () => firstTask,
+              );
 
               final isSelected = _selectedMovies.contains(mid);
 
@@ -290,12 +295,24 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
                     const SizedBox(height: 8),
                     Text(
                       firstTask.movieTitle,
-                      maxLines: 2,
+                      maxLines: 1,
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         color: Colors.white,
                         fontSize: 12,
                         fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      activeTask.statusDisplay,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        color: activeTask.status == DownloadStatus.downloading
+                            ? TxaTheme.accent
+                            : TxaTheme.textMuted,
+                        fontSize: 9,
                       ),
                     ),
                   ],

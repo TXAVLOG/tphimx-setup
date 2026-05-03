@@ -5,6 +5,9 @@ import '../theme/txa_theme.dart';
 import '../utils/txa_toast.dart';
 import '../utils/txa_format.dart';
 import '../services/txa_speed_service.dart';
+import 'package:permission_handler/permission_handler.dart';
+
+import '../widgets/txa_modal.dart';
 
 class GlobalSettingsScreen extends StatefulWidget {
   const GlobalSettingsScreen({super.key});
@@ -30,10 +33,46 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
   }
 
   Future<void> _clearCache() async {
-    await TxaSettings.clearCache();
-    await _loadCacheSize();
-    if (mounted) {
-      TxaToast.show(context, TxaLanguage.t('cache_cleared'));
+    final bool? confirm = await TxaModal.show<bool>(
+      context,
+      title: TxaLanguage.t('clear_cache'),
+      content: Text(
+        TxaLanguage.t('clear_cache_msg'),
+        style: const TextStyle(color: TxaTheme.textMuted),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context, false),
+          child: Text(
+            TxaLanguage.t('cancel'),
+            style: const TextStyle(color: Colors.white70),
+          ),
+        ),
+        ElevatedButton(
+          onPressed: () => Navigator.pop(context, true),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.redAccent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: Text(
+            TxaLanguage.t('clear'),
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    );
+
+    if (confirm == true) {
+      final bytesBefore = await TxaSettings.getCacheSize();
+      await TxaSettings.clearCache();
+      await _loadCacheSize();
+      if (mounted) {
+        final formatted = TxaFormat.formatFileSize(bytesBefore);
+        TxaToast.show(
+          context,
+          "${TxaLanguage.t('cache_cleared')} ($formatted)",
+        );
+      }
     }
   }
 
@@ -43,6 +82,7 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
       backgroundColor: TxaTheme.primaryBg,
       appBar: AppBar(
         backgroundColor: Colors.transparent,
+        elevation: 0,
         title: Text(
           TxaLanguage.t('settings'),
           style: const TextStyle(
@@ -53,18 +93,18 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
         iconTheme: const IconThemeData(color: Colors.white),
       ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
         children: [
           _buildSectionTitle(TxaLanguage.t('appearance')),
           _buildFontScaleTile(),
           const SizedBox(height: 8),
           _buildFontFamilyTile(),
           const Divider(color: Colors.white10, height: 32),
-          _buildSectionTitle(TxaLanguage.t('system')),
+          _buildSectionTitle(TxaLanguage.t('cache_management')),
           ListTile(
             onTap: _clearCache,
             leading: const Icon(
-              Icons.delete_outline_rounded,
+              Icons.cleaning_services_rounded,
               color: Colors.white70,
             ),
             title: Text(
@@ -72,7 +112,7 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
               style: const TextStyle(color: Colors.white),
             ),
             subtitle: Text(
-              _cacheSize,
+              TxaLanguage.t('cache_size', replace: {'size': _cacheSize}),
               style: const TextStyle(color: TxaTheme.textMuted),
             ),
             trailing: const Icon(
@@ -199,6 +239,25 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
               );
             },
           ),
+          const Divider(color: Colors.white10, height: 32),
+          _buildSectionTitle(TxaLanguage.t('permissions')),
+          ListTile(
+            leading: const Icon(Icons.security_rounded, color: Colors.white70),
+            title: Text(
+              TxaLanguage.t('manage_permissions'),
+              style: const TextStyle(color: Colors.white),
+            ),
+            subtitle: Text(
+              TxaLanguage.t('manage_permissions_desc'),
+              style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12),
+            ),
+            trailing: const Icon(
+              Icons.open_in_new_rounded,
+              color: TxaTheme.textMuted,
+              size: 20,
+            ),
+            onTap: () => openAppSettings(),
+          ),
         ],
       ),
     );
@@ -265,6 +324,19 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
       {'name': 'Montserrat', 'label': TxaLanguage.t('font_montserrat')},
       {'name': 'Oswald', 'label': TxaLanguage.t('font_oswald')},
       {'name': 'Playfair Display', 'label': TxaLanguage.t('font_playfair')},
+      {'name': 'Poppins', 'label': TxaLanguage.t('font_poppins')},
+      {'name': 'Lato', 'label': TxaLanguage.t('font_lato')},
+      {'name': 'Nunito', 'label': TxaLanguage.t('font_nunito')},
+      {'name': 'Merriweather', 'label': TxaLanguage.t('font_merriweather')},
+      {'name': 'Manrope', 'label': TxaLanguage.t('font_manrope')},
+      {'name': 'Rubik', 'label': TxaLanguage.t('font_rubik')},
+      {'name': 'Fira Sans', 'label': TxaLanguage.t('font_fira_sans')},
+      {'name': 'Source Sans 3', 'label': TxaLanguage.t('font_source_sans_3')},
+      {
+        'name': 'Plus Jakarta Sans',
+        'label': TxaLanguage.t('font_plus_jakarta_sans'),
+      },
+      {'name': 'Bebas Neue', 'label': TxaLanguage.t('font_bebas_neue')},
     ];
 
     return ListTile(

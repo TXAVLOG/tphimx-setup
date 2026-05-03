@@ -75,9 +75,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
     final Uri url = Uri.parse(urlStr);
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(TxaLanguage.t('not_open_link'))));
+      TxaToast.show(context, TxaLanguage.t('not_open_link'), isError: true);
     }
   }
 
@@ -229,10 +227,9 @@ class _PremiumScreenState extends State<PremiumScreen> {
         return;
       }
 
-      final xFiles = files.map((f) => XFile(f.path)).toList();
       await SharePlus.instance.share(
         ShareParams(
-          files: xFiles,
+          files: files.map((f) => XFile(f.path)).toList(),
           subject: TxaLanguage.t('share_logs_subject'),
         ),
       );

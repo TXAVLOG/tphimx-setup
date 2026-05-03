@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../theme/txa_theme.dart';
 
 class TxaTooltip extends StatelessWidget {
   final Widget child;
@@ -13,22 +14,37 @@ class TxaTooltip extends StatelessWidget {
       key: tooltipKey,
       message: message,
       triggerMode: TooltipTriggerMode.longPress,
+      waitDuration: const Duration(milliseconds: 250),
+      showDuration: const Duration(milliseconds: 1600),
+      preferBelow: false,
+      verticalOffset: 16,
       decoration: BoxDecoration(
-        color: const Color(0xFF333333).withValues(alpha: 0.9),
-        borderRadius: BorderRadius.circular(8),
+        gradient: LinearGradient(
+          colors: [
+            TxaTheme.secondaryBg.withValues(alpha: 0.95),
+            TxaTheme.cardBg.withValues(alpha: 0.92),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: TxaTheme.accent.withValues(alpha: 0.4),
+          width: 1,
+        ),
         boxShadow: [
           BoxShadow(
-            color: Colors.black.withValues(alpha: 0.3),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
+            color: Colors.black.withValues(alpha: 0.35),
+            blurRadius: 16,
+            offset: const Offset(0, 8),
           ),
         ],
       ),
       textStyle: const TextStyle(
         color: Colors.white,
-        fontSize: 12,
-        fontWeight: FontWeight.w500,
+        fontSize: 12.5,
+        fontWeight: FontWeight.w600,
       ),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       child: child,
     );
   }

@@ -11,6 +11,7 @@ class TxaMiniPlayerProvider with ChangeNotifier {
 
   bool _isMini = false;
   bool _isClosed = true;
+  bool _isPip = false;
 
   BetterPlayerController? get controller => _controller;
   dynamic get movie => _movie;
@@ -18,7 +19,13 @@ class TxaMiniPlayerProvider with ChangeNotifier {
   int get serverIndex => _serverIndex;
   bool get isMini => _isMini;
   bool get isClosed => _isClosed;
+  bool get isPip => _isPip;
   int get episodeIndex => _episodeIndex;
+
+  set isPip(bool value) {
+    _isPip = value;
+    notifyListeners();
+  }
 
   String get episodeName {
     try {
@@ -71,6 +78,16 @@ class TxaMiniPlayerProvider with ChangeNotifier {
   void switchToFull() {
     _isMini = false;
     TxaShortcutService.setPlayerStatus(miniActive: false);
+    notifyListeners();
+  }
+
+  void updateEpisode(int index) {
+    _episodeIndex = index;
+    notifyListeners();
+  }
+
+  void updateServer(int index) {
+    _serverIndex = index;
     notifyListeners();
   }
 

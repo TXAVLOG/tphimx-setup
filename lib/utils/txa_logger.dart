@@ -5,32 +5,76 @@ import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
 
 class TxaLogger {
+  static String? _cachedLogPath;
+
+  static Future<String>? _logPathFuture;
+
   static Future<String> get _logPath async {
-    // manageExternalStorage is Android-only; on other platforms (iOS) we always use the sandbox
-    bool isAndroid11Plus = false;
+    // If permission was granted later, we should clear cache to re-check
+    // But for performance, we only re-check if we are currently in fallback mode
+    if (_cachedLogPath != null && !_cachedLogPath!.contains('TPHIMX')) {
+      _cachedLogPath = null;
+      _logPathFuture = null;
+    }
+
+    _logPathFuture ??= _calculateLogPath();
+    return _logPathFuture!;
+  }
+
+  static Future<String> _calculateLogPath() async {
+    if (_cachedLogPath != null) return _cachedLogPath!;
+
+    // Default sandbox path
+    final docDir = await getApplicationDocumentsDirectory();
+    final sandboxPath = '${docDir.path}/Logs';
+
     if (Platform.isAndroid) {
-      final status = await Permission.manageExternalStorage.status;
-      if (status.isGranted) {
-        isAndroid11Plus = true;
+      try {
+        // Check permission with a strict timeout to prevent hangs
+        final status = await Permission.manageExternalStorage.status.timeout(
+          const Duration(milliseconds: 500),
+          onTimeout: () => PermissionStatus.denied,
+        );
+
+        if (status.isGranted) {
+          final premiumDir = Directory('/storage/emulated/0/TPHIMX/Logs');
+          if (!await premiumDir.exists()) {
+            await premiumDir.create(recursive: true);
+          }
+          _cachedLogPath = premiumDir.path;
+          return _cachedLogPath!;
+        }
+      } catch (e) {
+        debugPrint('Logger premium path check failed: $e');
       }
     }
 
-    if (isAndroid11Plus) {
-      // Premium path for granted "All Files" permission (Android Only)
-      final dir = Directory('/storage/emulated/0/TPHIMX/Logs');
-      if (!await dir.exists()) {
-        await dir.create(recursive: true);
-      }
-      return dir.path;
-    } else {
-      // Default sandbox path (iOS and non-authorized Android)
-      final dir = await getApplicationDocumentsDirectory();
-      final logDir = Directory('${dir.path}/Logs');
-      if (!await logDir.exists()) {
-        await logDir.create(recursive: true);
-      }
-      return logDir.path;
+    // Fallback to sandbox
+    final logDir = Directory(sandboxPath);
+    if (!await logDir.exists()) {
+      await logDir.create(recursive: true);
     }
+    _cachedLogPath = logDir.path;
+    return _cachedLogPath!;
+  }
+
+  static void init() {
+    // 1. Catch Flutter Framework Errors
+    FlutterError.onError = (FlutterErrorDetails details) {
+      FlutterError.presentError(details);
+      log('FLUTTER ERROR: ${details.exceptionAsString()}\n${details.stack}', 
+          isError: true, tag: 'CRASH', type: 'error');
+    };
+
+    // 2. Catch Platform Errors (Asynchronous)
+    PlatformDispatcher.instance.onError = (error, stack) {
+      log('PLATFORM ERROR: $error\n$stack', 
+          isError: true, tag: 'CRASH', type: 'error');
+      return true;
+    };
+
+    log('================================================================', tag: 'SESSION');
+    log('TxaLogger initialized. Global error tracking active.', tag: 'LOGGER');
   }
 
   static Future<void> log(
@@ -54,18 +98,16 @@ class TxaLogger {
       final level = isError ? 'ERROR' : 'INFO ';
       final tagStr = tag != null ? '[$tag] ' : '';
 
-      // Build a premium formatted log line
+      // Build a premium formatted log line with clearer separation
       final logLine = '[$timestamp] [$level] $tagStr$message\n';
 
       await file.writeAsString(logLine, mode: FileMode.append, flush: true);
 
       // Also print to console for development with colors/tags
-      if (kDebugMode) {
-        final consolePrefix = isError
-            ? '❌ [TPHIMX-$type]'
-            : 'ℹ️ [TPHIMX-$type]';
-        debugPrint('$consolePrefix $tagStr$message');
-      }
+      final consolePrefix = isError
+          ? '❌ [$timestamp] [TPHIMX-$type]'
+          : 'ℹ️ [$timestamp] [TPHIMX-$type]';
+      debugPrint('$consolePrefix $tagStr$message');
     } catch (e) {
       if (kDebugMode) debugPrint('CRITICAL: Failed to write to log file: $e');
     }
