@@ -32,9 +32,16 @@ workflows:
           echo "Current version identified: $VERSION (Tag: $TAG)"
       - name: 🍎 Build & Package iOS IPA (No-CodeSign)
         script: |
+          set -e
           echo "Building iOS for v$VERSION..."
           flutter build ios --release --no-codesign
           
+          # Verify build success
+          if [ ! -d "build/ios/iphoneos/Runner.app" ]; then
+            echo "❌ Error: Runner.app not found. Build failed."
+            exit 1
+          fi
+
           echo "Packaging .app into .ipa (Enterprise/Ad-hoc Style)..."
           mkdir -p build/ios/ipa/Payload
           cp -r build/ios/iphoneos/Runner.app build/ios/ipa/Payload/
@@ -44,7 +51,13 @@ workflows:
           cd ../../..
       - name: 🚀 Create GitHub Tags & Release
         script: |
+          set -e
           # Use GitHub CLI for robust release management
+          if [ -z "$GITHUB_TOKEN" ]; then
+            echo "❌ Error: GITHUB_TOKEN is not set."
+            exit 1
+          fi
+          
           export GITHUB_TOKEN=$GITHUB_TOKEN
           
           # Git Tagging with Token Auth
