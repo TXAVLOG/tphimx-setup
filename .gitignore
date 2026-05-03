@@ -12,6 +12,7 @@ build/
 .buildlog/
 .history
 .svn/
+android/java_pid*.hprof
 .swiftpm/
 scratch/
 migrate_working_dir/
