@@ -5,11 +5,11 @@ platform :ios, '14.0'
 # If you're encountering slow networking, set this environment variable to 1.
 # ENV['COCOAPODS_DISABLE_STATS'] = '1'
 
-project 'Runner', {
-  'Debug' => :debug,
-  'Release' => :release,
-  'Profile' => :profile,
-}
+# project 'Runner', {
+#   'Debug' => :debug,
+#   'Release' => :release,
+#   'Profile' => :profile,
+# }
 
 def flutter_root
   generated_xcode_build_settings_path = File.expand_path(File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__)
@@ -27,6 +27,7 @@ end
 require File.expand_path(File.join('packages', 'flutter_tools', 'bin', 'podhelper'), flutter_root)
 
 target 'Runner' do
+  use_frameworks! :linkage => :static
   use_modular_headers!
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
