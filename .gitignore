@@ -23,7 +23,9 @@ migrate_working_dir/
 *.iws
 .idea/
 *.kotlin
+scripts/
 analyze_output.txt
+auto_build_deploy.ps1
 
 # Visual Studio Code related
 .vscode/
