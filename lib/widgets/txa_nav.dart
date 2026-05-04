@@ -19,61 +19,82 @@ class TxaNav extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final bottomPadding = MediaQuery.of(context).padding.bottom;
+    final horizontalMargin = 20.0;
+    final bottomMargin = bottomPadding > 0 ? bottomPadding : 20.0;
 
-    return Container(
-      height: 65 + bottomPadding,
-      padding: EdgeInsets.only(bottom: bottomPadding),
-      decoration: BoxDecoration(
-        color: TxaTheme.primaryBg.withValues(alpha: 0.95),
-        border: Border(
-          top: BorderSide(
+    return Positioned(
+      bottom: bottomMargin,
+      left: horizontalMargin,
+      right: horizontalMargin,
+      child: Container(
+        height: 60,
+        decoration: BoxDecoration(
+          color: TxaTheme.primaryBg.withValues(alpha: 0.85),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(
             color: Colors.white.withValues(alpha: 0.1),
             width: 0.5,
           ),
-        ),
-      ),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceAround,
-        children: [
-          _NavItem(
-            icon: Icons.home_rounded,
-            label: TxaLanguage.t('home'),
-            isActive: currentIndex == 0,
-            onTap: () => onTap(0),
-          ),
-          _NavItem(
-            icon: Icons.search_rounded,
-            label: TxaLanguage.t('search'),
-            isActive: currentIndex == 1,
-            onTap: () => onTap(1),
-          ),
-          _NavItem(
-            icon: Icons.calendar_month_rounded,
-            label: TxaLanguage.t('schedule'),
-            isActive: currentIndex == 2,
-            onTap: () => onTap(2),
-          ),
-          _NavItem(
-            icon: Icons.terminal_rounded,
-            label: TxaLanguage.t('logs'),
-            isActive: currentIndex == 3,
-            onTap: () => onTap(3),
-          ),
-          if (isLoggedIn)
-            _NavItem(
-              icon: Icons.notifications_rounded,
-              label: TxaLanguage.t('notifications'),
-              isActive: currentIndex == 4,
-              badgeCount: unreadNotifications,
-              onTap: () => onTap(4),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 20,
+              offset: const Offset(0, 10),
             ),
-          _NavItem(
-            icon: Icons.person_rounded,
-            label: TxaLanguage.t('profile'),
-            isActive: currentIndex == 5,
-            onTap: () => onTap(5),
+          ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(30),
+          child: BackdropFilter(
+            filter: ColorFilter.mode(
+              Colors.black.withValues(alpha: 0.1),
+              BlendMode.darken,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceAround,
+              children: [
+                _NavItem(
+                  icon: Icons.home_rounded,
+                  label: TxaLanguage.t('home'),
+                  isActive: currentIndex == 0,
+                  onTap: () => onTap(0),
+                ),
+                _NavItem(
+                  icon: Icons.search_rounded,
+                  label: TxaLanguage.t('search'),
+                  isActive: currentIndex == 1,
+                  onTap: () => onTap(1),
+                ),
+                _NavItem(
+                  icon: Icons.calendar_month_rounded,
+                  label: TxaLanguage.t('schedule'),
+                  isActive: currentIndex == 2,
+                  onTap: () => onTap(2),
+                ),
+                _NavItem(
+                  icon: Icons.terminal_rounded,
+                  label: TxaLanguage.t('logs'),
+                  isActive: currentIndex == 3,
+                  onTap: () => onTap(3),
+                ),
+                if (isLoggedIn)
+                  _NavItem(
+                    icon: Icons.notifications_rounded,
+                    label: TxaLanguage.t('notifications'),
+                    isActive: currentIndex == 4,
+                    badgeCount: unreadNotifications,
+                    onTap: () => onTap(4),
+                  ),
+                _NavItem(
+                  icon: Icons.person_rounded,
+                  label: TxaLanguage.t('profile'),
+                  isActive: currentIndex == 5,
+                  onTap: () => onTap(5),
+                ),
+              ],
+            ),
           ),
-        ],
+        ),
       ),
     );
   }

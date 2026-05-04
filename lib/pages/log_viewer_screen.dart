@@ -36,14 +36,16 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
   late TabController _tabController;
   List<LogEntry> _appLogs = [];
   List<LogEntry> _apiLogs = [];
+  List<LogEntry> _downloadLogs = [];
   bool _loading = true;
   final ScrollController _appScroll = ScrollController();
   final ScrollController _apiScroll = ScrollController();
+  final ScrollController _downloadScroll = ScrollController();
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadLogs();
   }
 
@@ -52,6 +54,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
     _tabController.dispose();
     _appScroll.dispose();
     _apiScroll.dispose();
+    _downloadScroll.dispose();
     super.dispose();
   }
 
@@ -60,10 +63,12 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
     try {
       final appRaw = await _readLogFile('app');
       final apiRaw = await _readLogFile('api');
+      final downloadRaw = await _readLogFile('downloads');
       
       setState(() {
         _appLogs = _parseLogs(appRaw);
         _apiLogs = _parseApiLogs(apiRaw);
+        _downloadLogs = _parseLogs(downloadRaw);
         _loading = false;
       });
 
@@ -74,6 +79,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
         }
         if (_apiScroll.hasClients) {
           _apiScroll.jumpTo(_apiScroll.position.maxScrollExtent);
+        }
+        if (_downloadScroll.hasClients) {
+          _downloadScroll.jumpTo(_downloadScroll.position.maxScrollExtent);
         }
       });
     } catch (e) {
@@ -110,6 +118,12 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
         } else if (tag == 'LOGGER') {
           color = TxaTheme.accent;
           icon = Icons.settings_suggest_rounded;
+        } else if (tag == 'START' || tag == 'SUCCESS') {
+          color = Colors.greenAccent;
+          icon = Icons.file_download_done_rounded;
+        } else if (tag == 'ERROR' || tag == 'CANCEL') {
+          color = Colors.redAccent;
+          icon = Icons.report_gmailerrorred_rounded;
         }
 
         try {
@@ -240,7 +254,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
 
   Future<void> _shareLogs() async {
     try {
-      final type = _tabController.index == 0 ? 'app' : 'api';
+      String type = 'app';
+      if (_tabController.index == 1) type = 'api';
+      if (_tabController.index == 2) type = 'downloads';
       final docDir = await getApplicationDocumentsDirectory();
       String path = '${docDir.path}/Logs';
       if (Platform.isAndroid) {
@@ -293,6 +309,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
           tabs: [
             Tab(text: 'APP (${_appLogs.length})'),
             Tab(text: 'API (${_apiLogs.length})'),
+            Tab(text: 'DOWNLOADS (${_downloadLogs.length})'),
           ],
         ),
         actions: [
@@ -318,6 +335,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
               children: [
                 _buildLogList(_appLogs, _appScroll),
                 _buildLogList(_apiLogs, _apiScroll),
+                _buildLogList(_downloadLogs, _downloadScroll),
               ],
             ),
     );

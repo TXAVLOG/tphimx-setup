@@ -4,10 +4,10 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:background_downloader/background_downloader.dart';
 import 'package:background_downloader_hls/background_downloader_hls.dart';
 import '../utils/txa_format.dart';
 import '../services/txa_language.dart';
+import '../utils/txa_logger.dart';
 
 enum DownloadStatus { pending, downloading, paused, completed, error }
 
@@ -133,8 +133,10 @@ class TxaDownloadManager extends ChangeNotifier {
 
   List<TxaDownloadTask> _tasks = [];
   List<TxaDownloadTask> get tasks => _tasks;
-
   bool _initialized = false;
+
+  late HlsDownloader _hlsDownloader;
+  final Map<String, StreamSubscription> _hlsSubscriptions = {};
 
   Future<void> init() async {
     if (_initialized) return;
@@ -144,6 +146,10 @@ class TxaDownloadManager extends ChangeNotifier {
       globalConfig: [
         (Config.requestTimeout, const Duration(seconds: 30)),
       ],
+    );
+
+    _hlsDownloader = HlsDownloader(
+      logCallback: (level, message, [error, stackTrace]) => TxaLogger.log(message, type: 'downloads', tag: 'HLS_${level.name.toUpperCase()}'),
     );
 
     // Listen for updates
@@ -171,14 +177,17 @@ class TxaDownloadManager extends ChangeNotifier {
           case TaskStatus.complete:
             txaTask.status = DownloadStatus.completed;
             txaTask.progress = 1.0;
+            TxaLogger.log('✅ DOWNLOAD COMPLETE: ${txaTask.movieTitle} - ${txaTask.episodeTitle}', type: 'downloads', tag: 'SUCCESS');
             break;
           case TaskStatus.failed:
             txaTask.status = DownloadStatus.error;
             txaTask.error = 'Download failed';
+            TxaLogger.log('❌ DOWNLOAD FAILED: ${txaTask.movieTitle} - ${txaTask.episodeTitle} | TaskId: ${update.task.taskId}', isError: true, type: 'downloads', tag: 'ERROR');
             break;
           case TaskStatus.canceled:
             txaTask.status = DownloadStatus.error;
             txaTask.error = 'Download canceled';
+            TxaLogger.log('🛑 DOWNLOAD CANCELED: ${txaTask.movieTitle}', type: 'downloads', tag: 'CANCEL');
             break;
           case TaskStatus.paused:
             txaTask.status = DownloadStatus.paused;
@@ -271,24 +280,119 @@ class TxaDownloadManager extends ChangeNotifier {
     _tasks.add(txaTask);
     await _saveTasks();
     
-    // Enqueue via plugin
-    final task = DownloadTask(
-      url: url,
-      taskId: taskId,
-      filename: fileName,
-      directory: dirPath,
-      updates: Updates.statusAndProgress,
-      allowPause: true,
-    );
-    await FileDownloader().enqueue(task);
+    TxaLogger.log('🚀 ENQUEUE: $movieTitle - $episodeTitle [${isHls ? "HLS" : "MP4"}]', type: 'downloads', tag: 'START');
+
+    // Enqueue via appropriate task type
+    if (isHls) {
+      final options = HlsDownloadOptions(
+        downloadId: taskId,
+        outputDirectoryPath: dirPath,
+        combineSegments: true,
+        deleteSegmentsAfterCombine: true,
+      );
+
+      // Start the download
+      _hlsDownloader.downloadToFile(url, fileName, options: options).then((result) {
+        if (result.isSuccess) {
+          txaTask.status = DownloadStatus.completed;
+          txaTask.progress = 1.0;
+          TxaLogger.log('✅ HLS DOWNLOAD COMPLETE: ${txaTask.movieTitle} - ${txaTask.episodeTitle}', type: 'downloads', tag: 'SUCCESS');
+        }
+        _hlsSubscriptions[taskId]?.cancel();
+        _hlsSubscriptions.remove(taskId);
+        notifyListeners();
+        _saveTasks();
+      }).catchError((error) {
+        if (error is HlsDownloadException) {
+          if (error.code != HlsErrorCode.downloadCanceled && error.code != HlsErrorCode.downloadPaused) {
+            txaTask.status = DownloadStatus.error;
+            txaTask.error = error.message;
+            TxaLogger.log('❌ HLS DOWNLOAD FAILED: ${txaTask.movieTitle} | Error: ${txaTask.error}', isError: true, type: 'downloads', tag: 'ERROR');
+          }
+        } else {
+          txaTask.status = DownloadStatus.error;
+          txaTask.error = error.toString();
+          TxaLogger.log('❌ HLS DOWNLOAD ERROR: ${txaTask.movieTitle} | Error: ${txaTask.error}', isError: true, type: 'downloads', tag: 'ERROR');
+        }
+        _hlsSubscriptions[taskId]?.cancel();
+        _hlsSubscriptions.remove(taskId);
+        notifyListeners();
+        _saveTasks();
+      });
+
+      // Listen for progress updates
+      final subscription = _hlsDownloader.listen(taskId).listen((update) {
+        _handleHlsUpdate(taskId, update);
+      });
+      _hlsSubscriptions[taskId] = subscription;
+
+    } else {
+      final task = DownloadTask(
+        url: url,
+        taskId: taskId,
+        filename: fileName,
+        directory: dirPath,
+        updates: Updates.statusAndProgress,
+        allowPause: true,
+      );
+      await FileDownloader().enqueue(task);
+    }
+  }
+
+  void _handleHlsUpdate(String taskId, HlsOverallTaskUpdate update) {
+    final txaTaskIndex = _tasks.indexWhere((t) => t.id == taskId);
+    if (txaTaskIndex == -1) return;
+
+    final txaTask = _tasks[txaTaskIndex];
+    
+    switch (update.phase) {
+      case HlsDownloadPhase.preparing:
+        txaTask.status = DownloadStatus.pending;
+        break;
+      case HlsDownloadPhase.downloading:
+        txaTask.status = DownloadStatus.downloading;
+        txaTask.progress = update.progress;
+        txaTask.totalSegments = update.totalSegments;
+        txaTask.downloadedSegments = update.completedSegments;
+        txaTask.networkSpeed = update.networkSpeed ?? 0;
+        txaTask.timeRemaining = update.timeRemaining;
+        break;
+      case HlsDownloadPhase.combining:
+        txaTask.status = DownloadStatus.downloading;
+        txaTask.progress = 0.99; // Almost done
+        break;
+      case HlsDownloadPhase.completed:
+        txaTask.status = DownloadStatus.completed;
+        txaTask.progress = 1.0;
+        break;
+      case HlsDownloadPhase.paused:
+        txaTask.status = DownloadStatus.paused;
+        break;
+      case HlsDownloadPhase.failed:
+        txaTask.status = DownloadStatus.error;
+        txaTask.error = update.message;
+        break;
+      case HlsDownloadPhase.canceled:
+        txaTask.status = DownloadStatus.error;
+        txaTask.error = 'Canceled';
+        break;
+    }
+
+    notifyListeners();
+    _saveTasks();
   }
 
   Future<void> pauseTask(String taskId) async {
     final task = _tasks.firstWhere((t) => t.id == taskId);
     task.status = DownloadStatus.paused;
-    final pluginTask = await FileDownloader().taskForId(taskId);
-    if (pluginTask is DownloadTask) {
-      await FileDownloader().pause(pluginTask);
+    
+    if (task.isHls) {
+      await _hlsDownloader.pauseDownload(taskId);
+    } else {
+      final pluginTask = await FileDownloader().taskForId(taskId);
+      if (pluginTask is DownloadTask) {
+        await FileDownloader().pause(pluginTask);
+      }
     }
     notifyListeners();
     await _saveTasks();
@@ -297,18 +401,40 @@ class TxaDownloadManager extends ChangeNotifier {
   Future<void> resumeTask(String taskId) async {
     final task = _tasks.firstWhere((t) => t.id == taskId);
     task.status = DownloadStatus.downloading;
-    final pluginTask = await FileDownloader().taskForId(taskId);
-    if (pluginTask is DownloadTask) {
-      await FileDownloader().resume(pluginTask);
+
+    if (task.isHls) {
+      // Re-trigger download, it handles resuming internally if same ID is used
+      addTask(
+        movieId: task.movieId,
+        episodeId: task.episodeId,
+        movieTitle: task.movieTitle,
+        episodeTitle: task.episodeTitle,
+        url: task.url,
+        poster: task.poster,
+        format: task.format,
+      );
+    } else {
+      final pluginTask = await FileDownloader().taskForId(taskId);
+      if (pluginTask is DownloadTask) {
+        await FileDownloader().resume(pluginTask);
+      }
     }
     notifyListeners();
     await _saveTasks();
   }
 
   Future<void> removeTask(String taskId) async {
-    final pluginTask = await FileDownloader().taskForId(taskId);
-    if (pluginTask != null) {
-      await FileDownloader().cancelTasksWithIds([taskId]);
+    final task = _tasks.firstWhere((t) => t.id == taskId, orElse: () => _tasks[0]); // fallback if not found
+    
+    if (task.isHls) {
+      await _hlsDownloader.cancelDownload(taskId);
+      _hlsSubscriptions[taskId]?.cancel();
+      _hlsSubscriptions.remove(taskId);
+    } else {
+      final pluginTask = await FileDownloader().taskForId(taskId);
+      if (pluginTask != null) {
+        await FileDownloader().cancelTasksWithIds([taskId]);
+      }
     }
     
     final idx = _tasks.indexWhere((t) => t.id == taskId);
