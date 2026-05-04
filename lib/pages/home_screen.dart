@@ -47,7 +47,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 
-import '../services/txa_speed_service.dart';
+import '../widgets/txa_speed_test_modal.dart';
 import 'package:quick_actions/quick_actions.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -65,11 +65,6 @@ class _HomeScreenState extends State<HomeScreen> {
   double _headerOpacity = 0.0;
 
   late List<Widget> _tabs;
-
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-  }
 
   Timer? _updateTimer;
 
@@ -106,9 +101,81 @@ class _HomeScreenState extends State<HomeScreen> {
 
   void _startUpdateTimer() {
     _updateTimer?.cancel();
-    _updateTimer = Timer.periodic(const Duration(minutes: 1), (timer) {
+    _updateTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
       _checkUpdate();
+      _checkSystemStatus();
     });
+  }
+
+  bool _isSystemModalShowing = false;
+
+  Future<void> _checkSystemStatus() async {
+    if (_isSystemModalShowing) return;
+
+    try {
+      final api = Provider.of<TxaApi>(context, listen: false);
+      final updateData = await api.getCheckUpdate();
+      final Map<String, dynamic>? appData = updateData['data'];
+
+      if (appData == null) return;
+
+      final bool isAppActive = Platform.isIOS 
+          ? (appData['ios_active'] ?? true) 
+          : (appData['is_active'] ?? true);
+      final bool isBanned = appData['is_banned'] == true;
+
+      if (!isAppActive || isBanned) {
+        _isSystemModalShowing = true;
+        if (!mounted) return;
+
+        TxaModal.show(
+          context,
+          title: !isAppActive ? TxaLanguage.t('maintenance_title') : TxaLanguage.t('account_banned_title'),
+          barrierDismissible: false,
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: Colors.red.withValues(alpha: 0.1),
+                  shape: BoxShape.circle,
+                ),
+                child: Icon(
+                  !isAppActive ? Icons.construction_rounded : Icons.block_flipped,
+                  color: Colors.redAccent,
+                  size: 48,
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                !isAppActive 
+                  ? (TxaLanguage.currentLang == 'vi' ? 'Hệ thống đang bảo trì để nâng cấp. Vui lòng quay lại sau!' : 'System is under maintenance. Please check back later!')
+                  : (TxaLanguage.currentLang == 'vi' ? 'Tài khoản của bạn đã bị khóa do vi phạm chính sách.' : 'Your account has been banned due to policy violation.'),
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: TxaTheme.textSecondary, height: 1.5),
+              ),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => SystemNavigator.pop(),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.redAccent,
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                minimumSize: const Size(double.infinity, 50),
+              ),
+              child: Text(
+                TxaLanguage.t('exit_app'),
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+              ),
+            ),
+          ],
+        );
+      }
+    } catch (e) {
+      debugPrint('Check system status error: $e');
+    }
   }
 
   @override
@@ -137,146 +204,10 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _showSpeedTestDialog() {
-    TxaModal.show(
-      context,
-      title: TxaLanguage.t('speed_test'),
-      content: StatefulBuilder(
-        builder: (context, setDialogState) => Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            _buildInfoRow(
-              TxaLanguage.t('network'),
-              TxaSpeedService.currentNetworkType,
-            ),
-            _buildSpeedIndicator(
-              TxaLanguage.t('download_label'),
-              TxaSpeedService.currentDownload,
-            ),
-            const SizedBox(height: 12),
-            _buildSpeedIndicator(
-              TxaLanguage.t('upload_label'),
-              TxaSpeedService.currentUpload,
-            ),
-            const SizedBox(height: 20),
-            if (TxaSpeedService.isTesting)
-              const Center(
-                child: CircularProgressIndicator(color: TxaTheme.accent),
-              )
-            else
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () async {
-                    setDialogState(() {});
-                    final success = await TxaSpeedService.checkSpeed(
-                      onProgress: (d, u) {
-                        setDialogState(() {});
-                      },
-                    );
-                    if (!success && mounted) {
-                      TxaToast.show(context, TxaLanguage.t('speed_test_error'), isError: true);
-                    }
-                    setDialogState(() {});
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: TxaTheme.accent,
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                  child: Text(
-                    TxaLanguage.t('start_test'),
-                    style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-      children: [
-        Text(label, style: const TextStyle(color: TxaTheme.textMuted)),
-        Text(
-          value,
-          style: const TextStyle(
-            color: Colors.white,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildSpeedIndicator(String label, double value) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          label,
-          style: const TextStyle(color: TxaTheme.textMuted, fontSize: 12),
-        ),
-        const SizedBox(height: 4),
-        Container(
-          width: double.infinity,
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.05),
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            TxaFormat.formatNetworkSpeed(
-              value * 1000000,
-              unit: TxaSettings.speedUnit,
-            ),
-            style: const TextStyle(
-              color: TxaTheme.accent,
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  void _showBatteryOptimizationWarning() {
-    TxaModal.show(
-      context,
-      title: TxaLanguage.t('battery_optimization'),
-      content: Text(
-        TxaLanguage.t('ignore_battery_msg'),
-        style: const TextStyle(color: TxaTheme.textMuted, height: 1.5),
-      ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: Text(TxaLanguage.t('cancel'), style: const TextStyle(color: Colors.white70)),
-        ),
-        ElevatedButton(
-          onPressed: () async {
-            Navigator.pop(context);
-            await TxaPermission.requestIgnoreBatteryOptimizations();
-            await Future.delayed(const Duration(milliseconds: 500));
-            if (mounted) setState(() {});
-          },
-          style: ElevatedButton.styleFrom(
-            backgroundColor: TxaTheme.accent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-          ),
-          child: Text(
-            TxaLanguage.t('grant'),
-            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-          ),
-        ),
-      ],
-    );
+    TxaSpeedTestModal.show(context);
   }
 
   Future<void> _checkUpdate({bool manual = false}) async {
-    // SUPPRESS UPDATE MODAL IF PLAYER IS ACTIVE
     if (TxaPlayer.isPlayerActive && !manual) return;
 
     try {
@@ -291,13 +222,8 @@ class _HomeScreenState extends State<HomeScreen> {
       final String minVersion = appData?['min_version'] ?? '';
       final bool forceUpdate = appData?['force_update'] == true;
 
-      // Get current version from PackageInfo
       final packageInfo = await PackageInfo.fromPlatform();
       final String currentVersion = packageInfo.version;
-
-      debugPrint(
-        '[TxaUpdate] API Latest: $latestVersion, App Current: $currentVersion, Min: $minVersion',
-      );
 
       bool isNewer(String latest, String current) {
         List<int> latestParts = latest
@@ -319,7 +245,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return latestParts.length > currentParts.length;
       }
 
-      // Check if current version is below min_version (force update regardless)
       final bool belowMinVersion =
           minVersion.isNotEmpty && isNewer(minVersion, currentVersion);
       final bool shouldForce = forceUpdate || belowMinVersion;
@@ -357,9 +282,8 @@ class _HomeScreenState extends State<HomeScreen> {
           onUpdate: () async {
             final String rawUrl =
                 appData?['download_url'] ?? appData?['apk_url'] ?? '';
-            Navigator.pop(context); // Close modal
+            Navigator.pop(context);
 
-            // --- PLATFORM SENSITIVE UPDATE ---
             if (defaultTargetPlatform == TargetPlatform.iOS) {
               final uri = Uri.parse(rawUrl);
               if (await canLaunchUrl(uri)) {
@@ -375,7 +299,6 @@ class _HomeScreenState extends State<HomeScreen> {
               return;
             }
 
-            // --- ANDROID FLOW ---
             await _handleAndroidUpdate(rawUrl, latestVersion, rawSize, sha256);
           },
         );
@@ -394,17 +317,12 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Handles the full Android update flow:
-  /// 1. Check permissions (storage + install unknown apps)
-  /// 2. Check if APK already cached & valid → install directly
-  /// 3. Otherwise download then install
   Future<void> _handleAndroidUpdate(
     String rawUrl,
     String version,
     int expectedSize,
     String? sha256,
   ) async {
-    // --- STEP 1: STORAGE PERMISSION ---
     if (!await TxaPermission.checkAllRequired()) {
       if (!mounted) return;
       TxaToast.show(
@@ -417,8 +335,6 @@ class _HomeScreenState extends State<HomeScreen> {
       if (!await TxaPermission.checkAllRequired()) return;
     }
 
-    // --- STEP 2: INSTALL UNKNOWN APPS PERMISSION ---
-    // Request and then ALWAYS continue to install/download after granting
     if (!await TxaPermission.requestInstall()) {
       if (!mounted) return;
       TxaToast.show(
@@ -426,12 +342,11 @@ class _HomeScreenState extends State<HomeScreen> {
         TxaLanguage.t('permissions_required'),
         isError: true,
       );
-      return; // User explicitly denied — stop
+      return;
     }
 
     if (!mounted) return;
 
-    // --- STEP 3: CHECK CACHED APK ---
     final String filename = 'TPHIMX_$version.apk';
     final dir = await getExternalStorageDirectory();
     final String savePath = '${dir?.path}/$filename';
@@ -442,27 +357,18 @@ class _HomeScreenState extends State<HomeScreen> {
       bool isValid = false;
 
       if (expectedSize > 0 && localSize == expectedSize) {
-        // Size matches — check SHA256 if provided by server
         if (sha256 != null && sha256.isNotEmpty) {
           if (!mounted) return;
           TxaToast.show(context, TxaLanguage.t('verifying_file'));
           final bytes = await cachedFile.readAsBytes();
           final localHash = _sha256Hex(bytes);
           isValid = localHash == sha256.toLowerCase();
-          debugPrint(
-            '[TxaUpdate] SHA256 check: local=$localHash, server=$sha256, match=$isValid',
-          );
         } else {
-          // No SHA256 from server — size match is good enough
           isValid = true;
         }
       }
 
       if (isValid) {
-        // File is already downloaded and valid → install directly!
-        debugPrint(
-          '[TxaUpdate] Cached APK valid ($localSize bytes), opening installer directly',
-        );
         if (!mounted) return;
         TxaToast.show(context, TxaLanguage.t('installing_cached'));
         final result = await OpenFile.open(savePath);
@@ -472,21 +378,15 @@ class _HomeScreenState extends State<HomeScreen> {
         }
         return;
       } else {
-        // File corrupted or size mismatch → delete and re-download
-        debugPrint(
-          '[TxaUpdate] Cached APK invalid (local=$localSize, expected=$expectedSize), deleting...',
-        );
         try {
           cachedFile.deleteSync();
         } catch (_) {}
       }
     }
 
-    // --- STEP 4: DOWNLOAD ---
     if (!mounted) return;
     TxaToast.show(context, TxaLanguage.t('loading_progress'));
 
-    // Resolve direct link (Handles Mediafire!)
     final resolved = await TxaUrlResolve.resolve(rawUrl);
     if (resolved['success']) {
       if (!mounted) return;
@@ -521,7 +421,6 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  /// Simple SHA256 hex digest
   String _sha256Hex(List<int> bytes) {
     final digest = sha256.convert(bytes);
     return digest.toString();
@@ -559,10 +458,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
             if (isOffline) {
               if (hasDownloads) {
-                // Simplified UI: Only show Download Manager
                 return const DownloadManagerScreen(isOfflineMode: true);
               } else {
-                // Error widget for no internet + no downloads
                 return Center(
                   child: Padding(
                     padding: const EdgeInsets.all(32.0),
@@ -616,7 +513,6 @@ class _HomeScreenState extends State<HomeScreen> {
 
             return Stack(
               children: [
-                // Background
                 Positioned.fill(
                   child: Container(
                     decoration: const BoxDecoration(
@@ -633,10 +529,8 @@ class _HomeScreenState extends State<HomeScreen> {
                   child: IndexedStack(index: _currentIndex, children: _tabs),
                 ),
 
-                // Home Header (Pinned) - Only show on Home Tab
                 if (_currentIndex == 0) _buildHomeHeader(),
 
-                // TxaNav
                 Positioned(
                   bottom: 0,
                   left: 0,
@@ -758,7 +652,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               return _GlassIconBadge(
                                 icon: Icons.notifications_rounded,
                                 badgeCount: notif.unreadCount,
-                                onTap: () => setState(() => _currentIndex = 3),
+                                onTap: () => setState(() => _currentIndex = 4),
                               );
                             },
                           ),
@@ -786,6 +680,39 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  void _showBatteryOptimizationWarning() {
+    TxaModal.show(
+      context,
+      title: TxaLanguage.t('battery_optimization'),
+      content: Text(
+        TxaLanguage.t('ignore_battery_msg'),
+        style: const TextStyle(color: TxaTheme.textMuted, height: 1.5),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: Text(TxaLanguage.t('cancel'), style: const TextStyle(color: Colors.white70)),
+        ),
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.pop(context);
+            await TxaPermission.requestIgnoreBatteryOptimizations();
+            await Future.delayed(const Duration(milliseconds: 500));
+            if (mounted) setState(() {});
+          },
+          style: ElevatedButton.styleFrom(
+            backgroundColor: TxaTheme.accent,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+          ),
+          child: Text(
+            TxaLanguage.t('grant'),
+            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDrawer() {
     return Drawer(
       backgroundColor: const Color(0xFF0F172A),
@@ -810,7 +737,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const Divider(color: Colors.white10),
-            // Version & Check Update
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 24.0,
@@ -858,7 +784,6 @@ class _HomeScreenState extends State<HomeScreen> {
               ),
             ),
             const Divider(color: Colors.white10),
-            // Language Selection
             Padding(
               padding: const EdgeInsets.symmetric(
                 horizontal: 24.0,
@@ -956,9 +881,7 @@ class _HomeScreenState extends State<HomeScreen> {
                       child: ElevatedButton.icon(
                         onPressed: () async {
                           await TxaPermission.openSettings();
-                          setState(
-                            () {},
-                          ); // Refresh statuses when they come back
+                          setState(() {});
                         },
                         icon: const Icon(Icons.settings_rounded, size: 14),
                         label: Text(
@@ -986,8 +909,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.2.5';
-                  final build = snapshot.data?.buildNumber ?? '425';
+                  final version = snapshot.data?.version ?? '4.2.6';
+                  final build = snapshot.data?.buildNumber ?? '426';
                   return InkWell(
                     onTap: () => Navigator.push(
                       context,
@@ -1017,9 +940,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
-// =====================================================
-// HOME TAB — Trang Chủ (Ported from Ionic Home.jsx)
-// =====================================================
 class _HomeTab extends StatefulWidget {
   final ScrollController scrollController;
   const _HomeTab({required this.scrollController});
@@ -1039,11 +959,6 @@ class _HomeTabState extends State<_HomeTab> {
     _loadHome();
   }
 
-  @override
-  void dispose() {
-    super.dispose();
-  }
-
   Future<void> _loadHome() async {
     setState(() {
       _loading = true;
@@ -1054,7 +969,6 @@ class _HomeTabState extends State<_HomeTab> {
       final result = await api.getHome();
       final data = result['data'] ?? result;
 
-      // Sync favorite IDs to provider
       if (mounted && data['favorite_ids'] != null) {
         Provider.of<FavoriteProvider>(context, listen: false).loadFavoriteIds(
           (data['favorite_ids'] as List)
@@ -1078,7 +992,6 @@ class _HomeTabState extends State<_HomeTab> {
 
   @override
   Widget build(BuildContext context) {
-    // Build sections from API data (matching Ionic logic)
     final List<Map<String, dynamic>> sections = [];
 
     List getListData(String key) {
@@ -1199,7 +1112,6 @@ class _HomeTabState extends State<_HomeTab> {
             parent: AlwaysScrollableScrollPhysics(),
           ),
           slivers: [
-            // Spacer for Pinned Header (MediaQuery top + header height)
             SliverToBoxAdapter(
               child: SizedBox(height: MediaQuery.of(context).padding.top + 60),
             ),
@@ -1211,7 +1123,6 @@ class _HomeTabState extends State<_HomeTab> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Skeleton HeroSlider
                       const Padding(
                         padding: EdgeInsets.all(16),
                         child: TxaSkeleton(
@@ -1220,7 +1131,6 @@ class _HomeTabState extends State<_HomeTab> {
                           borderRadius: 16,
                         ),
                       ),
-                      // Skeleton FilterChips
                       Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
@@ -1236,7 +1146,6 @@ class _HomeTabState extends State<_HomeTab> {
                         ),
                       ),
                       const SizedBox(height: 24),
-                      // Skeleton MovieSections
                       ...List.generate(
                         2,
                         (i) => Column(
@@ -1284,14 +1193,12 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
               )
             else ...[
-              // Hero Slider
               SliverToBoxAdapter(
                 child: featured.isNotEmpty
                     ? _HeroSlider(movies: featured.take(10).toList())
                     : const SizedBox(height: 100),
               ),
 
-              // Filter Tabs
               SliverToBoxAdapter(
                 child: Padding(
                   padding: const EdgeInsets.fromLTRB(0, 12, 0, 4),
@@ -1342,7 +1249,6 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
               ),
 
-              // Popular Categories
               if (categories.isNotEmpty)
                 SliverToBoxAdapter(
                   child: Padding(

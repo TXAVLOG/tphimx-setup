@@ -104,10 +104,7 @@ class TxaFormat {
         if (bytesPerSec >= 1024 * 1024) {
           return '${(bytesPerSec / (1024.0 * 1024.0)).toStringAsFixed(2)} MB/s';
         }
-        if (bytesPerSec >= 1024) {
-          return '${(bytesPerSec / 1024.0).toStringAsFixed(2)} KB/s';
-        }
-        return '${bytesPerSec.toStringAsFixed(0)} B/s';
+        return '${(bytesPerSec / 1024.0).toStringAsFixed(2)} KB/s';
     }
   }
 

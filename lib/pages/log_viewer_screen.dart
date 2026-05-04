@@ -2,6 +2,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
+import 'package:tphimx_setup/utils/txa_toast.dart';
 import '../services/txa_language.dart';
 import '../theme/txa_theme.dart';
 import '../utils/txa_format.dart';
@@ -253,8 +254,8 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
       if (await file.exists()) {
         await SharePlus.instance.share(
           ShareParams(
-            files: [XFile(filePath)],
-            text: TxaLanguage.t('share_logs_desc'),
+            files: [XFile(filePath, name: '${type}_logs_$date.log')],
+            subject: 'TPhimX ${type.toUpperCase()} Logs - $date',
           ),
         );
       } else {
@@ -266,6 +267,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
       }
     } catch (e) {
       debugPrint('Failed to share logs: $e');
+      if (mounted) {
+        TxaToast.show(context, 'Lỗi chia sẻ: $e', isError: true);
+      }
     }
   }
 

@@ -355,8 +355,6 @@ class TxaLanguage extends ChangeNotifier {
       'my_list': 'Danh sách của tôi',
       'notifications_cleared': 'Đã xóa tất cả thông báo',
       'notifications_read_all': 'Đã đánh dấu tất cả là đã đọc',
-      'no_notifications_desc':
-          'Khi có thông báo mới, chúng sẽ xuất hiện ở đây.',
       'appearance': 'Giao diện',
       'settings': 'Cài đặt',
       'font_size': 'Cỡ chữ',
@@ -501,6 +499,15 @@ class TxaLanguage extends ChangeNotifier {
       'delete': 'Xóa',
       'local_playback_error':
           'Lỗi phát file cục bộ. File có thể bị hỏng hoặc thiếu dữ liệu (HLS segments).',
+      'test_completed': 'Kiểm tra hoàn tất',
+      'test_again': 'Đo lại',
+      'speed_excellent': 'Tuyệt vời! Mượt mà cho 4K.',
+      'speed_good': 'Rất tốt. Mượt mà cho HD.',
+      'speed_stable': 'Ổn định. Tốt cho SD.',
+      'speed_slow': 'Kết nối chậm. Có thể giật lag.',
+      'api_server': 'Server API',
+      'image_server': 'Server Ảnh',
+      'no_notifications_desc': 'Bạn chưa có thông báo nào mới. Hãy theo dõi các bộ phim yêu thích để nhận tin tức mới nhất!',
     },
     'en': {
       'preparing': 'Preparing...',

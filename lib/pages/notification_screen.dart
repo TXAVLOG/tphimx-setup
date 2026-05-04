@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:tphimx_setup/pages/movie_detail_screen.dart';
 import '../services/notification_provider.dart';
 import '../theme/txa_theme.dart';
 import '../services/txa_language.dart';
@@ -158,7 +159,16 @@ class _NotificationItem extends StatelessWidget {
       child: InkWell(
         onTap: () {
           context.read<NotificationProvider>().markAsRead(id);
-          // Potential navigation here if item has a movie slug
+          
+          final slug = item['movie_slug']?.toString();
+          if (slug != null && slug.isNotEmpty) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (ctx) => MovieDetailScreen(slug: slug),
+              ),
+            );
+          }
         },
         borderRadius: BorderRadius.circular(20),
         child: AnimatedContainer(
@@ -224,7 +234,7 @@ class _NotificationItem extends StatelessWidget {
                     ),
                     const SizedBox(height: 6),
                     Text(
-                      item['message'] ?? '',
+                      _formatMessage(item['message'] ?? ''),
                       style: TextStyle(
                         color: isRead
                             ? TxaTheme.textSecondary
@@ -254,21 +264,69 @@ class _NotificationItem extends StatelessWidget {
     );
   }
 
+  String _normalizeEpisode(String? input) {
+    if (input == null || input.isEmpty) return '';
+    // Remove "Tập", "Episode", "Ep", "Tập Tập" etc. Case insensitive.
+    String cleaned = input.replaceAll(RegExp(r'(Tập|Episode|Ep|Tập)\s*', caseSensitive: false), '').trim();
+    
+    if (cleaned.toLowerCase() == 'full') return 'FULL';
+    
+    // Check if it's a number (could be something like "17" or "17 - End")
+    return 'Tập $cleaned';
+  }
+
   Widget _buildLeading(bool isRead) {
-    final imageUrl = item['image_url']?.toString() ?? '';
+    final String imageUrl = item['image_url'] ?? '';
 
     if (imageUrl.isNotEmpty) {
-      return Container(
-        width: 48,
-        height: 48,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          image: DecorationImage(
-            image: NetworkImage(imageUrl),
-            fit: BoxFit.cover,
+      return Stack(
+        clipBehavior: Clip.none,
+        children: [
+          Container(
+            width: 54,
+            height: 76, // Poster aspect ratio
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(10),
+              image: DecorationImage(
+                image: NetworkImage(imageUrl),
+                fit: BoxFit.cover,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.3),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
           ),
-          border: Border.all(color: Colors.white10),
-        ),
+          if (item['episode_name'] != null)
+            Positioned(
+              top: -4,
+              right: -4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: TxaTheme.accent,
+                  borderRadius: BorderRadius.circular(6),
+                  boxShadow: [
+                    BoxShadow(
+                      color: TxaTheme.accent.withValues(alpha: 0.3),
+                      blurRadius: 4,
+                    ),
+                  ],
+                ),
+                child: Text(
+                  _normalizeEpisode(item['episode_name'].toString()),
+                  style: const TextStyle(
+                    color: Colors.black,
+                    fontSize: 9,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+        ],
       );
     }
 
@@ -289,5 +347,13 @@ class _NotificationItem extends StatelessWidget {
         size: 24,
       ),
     );
+  }
+  String _formatMessage(String msg) {
+    // Replace [Text] with Text (remove brackets)
+    String cleaned = msg.replaceAll('[', '').replaceAll(']', '');
+    // Replace (Server: #Name) with just @Name or something cleaner
+    cleaned = cleaned.replaceAll('(Server: #', '@');
+    cleaned = cleaned.replaceAll(')', '');
+    return cleaned;
   }
 }

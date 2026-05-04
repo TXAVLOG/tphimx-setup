@@ -7,6 +7,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import '../utils/txa_logger.dart';
 import '../services/txa_settings.dart';
 import '../services/txa_language.dart';
+import '../services/txa_api.dart';
 
 class TxaSpeedService {
   static const MethodChannel _channel = MethodChannel(
@@ -60,8 +61,25 @@ class TxaSpeedService {
     }
   }
 
+  /// Kiểm tra độ trễ (Ping) đến API Server
+  static Future<int> checkApiLatency() async {
+    final stopwatch = Stopwatch()..start();
+    try {
+      final client = HttpClient();
+      client.connectionTimeout = const Duration(seconds: 5);
+      final request = await client.getUrl(Uri.parse(TxaApi.baseUrl));
+      final response = await request.close();
+      stopwatch.stop();
+      client.close();
+      return response.statusCode == 200 ? stopwatch.elapsedMilliseconds : -1;
+    } catch (e) {
+      TxaLogger.log('Ping API Error: $e');
+      return -1;
+    }
+  }
+
   static Future<bool> checkSpeed({
-    Function(double down, double up)? onProgress,
+    Function(double down, double up, double progress)? onProgress,
   }) async {
     if (_isTesting) return false;
 
@@ -88,19 +106,23 @@ class TxaSpeedService {
       subscription = _speedChecker.speedTestResultStream.listen(
         (result) {
           final dynamic res = result;
+          double progress = 0;
           try {
             if (res is Map) {
               _currentDownload = (res['downloadSpeed'] as num?)?.toDouble() ?? 0;
               _currentUpload = (res['uploadSpeed'] as num?)?.toDouble() ?? 0;
+              progress = (res['progress'] as num?)?.toDouble() ?? 0;
             } else {
               _currentDownload = (res.downloadSpeed as num?)?.toDouble() ?? 0;
               _currentUpload = (res.uploadSpeed as num?)?.toDouble() ?? 0;
+              // Some versions might not have progress field, we estimate
+              progress = (_currentDownload > 0 ? 0.5 : 0) + (_currentUpload > 0 ? 0.5 : 0);
             }
           } catch (e) {
             TxaLogger.log('Error parsing speed result: $e');
           }
 
-          if (onProgress != null) onProgress(_currentDownload, _currentUpload);
+          if (onProgress != null) onProgress(_currentDownload, _currentUpload, progress);
         },
         onError: (e) {
           TxaLogger.log('Speed test stream error: $e');
@@ -142,16 +164,16 @@ class TxaSpeedService {
   }
 
   static Future<bool> _checkSpeedByDownload({
-    Function(double down, double up)? onProgress,
+    Function(double down, double up, double progress)? onProgress,
   }) async {
     TxaLogger.log('Starting fallback download speed test...');
     final client = HttpClient();
     final stopwatch = Stopwatch()..start();
     int downloadedBytes = 0;
+    const totalBytes = 10485760; // 10MB
     
     try {
-      // Use a known reliable fast file for testing (e.g. 10MB file)
-      final request = await client.getUrl(Uri.parse('https://speed.cloudflare.com/__down?bytes=10485760'));
+      final request = await client.getUrl(Uri.parse('https://speed.cloudflare.com/__down?bytes=$totalBytes'));
       final response = await request.close();
       
       await response.listen((chunk) {
@@ -159,7 +181,8 @@ class TxaSpeedService {
         final elapsedSec = stopwatch.elapsedMilliseconds / 1000.0;
         if (elapsedSec > 0) {
           _currentDownload = (downloadedBytes * 8 / (1024 * 1024)) / elapsedSec; // Mbps
-          if (onProgress != null) onProgress(_currentDownload, 0);
+          double progress = downloadedBytes / totalBytes;
+          if (onProgress != null) onProgress(_currentDownload, 0, progress);
         }
       }).asFuture();
       

@@ -222,7 +222,6 @@ class SpeedNotificationService : Service() {
             "TB/s", "TB" -> String.format(Locale.US, "%.2f TB%s", bytes / TB, suffix)
             else -> { // Auto
                 when {
-                    bytes < KB -> String.format(Locale.US, "%.0f B%s", bytes, suffix)
                     bytes < MB -> String.format(Locale.US, "%.2f KB%s", bytes / KB, suffix)
                     bytes < GB -> String.format(Locale.US, "%.2f MB%s", bytes / MB, suffix)
                     bytes < TB -> String.format(Locale.US, "%.2f GB%s", bytes / GB, suffix)
@@ -272,8 +271,6 @@ class SpeedNotificationService : Service() {
             .setCategory(NotificationCompat.CATEGORY_STATUS) // System status category
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
-            .setGroup("com.tphimx.speed_status") // Unique group to avoid stacking with other notifications
-            .setGroupSummary(false)
             .setShowWhen(false)
 
         try {
