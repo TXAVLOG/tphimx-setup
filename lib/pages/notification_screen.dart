@@ -283,8 +283,8 @@ class _NotificationItem extends StatelessWidget {
         clipBehavior: Clip.none,
         children: [
           Container(
-            width: 54,
-            height: 76, // Poster aspect ratio
+            width: 80,
+            height: 45, // 16:9 video aspect ratio (80/45 ≈ 16/9)
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(10),
               image: DecorationImage(

@@ -229,6 +229,17 @@ class TxaSpeedService {
     }
   }
 
+  static Future<void> updateSpeed(String downSpeed, String upSpeed) async {
+    try {
+      await _channel.invokeMethod('updateSpeed', {
+        'downSpeed': downSpeed,
+        'upSpeed': upSpeed,
+      });
+    } on PlatformException catch (e) {
+      TxaLogger.log('Failed to update native speed: ${e.message}');
+    }
+  }
+
   static Future<void> stopService() async {
     try {
       final bool? result = await _channel.invokeMethod('stopSpeedService');

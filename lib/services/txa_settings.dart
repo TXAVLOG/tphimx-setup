@@ -222,6 +222,11 @@ class TxaSettings extends ChangeNotifier {
       _prefs?.getBool('is_app_foreground') ?? false;
   static set isAppForeground(bool v) => _prefs?.setBool('is_app_foreground', v);
 
+  // --- Onboarding ---
+  static bool get hasSeenCoachMark =>
+      _prefs?.getBool('has_seen_coach_mark') ?? false;
+  static set hasSeenCoachMark(bool v) => _prefs?.setBool('has_seen_coach_mark', v);
+
   static String get lastNotifiedUpdateVersion =>
       _prefs?.getString('last_notified_update_version') ?? '';
   static set lastNotifiedUpdateVersion(String v) =>

@@ -102,6 +102,16 @@ void main() async {
 
   print('TXA_BOOT: Sequence completed. Launching app...');
 
+  // Set System UI Mode for better Nav Bar behavior
+  SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    systemNavigationBarColor: Colors.transparent,
+    systemNavigationBarDividerColor: Colors.transparent,
+    systemNavigationBarIconBrightness: Brightness.light,
+    statusBarColor: Colors.transparent,
+    statusBarIconBrightness: Brightness.light,
+  ));
+
   // Handle Deep Links
   final appLinks = AppLinks();
 

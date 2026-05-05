@@ -74,6 +74,17 @@ class MainActivity : FlutterFragmentActivity() {
                     stopService(intent)
                     result.success(true)
                 }
+                "updateSpeed" -> {
+                    val downSpeed = call.argument<String>("downSpeed") ?: "0 KB/s"
+                    val upSpeed = call.argument<String>("upSpeed") ?: "0 KB/s"
+                    val intent = Intent(this, SpeedNotificationService::class.java).apply {
+                        action = "UPDATE_SPEED_DATA"
+                        putExtra("downSpeed", downSpeed)
+                        putExtra("upSpeed", upSpeed)
+                    }
+                    startService(intent)
+                    result.success(true)
+                }
                 else -> result.notImplemented()
             }
         }

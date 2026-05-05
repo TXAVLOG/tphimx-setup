@@ -1171,8 +1171,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
 
                                     // Get link with fallback
                                     String? downloadUrl;
+                                    Map<String, dynamic>? linkData;
                                     try {
-                                      final linkData = await TxaApi()
+                                      linkData = await TxaApi()
                                           .getEpisodeLink(epId)
                                           .timeout(const Duration(seconds: 5));
                                       downloadUrl = linkData?['link'];
@@ -1183,6 +1184,17 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                         tag: 'API',
                                         type: 'api',
                                       );
+                                    }
+
+                                    // If API returns a proxy playlist URL (streamV6) without .m3u8,
+                                    // prefer the direct link_m3u8 for HLS download
+                                    if (downloadUrl != null &&
+                                        downloadUrl.isNotEmpty &&
+                                        !downloadUrl.contains('.m3u8')) {
+                                      downloadUrl =
+                                          linkData?['link_m3u8'] ??
+                                          ep['link_m3u8'] ??
+                                          downloadUrl;
                                     }
 
                                     // Fallback to data already in the movieDetail response if API fails
@@ -1413,8 +1425,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                       );
 
                                       String? downloadUrl;
+                                      Map<String, dynamic>? linkData;
                                       try {
-                                        final linkData = await TxaApi()
+                                        linkData = await TxaApi()
                                             .getEpisodeLink(epId)
                                             .timeout(const Duration(seconds: 10));
                                         downloadUrl = linkData?['link'];
@@ -1426,7 +1439,18 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                         );
                                       }
 
-                                      if (downloadUrl != null) {
+                                      // Prefer direct m3u8 for download when API returns proxy playlist
+                                      if (downloadUrl != null &&
+                                          downloadUrl.isNotEmpty &&
+                                          !downloadUrl.contains('.m3u8')) {
+                                        downloadUrl =
+                                            linkData?['link_m3u8'] ??
+                                            ep['link_m3u8'] ??
+                                            downloadUrl;
+                                      }
+
+                                      if (downloadUrl != null &&
+                                          downloadUrl.isNotEmpty) {
                                         await TxaDownloadManager().addTask(
                                           movieId: movieData['movie']['id'].toString(),
                                           movieTitle: movieData['movie']['name'],
@@ -1440,9 +1464,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                         );
 
                                         if (mounted) {
-                                          TxaToast.show(
+                                          _showDownloadProgressBottomSheet(
                                             context,
-                                            TxaLanguage.t('added_to_download'),
+                                            "${movieData['movie']['id']}_$epId",
                                           );
                                         }
                                         setModalState(() {});
@@ -1464,6 +1488,163 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                       },
                     ),
                   ),
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _showDownloadProgressBottomSheet(BuildContext context, String taskId) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: TxaTheme.cardBg,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (ctx) {
+        return Consumer<TxaDownloadManager>(
+          builder: (context, manager, child) {
+            final task = manager.tasks.firstWhere(
+              (t) => t.id == taskId,
+              orElse: () => TxaDownloadTask(
+                id: taskId,
+                movieId: '',
+                episodeId: '',
+                movieTitle: '',
+                episodeTitle: '',
+                url: '',
+                poster: '',
+                format: '',
+              ),
+            );
+            if (task.movieId.isEmpty) {
+              WidgetsBinding.instance.addPostFrameCallback((_) {
+                if (ctx.mounted) Navigator.pop(ctx);
+              });
+              return const SizedBox.shrink();
+            }
+
+            final isDone = task.status == DownloadStatus.completed;
+            final isError = task.status == DownloadStatus.error;
+
+            return Container(
+              padding: const EdgeInsets.all(20),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Container(
+                        width: 48,
+                        height: 48,
+                        decoration: BoxDecoration(
+                          color: isDone
+                              ? TxaTheme.accent.withValues(alpha: 0.1)
+                              : isError
+                                  ? Colors.redAccent.withValues(alpha: 0.1)
+                                  : Colors.white.withValues(alpha: 0.05),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Icon(
+                          isDone
+                              ? Icons.download_done_rounded
+                              : isError
+                                  ? Icons.error_outline_rounded
+                                  : Icons.downloading_rounded,
+                          color: isDone
+                              ? TxaTheme.accent
+                              : isError
+                                  ? Colors.redAccent
+                                  : Colors.white70,
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              task.episodeTitle,
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              task.statusDisplay,
+                              style: TextStyle(
+                                color: isDone
+                                    ? TxaTheme.accent
+                                    : isError
+                                        ? Colors.redAccent
+                                        : TxaTheme.textMuted,
+                                fontSize: 13,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      if (!isDone && !isError)
+                        IconButton(
+                          onPressed: () => manager.pauseTask(task.id),
+                          icon: const Icon(
+                            Icons.pause_rounded,
+                            color: Colors.white70,
+                          ),
+                        ),
+                      IconButton(
+                        onPressed: () {
+                          manager.removeTask(task.id);
+                          Navigator.pop(ctx);
+                        },
+                        icon: const Icon(
+                          Icons.close_rounded,
+                          color: TxaTheme.textMuted,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                  if (!isDone && !isError) ...[
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(4),
+                      child: LinearProgressIndicator(
+                        value: task.progress,
+                        backgroundColor: Colors.white10,
+                        valueColor: const AlwaysStoppedAnimation<Color>(
+                          TxaTheme.accent,
+                        ),
+                        minHeight: 6,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        Text(
+                          '${(task.progress * 100).toStringAsFixed(1)}%',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 12,
+                          ),
+                        ),
+                        if (task.totalBytes > 0)
+                          Text(
+                            '${TxaFormat.formatFileSize(task.downloadedBytes)} / ${TxaFormat.formatFileSize(task.totalBytes)}',
+                            style: const TextStyle(
+                              color: TxaTheme.textMuted,
+                              fontSize: 12,
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
                 ],
               ),
             );

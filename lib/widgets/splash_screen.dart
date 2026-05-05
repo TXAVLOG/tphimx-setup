@@ -237,11 +237,8 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
       barrierDismissible: false,
       builder: (ctx) => StatefulBuilder(
         builder: (ctx, setModalState) {
-          // Continuous check inside modal
           Timer? checkTimer;
-          
-          // We use a local state to track if we've already started the timer
-          // to avoid multiple timers in the same dialog
+
           void startTimer() {
             checkTimer?.cancel();
             checkTimer = Timer.periodic(const Duration(seconds: 1), (timer) async {
@@ -259,7 +256,6 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
                 setModalState(() {
                   _permissionStatuses = newStatuses;
                 });
-                // Also update the parent state just in case
                 if (mounted) {
                   setState(() {
                     _permissionStatuses = newStatuses;
@@ -269,11 +265,16 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
             });
           }
 
-          // Trigger timer once
           WidgetsBinding.instance.addPostFrameCallback((_) => startTimer());
 
           final mandatory = TxaPermission.mandatoryPermissions;
           final optional = TxaPermission.optionalPermissions;
+          final all = [...mandatory, ...optional];
+
+          final grantedCount = all.where((p) {
+            return (_permissionStatuses[p['id']] ?? PermissionStatus.denied).isGranted;
+          }).length;
+          final progress = grantedCount / all.length;
 
           bool canContinue = true;
           for (var p in mandatory) {
@@ -286,22 +287,136 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
           return TxaModal(
             title: TxaLanguage.t('permissions_required'),
             showClose: false,
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                _buildPermissionSection(
-                  TxaLanguage.t('permissions_mandatory'),
-                  mandatory,
-                  setModalState,
+            content: ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 520),
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Progress summary
+                    Container(
+                      padding: const EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF1E293B), Color(0xFF0F172A)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        ),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.08),
+                        ),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Container(
+                                padding: const EdgeInsets.all(10),
+                                decoration: BoxDecoration(
+                                  color: TxaTheme.accent.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  Icons.shield_rounded,
+                                  color: TxaTheme.accent,
+                                  size: 24,
+                                ),
+                              ),
+                              const SizedBox(width: 14),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      '$grantedCount/${all.length} ${TxaLanguage.t('permissions')}',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    ClipRRect(
+                                      borderRadius: BorderRadius.circular(4),
+                                      child: LinearProgressIndicator(
+                                        value: progress,
+                                        backgroundColor: Colors.white.withValues(alpha: 0.1),
+                                        valueColor: const AlwaysStoppedAnimation<Color>(
+                                          TxaTheme.accent,
+                                        ),
+                                        minHeight: 6,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              if (progress < 1.0)
+                                GestureDetector(
+                                  onTap: () async {
+                                    for (var p in all) {
+                                      final status = _permissionStatuses[p['id']] ?? PermissionStatus.denied;
+                                      if (!status.isGranted) {
+                                        if (p['id'] == 'battery') {
+                                          await TxaPermission.requestIgnoreBatteryOptimizations();
+                                        } else {
+                                          final Permission perm = p['permission'];
+                                          await perm.request();
+                                        }
+                                      }
+                                    }
+                                    final newStatuses = await TxaPermission.getAllStatus();
+                                    if (mounted) {
+                                      setState(() {
+                                        _permissionStatuses = newStatuses;
+                                      });
+                                      setModalState(() {});
+                                    }
+                                  },
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      gradient: const LinearGradient(
+                                        colors: [TxaTheme.accent, TxaTheme.purple],
+                                      ),
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    child: Text(
+                                      TxaLanguage.t('grant'),
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+                    _buildPermissionSection(
+                      TxaLanguage.t('permissions_mandatory'),
+                      Icons.warning_amber_rounded,
+                      Colors.orangeAccent,
+                      mandatory,
+                      setModalState,
+                    ),
+                    const SizedBox(height: 20),
+                    _buildPermissionSection(
+                      TxaLanguage.t('permissions_optional'),
+                      Icons.settings_suggest_rounded,
+                      TxaTheme.accent,
+                      optional,
+                      setModalState,
+                    ),
+                  ],
                 ),
-                const SizedBox(height: 16),
-                _buildPermissionSection(
-                  TxaLanguage.t('permissions_optional'),
-                  optional,
-                  setModalState,
-                ),
-              ],
+              ),
             ),
             actions: [
               TextButton(
@@ -331,7 +446,7 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  minimumSize: const Size(120, 44),
+                  minimumSize: const Size(140, 46),
                 ),
                 child: Text(
                   TxaLanguage.t('continue'),
@@ -347,39 +462,66 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
 
   Widget _buildPermissionSection(
     String title,
+    IconData sectionIcon,
+    Color sectionColor,
     List<Map<String, dynamic>> perms,
     StateSetter setModalState,
   ) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Text(
-          title,
-          style: const TextStyle(
-            color: TxaTheme.accent,
-            fontSize: 14,
-            fontWeight: FontWeight.bold,
-          ),
+        Row(
+          children: [
+            Icon(sectionIcon, color: sectionColor, size: 16),
+            const SizedBox(width: 8),
+            Text(
+              title,
+              style: TextStyle(
+                color: sectionColor,
+                fontSize: 13,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
         ...perms.map((p) {
           final status = _permissionStatuses[p['id']] ?? PermissionStatus.denied;
           final isGranted = status.isGranted;
+          final iconData = _permissionIcon(p['id']);
 
-          return Container(
+          return AnimatedContainer(
+            duration: const Duration(milliseconds: 300),
             margin: const EdgeInsets.only(bottom: 8),
             padding: const EdgeInsets.all(12),
             decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.05),
-              borderRadius: BorderRadius.circular(12),
+              color: isGranted
+                  ? Colors.green.withValues(alpha: 0.05)
+                  : Colors.white.withValues(alpha: 0.04),
+              borderRadius: BorderRadius.circular(14),
               border: Border.all(
                 color: isGranted
-                    ? Colors.green.withValues(alpha: 0.3)
-                    : Colors.white.withValues(alpha: 0.1),
+                    ? Colors.green.withValues(alpha: 0.25)
+                    : Colors.white.withValues(alpha: 0.08),
               ),
             ),
             child: Row(
               children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: isGranted
+                        ? Colors.green.withValues(alpha: 0.1)
+                        : Colors.white.withValues(alpha: 0.06),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Icon(
+                    isGranted ? Icons.check_circle_rounded : iconData,
+                    color: isGranted ? Colors.greenAccent : Colors.white70,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -389,23 +531,25 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
                         style: const TextStyle(
                           color: Colors.white,
                           fontSize: 13,
-                          fontWeight: FontWeight.bold,
+                          fontWeight: FontWeight.w600,
                         ),
                       ),
-                      const SizedBox(height: 2),
+                      const SizedBox(height: 3),
                       Text(
                         p['desc'],
                         style: const TextStyle(
                           color: TxaTheme.textMuted,
                           fontSize: 11,
+                          height: 1.4,
                         ),
                       ),
                     ],
                   ),
                 ),
-                const SizedBox(width: 12),
-                TextButton(
-                  onPressed: isGranted
+                const SizedBox(width: 8),
+                _PermissionActionButton(
+                  isGranted: isGranted,
+                  onTap: isGranted
                       ? null
                       : () async {
                           if (p['id'] == 'battery') {
@@ -422,20 +566,6 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
                             setModalState(() {});
                           }
                         },
-                  style: TextButton.styleFrom(
-                    backgroundColor: isGranted
-                        ? Colors.green.withValues(alpha: 0.1)
-                        : TxaTheme.accent.withValues(alpha: 0.1),
-                    foregroundColor: isGranted ? Colors.green : TxaTheme.accent,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  ),
-                  child: Text(
-                    isGranted ? TxaLanguage.t('granted') : TxaLanguage.t('grant'),
-                    style: const TextStyle(fontSize: 11, fontWeight: FontWeight.bold),
-                  ),
                 ),
               ],
             ),
@@ -443,6 +573,31 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
         }),
       ],
     );
+  }
+
+  IconData _permissionIcon(String id) {
+    switch (id) {
+      case 'storage':
+        return Icons.folder_rounded;
+      case 'install_packages':
+        return Icons.system_update_rounded;
+      case 'notifications':
+        return Icons.notifications_active_rounded;
+      case 'overlay':
+        return Icons.picture_in_picture_alt_rounded;
+      case 'dnd':
+        return Icons.do_not_disturb_on_rounded;
+      case 'exact_alarm':
+        return Icons.alarm_rounded;
+      case 'battery':
+        return Icons.battery_full_rounded;
+      case 'location':
+        return Icons.location_on_rounded;
+      case 'nearby':
+        return Icons.wifi_tethering_rounded;
+      default:
+        return Icons.security_rounded;
+    }
   }
 
   Future<void> _handleGetUDID() async {
@@ -669,6 +824,43 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
               ],
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _PermissionActionButton extends StatelessWidget {
+  final bool isGranted;
+  final VoidCallback? onTap;
+
+  const _PermissionActionButton({required this.isGranted, this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 250),
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+        decoration: BoxDecoration(
+          color: isGranted
+              ? Colors.green.withValues(alpha: 0.12)
+              : TxaTheme.accent.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(
+            color: isGranted
+                ? Colors.green.withValues(alpha: 0.3)
+                : TxaTheme.accent.withValues(alpha: 0.3),
+          ),
+        ),
+        child: Text(
+          isGranted ? TxaLanguage.t('granted') : TxaLanguage.t('grant'),
+          style: TextStyle(
+            color: isGranted ? Colors.greenAccent : TxaTheme.accent,
+            fontSize: 11,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
     );

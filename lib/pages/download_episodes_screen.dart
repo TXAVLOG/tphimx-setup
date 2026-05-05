@@ -327,12 +327,12 @@ class DownloadEpisodesScreen extends StatelessWidget {
                             valueColor: const AlwaysStoppedAnimation<Color>(
                               TxaTheme.accent,
                             ),
-                            minHeight: 3,
+                            minHeight: 4,
                           ),
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          task.statusDisplay,
+                          _buildProgressText(task),
                           style: const TextStyle(
                             color: TxaTheme.textMuted,
                             fontSize: 10,
@@ -382,6 +382,24 @@ class DownloadEpisodesScreen extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  String _buildProgressText(TxaDownloadTask task) {
+    if (task.status == DownloadStatus.downloading) {
+      final parts = <String>[];
+      parts.add(task.statusDisplay);
+      if (task.networkSpeed > 0) {
+        parts.add(TxaFormat.formatSpeed(task.networkSpeed)['display']);
+      }
+      if (task.timeRemaining != null && task.timeRemaining!.inSeconds > 0) {
+        parts.add('ETA ${TxaFormat.formatDuration(task.timeRemaining!.inSeconds)}');
+      }
+      if (task.totalBytes > 0) {
+        parts.add('${TxaFormat.formatFileSize(task.downloadedBytes)} / ${TxaFormat.formatFileSize(task.totalBytes)}');
+      }
+      return parts.join(' • ');
+    }
+    return task.statusDisplay;
   }
 
   void _showDeleteAllDialog(BuildContext context, TxaDownloadManager manager) {

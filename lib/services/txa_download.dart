@@ -215,6 +215,7 @@ class TxaDownload {
       'TPhimX Tải về',
       importance: Importance.max,
       priority: Priority.high,
+      category: AndroidNotificationCategory.service,
       showProgress: true,
       maxProgress: 100,
       progress: progress,

@@ -199,6 +199,19 @@ class TxaDownloadManager extends ChangeNotifier {
       txaTask.progress = update.progress;
       txaTask.networkSpeed = update.networkSpeed;
       txaTask.timeRemaining = update.timeRemaining;
+
+      // Estimate bytes for progress display when total is unknown
+      if (txaTask.totalBytes > 0) {
+        txaTask.downloadedBytes = (update.progress * txaTask.totalBytes).toInt();
+      } else if (update.progress > 0 && update.networkSpeed > 0 && update.timeRemaining.inSeconds > 0) {
+        // Infer: total = remainingBytes / (1 - progress)
+        final remainingBytes = update.networkSpeed * update.timeRemaining.inSeconds;
+        final inferredTotal = (remainingBytes / (1 - update.progress)).toInt();
+        if (inferredTotal > 0 && inferredTotal < 50 * 1024 * 1024 * 1024) {
+          txaTask.totalBytes = inferredTotal;
+          txaTask.downloadedBytes = (update.progress * inferredTotal).toInt();
+        }
+      }
     }
 
     notifyListeners();
@@ -244,7 +257,7 @@ class TxaDownloadManager extends ChangeNotifier {
     final String taskId = "${movieId}_$episodeId";
     if (_tasks.any((t) => t.id == taskId)) return;
 
-    final isHls = url.contains('.m3u8');
+    final isHls = url.contains('.m3u8') || url.contains('/api/v6/playlist') || url.contains('/api/proxy-media');
     
     Directory? baseDir;
     if (Platform.isAndroid) {
@@ -356,6 +369,12 @@ class TxaDownloadManager extends ChangeNotifier {
         txaTask.downloadedSegments = update.completedSegments;
         txaTask.networkSpeed = update.networkSpeed ?? 0;
         txaTask.timeRemaining = update.timeRemaining;
+        // Estimate total bytes from segment count (avg ~1.5MB per .ts segment)
+        if (update.totalSegments > 0) {
+          const avgSegmentBytes = 1572864; // 1.5 MB
+          txaTask.totalBytes = update.totalSegments * avgSegmentBytes;
+          txaTask.downloadedBytes = (update.progress * txaTask.totalBytes).toInt();
+        }
         break;
       case HlsDownloadPhase.combining:
         txaTask.status = DownloadStatus.downloading;
@@ -442,7 +461,27 @@ class TxaDownloadManager extends ChangeNotifier {
       final txaTask = _tasks[idx];
       if (txaTask.savePath != null) {
         final file = File(txaTask.savePath!);
-        if (await file.exists()) await file.delete();
+        if (await file.exists()) {
+          await file.delete();
+          
+          // Also delete episode folder if it's empty
+          final epDir = file.parent;
+          if (await epDir.exists()) {
+            final children = await epDir.list().toList();
+            if (children.isEmpty) {
+              await epDir.delete();
+              
+              // Also check movie folder
+              final movieDir = epDir.parent;
+              if (await movieDir.exists()) {
+                final movieChildren = await movieDir.list().toList();
+                if (movieChildren.isEmpty) {
+                  await movieDir.delete();
+                }
+              }
+            }
+          }
+        }
       }
       _tasks.removeAt(idx);
       await _saveTasks();

@@ -508,6 +508,21 @@ class TxaLanguage extends ChangeNotifier {
       'api_server': 'Server API',
       'image_server': 'Server Ảnh',
       'no_notifications_desc': 'Bạn chưa có thông báo nào mới. Hãy theo dõi các bộ phim yêu thích để nhận tin tức mới nhất!',
+      // Coach Mark
+      'coach_menu_title': 'Menu chính',
+      'coach_menu_desc': 'Chạm vào đây để mở menu: cài đặt ngôn ngữ, kiểm tra quyền, và nhiều tùy chọn khác.',
+      'coach_search_title': 'Tìm kiếm phim',
+      'coach_search_desc': 'Chạm vào đây để tìm kiếm phim, diễn viên hoặc thể loại bạn yêu thích.',
+      'coach_hero_title': 'Phim nổi bật',
+      'coach_hero_desc': 'Vuốt để khám phá những bộ phim đang hot và được đề xuất dành cho bạn.',
+      'coach_filter_title': 'Bộ lọc thể loại',
+      'coach_filter_desc': 'Chọn thể loại phim bạn muốn xem: phim bộ, phim lẻ, hoạt hình, chiếu rạp...',
+      'coach_movie_title': 'Danh sách phim',
+      'coach_movie_desc': 'Chạm vào bất kỳ bộ phim nào để xem chi tiết, tải xuống hoặc thêm vào yêu thích.',
+      'coach_nav_title': 'Thanh điều hướng',
+      'coach_nav_desc': 'Di chuyển giữa Trang chủ, Tìm kiếm, Lịch chiếu, và Tài khoản tại đây.',
+      'got_it': 'Đã hiểu!',
+      'next': 'Tiếp theo',
     },
     'en': {
       'preparing': 'Preparing...',
@@ -995,6 +1010,21 @@ class TxaLanguage extends ChangeNotifier {
       'delete': 'Delete',
       'local_playback_error':
           'Local playback error. File might be corrupted or missing data (HLS segments).',
+      // Coach Mark
+      'coach_menu_title': 'Main Menu',
+      'coach_menu_desc': 'Tap here to open the menu: language settings, permission check, and more options.',
+      'coach_search_title': 'Search Movies',
+      'coach_search_desc': 'Tap here to search for movies, actors, or genres you love.',
+      'coach_hero_title': 'Featured Movies',
+      'coach_hero_desc': 'Swipe to discover trending movies and personalized recommendations.',
+      'coach_filter_title': 'Genre Filters',
+      'coach_filter_desc': 'Choose the movie genre you want: series, singles, anime, theaters...',
+      'coach_movie_title': 'Movie List',
+      'coach_movie_desc': 'Tap any movie to view details, download, or add to favorites.',
+      'coach_nav_title': 'Navigation Bar',
+      'coach_nav_desc': 'Navigate between Home, Search, Schedule, and Account here.',
+      'got_it': 'Got it!',
+      'next': 'Next',
     },
   };
 

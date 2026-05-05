@@ -661,7 +661,7 @@ class _TxaPlayerState extends State<TxaPlayer>
     );
 
     BetterPlayerConfiguration config = BetterPlayerConfiguration(
-      aspectRatio: 16 / 9,
+      aspectRatio: null, // Auto-detect from video metadata
       fit: BoxFit.contain,
       autoPlay: true,
       fullScreenByDefault: true,

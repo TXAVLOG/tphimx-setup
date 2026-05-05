@@ -17,6 +17,7 @@ import android.graphics.Canvas
 import android.graphics.Color
 import android.graphics.Paint
 import android.graphics.Typeface
+import android.widget.RemoteViews
 import androidx.core.app.NotificationCompat
 import androidx.core.graphics.drawable.IconCompat
 import com.tphimx.tphimx_setup.R
@@ -97,6 +98,16 @@ class SpeedNotificationService : Service() {
             txtUnknown = it.getStringExtra("txtUnknown") ?: txtUnknown
             txtUsage = it.getStringExtra("txtUsage") ?: "Dùng"
             txtTotal = it.getStringExtra("txtTotal") ?: "Tổng"
+        }
+
+        if (intent?.action == "UPDATE_SPEED_DATA") {
+            val down = intent.getStringExtra("downSpeed") ?: "0 KB/s"
+            val up = intent.getStringExtra("upSpeed") ?: "0 KB/s"
+            
+            val notification = buildNotification(down, up)
+            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+            notificationManager.notify(NOTIFICATION_ID, notification)
+            return START_STICKY
         }
         
         val notification = buildNotification(txtTitle, txtInit)
@@ -194,10 +205,7 @@ class SpeedNotificationService : Service() {
         // Format daily usage
         val totalUsageStr = formatWithUnit((totalDailyRx + totalDailyTx).toDouble(), "Auto", false)
 
-        val contentTitle = "▼ $downSpeedStr   ▲ $upSpeedStr"
-        val contentText = "$txtNetwork: $networkInfo  •  $txtTotal: $totalUsageStr"
-
-        val notification = buildNotification(contentTitle, contentText, downSpeedStr)
+        val notification = buildNotification(downSpeedStr, upSpeedStr)
         val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         notificationManager.notify(NOTIFICATION_ID, notification)
         
@@ -209,6 +217,17 @@ class SpeedNotificationService : Service() {
 
     private fun formatWithUnit(bytes: Double, unit: String, isSpeed: Boolean = true): String {
         val suffix = if (isSpeed) "/s" else ""
+        
+        // TxaFormat uses decimal for Mb/s and Gb/s, but binary for others
+        if (unit == "Mb/s" || unit == "Gb/s") {
+            val bits = bytes * 8
+            return if (unit == "Mb/s") {
+                String.format(Locale.US, "%.2f Mb/s", bits / 1_000_000.0)
+            } else {
+                String.format(Locale.US, "%.2f Gb/s", bits / 1_000_000_000.0)
+            }
+        }
+
         val KB = 1024.0
         val MB = KB * KB
         val GB = MB * KB
@@ -244,7 +263,7 @@ class SpeedNotificationService : Service() {
         }
     }
 
-    private fun buildNotification(title: String, text: String, rxSpeedStr: String = "0 KB/s"): Notification {
+    private fun buildNotification(downSpeedStr: String, upSpeedStr: String): Notification {
         // Intent to open app
         val openAppIntent = packageManager.getLaunchIntentForPackage(packageName)
         val openAppPendingIntent = PendingIntent.getActivity(
@@ -252,32 +271,29 @@ class SpeedNotificationService : Service() {
             PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
         )
 
+        // Custom RemoteViews
+        val remoteViews = RemoteViews(packageName, R.layout.notification_speed).apply {
+            setTextViewText(R.id.tv_title, txtTitle)
+            setTextViewText(R.id.tv_network, "$txtNetwork: ${getNetworkType()}")
+            setTextViewText(R.id.tv_down, downSpeedStr)
+            setTextViewText(R.id.tv_up, upSpeedStr)
+        }
+
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setContentTitle(title)
-            .setContentText(text)
-            .setSubText("$txtUsage • $txtTitle")
-            .setStyle(
-                NotificationCompat.BigTextStyle()
-                    .setBigContentTitle(title)
-                    .bigText(text)
-            )
+            .setSmallIcon(createSpeedIcon(downSpeedStr))
+            .setCustomContentView(remoteViews)
+            .setCustomBigContentView(remoteViews) // Same for expanded
+            .setStyle(NotificationCompat.DecoratedCustomViewStyle())
             .setColor(0xFF737DFD.toInt())
-            .setColorized(true)
             .setContentIntent(openAppPendingIntent)
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
             .setPriority(NotificationCompat.PRIORITY_MAX)
-            .setCategory(NotificationCompat.CATEGORY_STATUS) // System status category
+            .setCategory(NotificationCompat.CATEGORY_SERVICE) // AS REQUESTED
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
             .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
             .setShowWhen(false)
-
-        try {
-            builder.setSmallIcon(createSpeedIcon(rxSpeedStr))
-        } catch (e: Exception) {
-            builder.setSmallIcon(R.drawable.ic_speed_notification)
-        }
 
         return builder.build()
     }
@@ -285,10 +301,10 @@ class SpeedNotificationService : Service() {
     private fun createSpeedIcon(speedText: String): IconCompat {
         val parts = speedText.split(" ")
         var valueStr = "0"
-        var unitStr = "KB/s"
+        var unitStr = "K" // Default to K for space
         if (parts.size >= 2) {
             valueStr = parts[0]
-            unitStr = parts[1]
+            unitStr = parts[1].take(1).uppercase() // Just take 'K', 'M', 'G'
         }
         
         val valueFloat = valueStr.toFloatOrNull() ?: 0f
@@ -302,9 +318,11 @@ class SpeedNotificationService : Service() {
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
+        // The background of the icon should be transparent
+        // Android status bar icons use the ALPHA channel to colorize
         val paintValue = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = if (displayValue.length > 3) 40f else 55f
+            textSize = if (displayValue.length > 3) 38f else 52f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
@@ -316,9 +334,9 @@ class SpeedNotificationService : Service() {
             textAlign = Paint.Align.CENTER
         }
 
-        // Draw text vertically centered. The Android status bar uses the alpha channel.
-        canvas.drawText(displayValue, size / 2f, size * 0.50f, paintValue)
-        canvas.drawText(unitStr, size / 2f, size * 0.90f, paintUnit)
+        // Draw value and unit
+        canvas.drawText(displayValue, size / 2f, size * 0.55f, paintValue)
+        canvas.drawText(unitStr, size / 2f, size * 0.95f, paintUnit)
 
         return IconCompat.createWithBitmap(bitmap)
     }
@@ -326,12 +344,13 @@ class SpeedNotificationService : Service() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(NotificationManager::class.java)
+            // Re-create to ensure importance is updated
             manager.deleteNotificationChannel(CHANNEL_ID)
 
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
                 txtTitle,
-                NotificationManager.IMPORTANCE_MAX
+                NotificationManager.IMPORTANCE_HIGH // HIGH instead of MAX to be slightly less intrusive but still primary
             ).apply {
                 description = "Hiển thị tốc độ mạng thời gian thực"
                 setShowBadge(false)

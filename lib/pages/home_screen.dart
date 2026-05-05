@@ -48,6 +48,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:crypto/crypto.dart';
 
 import '../widgets/txa_speed_test_modal.dart';
+import '../widgets/txa_coach_mark.dart';
 import 'package:quick_actions/quick_actions.dart';
 
 class HomeScreen extends StatefulWidget {
@@ -64,6 +65,14 @@ class _HomeScreenState extends State<HomeScreen> {
   final ScrollController _homeScrollController = ScrollController();
   double _headerOpacity = 0.0;
 
+  // Coach Mark keys
+  final GlobalKey _menuKey = GlobalKey();
+  final GlobalKey _searchKey = GlobalKey();
+  final GlobalKey _heroKey = GlobalKey();
+  final GlobalKey _filterKey = GlobalKey();
+  final GlobalKey _movieSectionKey = GlobalKey();
+  final GlobalKey _navKey = GlobalKey();
+
   late List<Widget> _tabs;
 
   Timer? _updateTimer;
@@ -74,7 +83,13 @@ class _HomeScreenState extends State<HomeScreen> {
     _homeScrollController.addListener(_onHomeScroll);
     _initQuickActions();
     _tabs = [
-      _HomeTab(scrollController: _homeScrollController),
+      _HomeTab(
+        scrollController: _homeScrollController,
+        heroKey: _heroKey,
+        filterKey: _filterKey,
+        movieSectionKey: _movieSectionKey,
+        onDataLoaded: _maybeShowCoachMark,
+      ),
       const SearchScreen(),
       const ScheduleScreen(),
       const LogViewerScreen(),
@@ -201,6 +216,65 @@ class _HomeScreenState extends State<HomeScreen> {
         icon: 'ic_launcher',
       ),
     ]);
+  }
+
+  void _maybeShowCoachMark() {
+    if (TxaSettings.hasSeenCoachMark) return;
+    if (!mounted) return;
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      TxaCoachMark.show(
+        context: context,
+        targets: [
+          TxaCoachMarkTarget(
+            key: _menuKey,
+            titleKey: 'coach_menu_title',
+            descKey: 'coach_menu_desc',
+            icon: Icons.menu_rounded,
+            tooltipPosition: CoachMarkPosition.bottom,
+          ),
+          TxaCoachMarkTarget(
+            key: _searchKey,
+            titleKey: 'coach_search_title',
+            descKey: 'coach_search_desc',
+            icon: Icons.search_rounded,
+            tooltipPosition: CoachMarkPosition.bottom,
+          ),
+          TxaCoachMarkTarget(
+            key: _heroKey,
+            titleKey: 'coach_hero_title',
+            descKey: 'coach_hero_desc',
+            icon: Icons.local_fire_department_rounded,
+            tooltipPosition: CoachMarkPosition.bottom,
+          ),
+          TxaCoachMarkTarget(
+            key: _filterKey,
+            titleKey: 'coach_filter_title',
+            descKey: 'coach_filter_desc',
+            icon: Icons.filter_list_rounded,
+            tooltipPosition: CoachMarkPosition.bottom,
+          ),
+          TxaCoachMarkTarget(
+            key: _movieSectionKey,
+            titleKey: 'coach_movie_title',
+            descKey: 'coach_movie_desc',
+            icon: Icons.movie_rounded,
+            tooltipPosition: CoachMarkPosition.top,
+          ),
+          TxaCoachMarkTarget(
+            key: _navKey,
+            titleKey: 'coach_nav_title',
+            descKey: 'coach_nav_desc',
+            icon: Icons.navigation_rounded,
+            tooltipPosition: CoachMarkPosition.top,
+          ),
+        ],
+        onFinish: () {
+          TxaSettings.hasSeenCoachMark = true;
+        },
+      );
+    });
   }
 
   void _showSpeedTestDialog() {
@@ -535,17 +609,20 @@ class _HomeScreenState extends State<HomeScreen> {
                   bottom: 0,
                   left: 0,
                   right: 0,
-                  child: Consumer<NotificationProvider>(
-                    builder: (context, notif, child) {
-                      return TxaNav(
-                        currentIndex: _currentIndex,
-                        unreadNotifications: notif.unreadCount,
-                        isLoggedIn: TxaSettings.authToken.isNotEmpty,
-                        onTap: (index) {
-                          setState(() => _currentIndex = index);
-                        },
-                      );
-                    },
+                  child: Container(
+                    key: _navKey,
+                    child: Consumer<NotificationProvider>(
+                      builder: (context, notif, child) {
+                        return TxaNav(
+                          currentIndex: _currentIndex,
+                          unreadNotifications: notif.unreadCount,
+                          isLoggedIn: TxaSettings.authToken.isNotEmpty,
+                          onTap: (index) {
+                            setState(() => _currentIndex = index);
+                          },
+                        );
+                      },
+                    ),
                   ),
                 ),
               ],
@@ -591,12 +668,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    GestureDetector(
-                      onTap: () => _scaffoldKey.currentState?.openDrawer(),
-                      child: const Icon(
-                        Icons.menu_rounded,
-                        color: Colors.white,
-                        size: 28,
+                    Container(
+                      key: _menuKey,
+                      child: GestureDetector(
+                        onTap: () => _scaffoldKey.currentState?.openDrawer(),
+                        child: const Icon(
+                          Icons.menu_rounded,
+                          color: Colors.white,
+                          size: 28,
+                        ),
                       ),
                     ),
                     Row(
@@ -641,9 +721,12 @@ class _HomeScreenState extends State<HomeScreen> {
                             return const SizedBox.shrink();
                           },
                         ),
-                        _GlassIconBtn(
-                          icon: Icons.search_rounded,
-                          onTap: () => setState(() => _currentIndex = 1),
+                        Container(
+                          key: _searchKey,
+                          child: _GlassIconBtn(
+                            icon: Icons.search_rounded,
+                            onTap: () => setState(() => _currentIndex = 1),
+                          ),
                         ),
                         const SizedBox(width: 8),
                         if (TxaSettings.authToken.isNotEmpty)
@@ -909,8 +992,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.2.7';
-                  final build = snapshot.data?.buildNumber ?? '427';
+                  final version = snapshot.data?.version ?? '4.2.8';
+                  final build = snapshot.data?.buildNumber ?? '428';
                   return InkWell(
                     onTap: () => Navigator.push(
                       context,
@@ -942,7 +1025,18 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _HomeTab extends StatefulWidget {
   final ScrollController scrollController;
-  const _HomeTab({required this.scrollController});
+  final GlobalKey heroKey;
+  final GlobalKey filterKey;
+  final GlobalKey movieSectionKey;
+  final VoidCallback? onDataLoaded;
+
+  const _HomeTab({
+    required this.scrollController,
+    required this.heroKey,
+    required this.filterKey,
+    required this.movieSectionKey,
+    this.onDataLoaded,
+  });
 
   @override
   State<_HomeTab> createState() => _HomeTabState();
@@ -981,6 +1075,7 @@ class _HomeTabState extends State<_HomeTab> {
         _data = data;
         _loading = false;
       });
+      widget.onDataLoaded?.call();
     } catch (e) {
       TxaLogger.log('Home Load Error: $e', isError: true);
       setState(() {
@@ -1194,22 +1289,27 @@ class _HomeTabState extends State<_HomeTab> {
               )
             else ...[
               SliverToBoxAdapter(
-                child: featured.isNotEmpty
-                    ? _HeroSlider(movies: featured.take(10).toList())
-                    : const SizedBox(height: 100),
+                child: Container(
+                  key: widget.heroKey,
+                  child: featured.isNotEmpty
+                      ? _HeroSlider(movies: featured.take(10).toList())
+                      : const SizedBox(height: 100),
+                ),
               ),
 
               SliverToBoxAdapter(
-                child: Padding(
-                  padding: const EdgeInsets.fromLTRB(0, 12, 0, 4),
-                  child: SizedBox(
-                    height: 34,
-                    child: ListView(
-                      scrollDirection: Axis.horizontal,
-                      physics: const BouncingScrollPhysics(),
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      children: [
-                        _FilterChip(
+                child: Container(
+                  key: widget.filterKey,
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(0, 12, 0, 4),
+                    child: SizedBox(
+                      height: 34,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        physics: const BouncingScrollPhysics(),
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        children: [
+                          _FilterChip(
                           label: TxaLanguage.t('recommendation'),
                           isActive: _activeFilter == 'all',
                           onTap: () => setState(() => _activeFilter = 'all'),
@@ -1248,6 +1348,7 @@ class _HomeTabState extends State<_HomeTab> {
                   ),
                 ),
               ),
+            ),
 
               if (categories.isNotEmpty)
                 SliverToBoxAdapter(
@@ -1380,14 +1481,21 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
 
               // Movie Sections
-              ...filteredSections.map(
-                (section) => SliverToBoxAdapter(
-                  child: _MovieSection(
-                    title: section['title'],
-                    movies: section['movies'],
-                    sectionKey: section['key'],
-                  ),
-                ),
+              ...filteredSections.asMap().entries.map(
+                (entry) {
+                  final section = entry.value;
+                  final isFirst = entry.key == 0;
+                  return SliverToBoxAdapter(
+                    child: Container(
+                      key: isFirst ? widget.movieSectionKey : null,
+                      child: _MovieSection(
+                        title: section['title'],
+                        movies: section['movies'],
+                        sectionKey: section['key'],
+                      ),
+                    ),
+                  );
+                },
               ),
             ],
 

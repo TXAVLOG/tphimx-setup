@@ -7,8 +7,8 @@ class TxaApi {
   static const String baseUrl = 'https://film.nrotxa.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '4.2.7';
-  static const String buildNumber = '427';
+  static const String apiVersion = '4.2.8';
+  static const String buildNumber = '428';
 
   // Community Links
   static const String facebookFanpage =
@@ -351,7 +351,7 @@ class TxaApi {
           'type': type,
           'message': message,
           'extra': extra,
-          'device_info': 'TPhimX-App-V4.2.7',
+          'device_info': 'TPhimX-App-V4.2.8',
           'timestamp': DateTime.now().toIso8601String(),
         },
       );
@@ -365,6 +365,11 @@ class TxaApi {
     try {
       // 1. Kiểm tra qua check-update (Chính xác nhất cho việc khóa app/bảo trì)
       final updateInfo = await getCheckUpdate();
+
+      // Kiểm tra maintenance_mode - app không có ngoại lệ khi bảo trì
+      final isMaintenance = updateInfo['maintenance_mode'] ?? false;
+      if (isMaintenance) return true;
+
       final isActive = Platform.isIOS
           ? (updateInfo['ios_active'] ?? true)
           : (updateInfo['is_active'] ?? true);
