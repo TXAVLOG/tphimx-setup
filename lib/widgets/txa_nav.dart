@@ -31,7 +31,7 @@ class TxaNav extends StatelessWidget {
         bottom: bottomMargin,
       ),
       child: Container(
-        height: 60,
+        height: 66,
         decoration: BoxDecoration(
           // Frosted glass effect: white with low opacity
           color: Colors.white.withValues(alpha: 0.15),
@@ -137,69 +137,70 @@ class _NavItem extends StatelessWidget {
       child: GestureDetector(
         onTap: onTap,
         behavior: HitTestBehavior.opaque,
-        child: Container(
-          height: double.infinity,
-          alignment: Alignment.center,
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 300),
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            decoration: BoxDecoration(
-              // Light highlight for active item
-              color: isActive ? TxaTheme.accent.withValues(alpha: 0.15) : Colors.transparent,
-              borderRadius: BorderRadius.circular(20),
-            ),
-            child: Row(
-              mainAxisSize: MainAxisSize.min,
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            // Icon section with pill highlight
+            Stack(
+              clipBehavior: Clip.none,
+              alignment: Alignment.center,
               children: [
-                Stack(
-                  clipBehavior: Clip.none,
-                  children: [
-                    Icon(
-                      icon,
-                      color: isActive ? TxaTheme.accent : Colors.white70,
-                      size: 22,
-                    ),
-                    if (badgeCount > 0)
-                      Positioned(
-                        top: -5,
-                        right: -5,
-                        child: Container(
-                          padding: const EdgeInsets.all(2),
-                          decoration: const BoxDecoration(
-                            color: Colors.redAccent,
-                            shape: BoxShape.circle,
-                          ),
-                          constraints: const BoxConstraints(
-                            minWidth: 14,
-                            minHeight: 14,
-                          ),
-                          child: Text(
-                            badgeCount > 9 ? '9+' : badgeCount.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 8,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            textAlign: TextAlign.center,
-                          ),
-                        ),
-                      ),
-                  ],
+                AnimatedContainer(
+                  duration: const Duration(milliseconds: 300),
+                  curve: Curves.easeInOut,
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: isActive ? TxaTheme.accent.withValues(alpha: 0.15) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: isActive ? TxaTheme.accent : Colors.white.withValues(alpha: 0.5),
+                    size: 24,
+                  ),
                 ),
-                if (isActive) ...[
-                  const SizedBox(width: 8),
-                  Text(
-                    label,
-                    style: const TextStyle(
-                      color: TxaTheme.accent,
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
+                if (badgeCount > 0)
+                  Positioned(
+                    top: -2,
+                    right: 2,
+                    child: Container(
+                      padding: const EdgeInsets.all(2),
+                      decoration: BoxDecoration(
+                        color: Colors.redAccent,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: TxaTheme.cardBg, width: 1.5),
+                      ),
+                      constraints: const BoxConstraints(
+                        minWidth: 16,
+                        minHeight: 16,
+                      ),
+                      child: Text(
+                        badgeCount > 9 ? '9+' : badgeCount.toString(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.bold,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
-                ],
               ],
             ),
-          ),
+            const SizedBox(height: 4),
+            // Label section
+            Text(
+              label,
+              style: TextStyle(
+                color: isActive ? TxaTheme.accent : Colors.white.withValues(alpha: 0.5),
+                fontSize: 10,
+                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
+                letterSpacing: 0.2,
+              ),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ],
         ),
       ),
     );

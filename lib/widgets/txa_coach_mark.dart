@@ -294,7 +294,9 @@ class _CoachMarkOverlayState extends State<_CoachMarkOverlay>
           ),
         );
       },
-      child: Container(
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
           color: TxaTheme.cardBg,
@@ -421,6 +423,7 @@ class _CoachMarkOverlayState extends State<_CoachMarkOverlay>
               ],
             ),
           ],
+        ),
         ),
       ),
     );

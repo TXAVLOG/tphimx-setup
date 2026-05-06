@@ -77,14 +77,9 @@ class TxaFormat {
   /// Format network speed specifically for App Settings/Status - Support custom Units
   static String formatNetworkSpeed(double bitsPerSec, {String unit = 'Auto'}) {
     if (bitsPerSec <= 0) return '0 ${unit == 'Auto' ? 'KB/s' : unit}';
-    double mbps = bitsPerSec / 1000000.0;
     double bytesPerSec = bitsPerSec / 8.0;
 
     switch (unit) {
-      case 'Mb/s':
-        return '${mbps.toStringAsFixed(2)} Mb/s';
-      case 'Gb/s':
-        return '${(mbps / 1000.0).toStringAsFixed(2)} Gb/s';
       case 'B/s':
         return '${bytesPerSec.toStringAsFixed(0)} B/s';
       case 'KB/s':
@@ -217,6 +212,7 @@ class TxaFormat {
   static String formatBattery(int level) {
     return '$level%';
   }
+
 
   /// Format episode name to avoid duplication (e.g. "Tập Tập 1")
   /// Also handles special cases like "Full", "Trailer" to not add "Tập" prefix.

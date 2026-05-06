@@ -218,16 +218,7 @@ class SpeedNotificationService : Service() {
     private fun formatWithUnit(bytes: Double, unit: String, isSpeed: Boolean = true): String {
         val suffix = if (isSpeed) "/s" else ""
         
-        // TxaFormat uses decimal for Mb/s and Gb/s, but binary for others
-        if (unit == "Mb/s" || unit == "Gb/s") {
-            val bits = bytes * 8
-            return if (unit == "Mb/s") {
-                String.format(Locale.US, "%.2f Mb/s", bits / 1_000_000.0)
-            } else {
-                String.format(Locale.US, "%.2f Gb/s", bits / 1_000_000_000.0)
-            }
-        }
-
+        // Mb/s and Gb/s removed - use MB/s and GB/s only
         val KB = 1024.0
         val MB = KB * KB
         val GB = MB * KB
@@ -263,6 +254,41 @@ class SpeedNotificationService : Service() {
         }
     }
 
+    private fun getSignalStrength(): String {
+        val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
+        val network = connectivityManager.activeNetwork ?: return "━━━━"
+        val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return "━━━━"
+        
+        // Get signal strength from NetworkCapabilities (API 29+)
+        val signalStrength = capabilities.signalStrength // dBm value, negative
+        
+        // Convert to bars (0-4)
+        val bars = when {
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_WIFI) -> {
+                when {
+                    signalStrength >= -50 -> 4  // Excellent
+                    signalStrength >= -60 -> 3  // Good
+                    signalStrength >= -70 -> 2  // Fair
+                    signalStrength >= -80 -> 1  // Weak
+                    else -> 0                    // Very weak
+                }
+            }
+            capabilities.hasTransport(NetworkCapabilities.TRANSPORT_CELLULAR) -> {
+                when {
+                    signalStrength >= -85 -> 4
+                    signalStrength >= -95 -> 3
+                    signalStrength >= -105 -> 2
+                    signalStrength >= -115 -> 1
+                    else -> 0
+                }
+            }
+            else -> 4 // Ethernet/other = full
+        }
+        
+        val barIcons = listOf("▁", "▂", "▄", "▆", "█")
+        return barIcons.take(bars + 1).joinToString("")
+    }
+
     private fun buildNotification(downSpeedStr: String, upSpeedStr: String): Notification {
         // Intent to open app
         val openAppIntent = packageManager.getLaunchIntentForPackage(packageName)
@@ -274,7 +300,7 @@ class SpeedNotificationService : Service() {
         // Custom RemoteViews
         val remoteViews = RemoteViews(packageName, R.layout.notification_speed).apply {
             setTextViewText(R.id.tv_title, txtTitle)
-            setTextViewText(R.id.tv_network, "$txtNetwork: ${getNetworkType()}")
+            setTextViewText(R.id.tv_network, "$txtNetwork: ${getNetworkType()} • ${getSignalStrength()}")
             setTextViewText(R.id.tv_down, downSpeedStr)
             setTextViewText(R.id.tv_up, upSpeedStr)
         }
@@ -301,10 +327,12 @@ class SpeedNotificationService : Service() {
     private fun createSpeedIcon(speedText: String): IconCompat {
         val parts = speedText.split(" ")
         var valueStr = "0"
-        var unitStr = "K" // Default to K for space
+        var unitStr = "KB" // Default
         if (parts.size >= 2) {
             valueStr = parts[0]
-            unitStr = parts[1].take(1).uppercase() // Just take 'K', 'M', 'G'
+            // Take unit prefix: KB, MB, GB, TB, B
+            val rawUnit = parts[1].replace("/s", "")
+            unitStr = if (rawUnit.length <= 2) rawUnit.uppercase() else rawUnit.take(2).uppercase()
         }
         
         val valueFloat = valueStr.toFloatOrNull() ?: 0f
@@ -314,7 +342,7 @@ class SpeedNotificationService : Service() {
             String.format(Locale.US, "%.1f", valueFloat)
         }
 
-        val size = 96
+        val size = 128
         val bitmap = Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
         val canvas = Canvas(bitmap)
 
@@ -322,21 +350,21 @@ class SpeedNotificationService : Service() {
         // Android status bar icons use the ALPHA channel to colorize
         val paintValue = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = if (displayValue.length > 3) 38f else 52f
+            textSize = if (displayValue.length > 3) 50f else 68f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
 
         val paintUnit = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = 28f
+            textSize = 36f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
 
         // Draw value and unit
-        canvas.drawText(displayValue, size / 2f, size * 0.55f, paintValue)
-        canvas.drawText(unitStr, size / 2f, size * 0.95f, paintUnit)
+        canvas.drawText(displayValue, size / 2f, size * 0.50f, paintValue)
+        canvas.drawText(unitStr, size / 2f, size * 0.90f, paintUnit)
 
         return IconCompat.createWithBitmap(bitmap)
     }

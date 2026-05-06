@@ -31,6 +31,7 @@ import 'services/txa_speed_service.dart';
 import 'services/txa_download_manager.dart';
 import 'services/txa_history_sync_service.dart';
 import 'pages/download_manager_screen.dart';
+import 'widgets/txa_download_mini_progress.dart';
 import 'widgets/txa_watermark.dart';
 import 'services/txa_screenshot_service.dart';
 import 'services/txa_permission.dart';
@@ -424,6 +425,7 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
               child: Stack(
                 children: [
                   child ?? const SizedBox.shrink(),
+                  const TxaDownloadMiniProgress(),
                   const TxaMiniPlayer(),
                 ],
               ),

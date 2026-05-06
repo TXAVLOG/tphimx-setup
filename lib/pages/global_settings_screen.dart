@@ -173,8 +173,6 @@ class _GlobalSettingsScreenState extends State<GlobalSettingsScreen> {
                 'MB/s',
                 'GB/s',
                 'B/s',
-                'Mb/s',
-                'Gb/s',
               ];
               showModalBottomSheet(
                 context: context,
