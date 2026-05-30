@@ -93,6 +93,9 @@ workflows:
             --clobber
           
           echo "✅ iOS Release and Upload completed successfully."
+          GITHUB_RELEASE_IPA_URL="https://github.com/$REPO_ID/releases/download/$TAG/$PACKAGE_NAME-v$VERSION.ipa"
+          echo "IPA_URL=$GITHUB_RELEASE_IPA_URL" >> $CM_ENV
+          echo "🎉 Published IPA URL: $GITHUB_RELEASE_IPA_URL"
     artifacts:
       - build/ios/ipa/*.ipa
 
@@ -169,5 +172,8 @@ workflows:
             --clobber
           
           echo "✅ iOS Release and Upload completed successfully."
+          GITHUB_RELEASE_IPA_URL="https://github.com/$REPO_ID/releases/download/$TAG/$PACKAGE_NAME-v$VERSION.ipa"
+          echo "IPA_URL=$GITHUB_RELEASE_IPA_URL" >> $CM_ENV
+          echo "🎉 Published IPA URL: $GITHUB_RELEASE_IPA_URL"
     artifacts:
       - build/ios/ipa/*.ipa
