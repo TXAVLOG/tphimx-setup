@@ -36,12 +36,6 @@ class TxaPermission {
     ];
     if (Platform.isAndroid) {
       perms.add({
-        'id': 'overlay',
-        'label': TxaLanguage.t('permission_overlay_label'),
-        'desc': TxaLanguage.t('permission_overlay_desc'),
-        'permission': Permission.systemAlertWindow,
-      });
-      perms.add({
         'id': 'dnd',
         'label': TxaLanguage.t('permission_dnd_label'),
         'desc': TxaLanguage.t('permission_dnd_desc'),

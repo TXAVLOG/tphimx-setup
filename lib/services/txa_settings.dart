@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
+import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/txa_logger.dart';
 
@@ -10,6 +10,7 @@ class TxaSettings extends ChangeNotifier {
   factory TxaSettings() => _instance;
   TxaSettings._internal();
 
+  static final navigatorKey = GlobalKey<NavigatorState>();
   static SharedPreferences? _prefs;
   static bool get isInitialized => _prefs != null;
 
@@ -17,7 +18,10 @@ class TxaSettings extends ChangeNotifier {
     try {
       _prefs = await SharedPreferences.getInstance();
     } catch (e) {
-      TxaLogger.log('TxaSettings: Failed to initialize SharedPreferences: $e', isError: true);
+      TxaLogger.log(
+        'TxaSettings: Failed to initialize SharedPreferences: $e',
+        isError: true,
+      );
       // Don't rethrow, let the app try to run with defaults
     }
   }
@@ -73,12 +77,6 @@ class TxaSettings extends ChangeNotifier {
   static bool get autoDND => _prefs?.getBool('player_auto_dnd') ?? true;
   static set autoDND(bool v) {
     _prefs?.setBool('player_auto_dnd', v);
-    _notify();
-  }
-
-  static bool get autoPiP => _prefs?.getBool('player_auto_pip') ?? true;
-  static set autoPiP(bool v) {
-    _prefs?.setBool('player_auto_pip', v);
     _notify();
   }
 
@@ -225,7 +223,8 @@ class TxaSettings extends ChangeNotifier {
   // --- Onboarding ---
   static bool get hasSeenCoachMark =>
       _prefs?.getBool('has_seen_coach_mark') ?? false;
-  static set hasSeenCoachMark(bool v) => _prefs?.setBool('has_seen_coach_mark', v);
+  static set hasSeenCoachMark(bool v) =>
+      _prefs?.setBool('has_seen_coach_mark', v);
 
   static String get lastNotifiedUpdateVersion =>
       _prefs?.getString('last_notified_update_version') ?? '';

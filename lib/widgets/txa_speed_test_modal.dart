@@ -42,6 +42,7 @@ class _TxaSpeedTestModalState extends State<TxaSpeedTestModal>
   int _apiPing = -1;
   int _imgPing = -1;
   bool _isFinished = false;
+  TxaSpeedTestPhase _phase = TxaSpeedTestPhase.ping;
 
   late AnimationController _pulseController;
 
@@ -74,20 +75,25 @@ class _TxaSpeedTestModalState extends State<TxaSpeedTestModal>
       _progress = 0;
       _apiPing = -1;
       _imgPing = -1;
+      _phase = TxaSpeedTestPhase.ping;
     });
 
     // 1. Check Pings
     final apiLatency = await TxaSpeedService.checkApiLatency();
+    if (!mounted) return;
     setState(() => _apiPing = apiLatency);
     
     // Simulating checking image server ping (could use actual image CDN if available)
     await Future.delayed(const Duration(milliseconds: 500));
+    if (!mounted) return;
     setState(() => _imgPing = (apiLatency * 1.2).toInt());
 
     // 2. Check Speed
-    await TxaSpeedService.checkSpeed(
-      onProgress: (down, up, prog) {
+    await TxaSpeedService.checkSpeedPhased(
+      onProgress: (phase, down, up, prog) {
+        if (!mounted) return;
         setState(() {
+          _phase = phase;
           _download = down;
           _upload = up;
           _progress = prog;
@@ -95,9 +101,12 @@ class _TxaSpeedTestModalState extends State<TxaSpeedTestModal>
       },
     );
 
+    if (!mounted) return;
     setState(() {
       _isTesting = false;
       _isFinished = true;
+      _phase = TxaSpeedTestPhase.complete;
+      _progress = 1;
     });
   }
 
@@ -138,7 +147,12 @@ class _TxaSpeedTestModalState extends State<TxaSpeedTestModal>
                     const SizedBox(height: 32),
                     _buildStatsRow(),
                     const SizedBox(height: 24),
-                    _buildProgressBar(),
+                    AnimatedSwitcher(
+                      duration: const Duration(milliseconds: 260),
+                      child: _isFinished
+                          ? _buildResultChart()
+                          : _buildProgressBar(),
+                    ),
                     const SizedBox(height: 32),
                     _buildActionButton(),
                   ],
@@ -185,63 +199,114 @@ class _TxaSpeedTestModalState extends State<TxaSpeedTestModal>
   }
 
   Widget _buildSpeedDisplay() {
+    final displaySpeed = _phase == TxaSpeedTestPhase.upload ? _upload : _download;
+    final phaseLabel = _phase == TxaSpeedTestPhase.upload
+        ? TxaLanguage.t('upload_label')
+        : _phase == TxaSpeedTestPhase.download
+            ? TxaLanguage.t('download_label')
+            : _phase == TxaSpeedTestPhase.complete
+                ? TxaLanguage.t('test_completed')
+                : TxaLanguage.t('testing');
+
     return AnimatedBuilder(
       animation: _pulseController,
       builder: (context, child) {
-        return Container(
-          width: 180,
-          height: 180,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            border: Border.all(
-              color: TxaTheme.accent.withValues(alpha: 0.2 + (0.1 * _pulseController.value)),
-              width: 8,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: TxaTheme.accent.withValues(alpha: 0.1 * _pulseController.value),
-                blurRadius: 20,
-                spreadRadius: 5,
+        return SizedBox(
+          width: 188,
+          height: 188,
+          child: Stack(
+            alignment: Alignment.center,
+            children: [
+              SizedBox(
+                width: 188,
+                height: 188,
+                child: CircularProgressIndicator(
+                  value: _isTesting
+                      ? _progress.clamp(0.02, 1.0).toDouble()
+                      : 1,
+                  strokeWidth: 8,
+                  backgroundColor: Colors.white.withValues(alpha: 0.08),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    _phase == TxaSpeedTestPhase.upload
+                        ? Colors.orangeAccent
+                        : TxaTheme.accent,
+                  ),
+                ),
               ),
-            ],
-          ),
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Text(
-                  _download.toStringAsFixed(1),
-                  style: const TextStyle(
-                    color: TxaTheme.accent,
-                    fontSize: 42,
-                    fontWeight: FontWeight.w900,
-                  ),
-                ),
-                const Text(
-                  'Mbps',
-                  style: TextStyle(
-                    color: TxaTheme.textMuted,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                if (_isTesting)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 8),
-                    child: Text(
-                      _progress < 0.5 
-                          ? TxaLanguage.t('downloading') 
-                          : TxaLanguage.t('upload_label'),
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 10,
-                        fontStyle: FontStyle.italic,
+              Container(
+                width: 164,
+                height: 164,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: Colors.white.withValues(alpha: 0.04),
+                  boxShadow: [
+                    BoxShadow(
+                      color: TxaTheme.accent.withValues(
+                        alpha: 0.10 + (0.12 * _pulseController.value),
                       ),
+                      blurRadius: 24,
+                      spreadRadius: 4,
+                    ),
+                  ],
+                ),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      AnimatedSwitcher(
+                        duration: const Duration(milliseconds: 180),
+                        child: Text(
+                          displaySpeed.toStringAsFixed(1),
+                          key: ValueKey(
+                            '${_phase.name}_${displaySpeed.toStringAsFixed(1)}',
+                          ),
+                          style: TextStyle(
+                            color: _phase == TxaSpeedTestPhase.upload
+                                ? Colors.orangeAccent
+                                : TxaTheme.accent,
+                            fontSize: 42,
+                            fontWeight: FontWeight.w900,
+                          ),
+                        ),
+                      ),
+                      const Text(
+                        'Mbps',
+                        style: TextStyle(
+                          color: TxaTheme.textMuted,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8),
+                        child: Text(
+                          phaseLabel,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 10,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              if (_isTesting)
+                Positioned(
+                  bottom: 10,
+                  child: Text(
+                    '${(_progress * 100).clamp(0, 100).toStringAsFixed(0)}%',
+                    style: const TextStyle(
+                      color: Colors.white54,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
+                ),
               ],
             ),
-          ),
         );
       },
     );
@@ -264,9 +329,15 @@ class _TxaSpeedTestModalState extends State<TxaSpeedTestModal>
           _imgPing != -1 && _imgPing < 300 ? Colors.greenAccent : Colors.redAccent,
         ),
         _buildStatItem(
-          Icons.upload_rounded,
-          'Upload',
-          _upload.toStringAsFixed(1),
+          _phase == TxaSpeedTestPhase.upload
+              ? Icons.upload_rounded
+              : Icons.download_rounded,
+          _phase == TxaSpeedTestPhase.upload
+              ? TxaLanguage.t('upload_label')
+              : TxaLanguage.t('download_label'),
+          _phase == TxaSpeedTestPhase.upload
+              ? _upload.toStringAsFixed(1)
+              : _download.toStringAsFixed(1),
           TxaTheme.accent,
         ),
       ],
@@ -296,66 +367,148 @@ class _TxaSpeedTestModalState extends State<TxaSpeedTestModal>
   }
 
   Widget _buildProgressBar() {
-    String evaluation = '';
-    if (_isFinished) {
-      if (_download > 50) {
-        evaluation = TxaLanguage.t('speed_excellent');
-      } else if (_download > 20) {
-        evaluation = TxaLanguage.t('speed_good');
-      } else if (_download > 5) {
-        evaluation = TxaLanguage.t('speed_stable');
-      } else {
-        evaluation = TxaLanguage.t('speed_slow');
-      }
-    }
-
     return Column(
+      key: const ValueKey('speed-progress'),
       children: [
         ClipRRect(
           borderRadius: BorderRadius.circular(10),
           child: LinearProgressIndicator(
             value: _progress,
             backgroundColor: Colors.white.withValues(alpha: 0.05),
-            valueColor: const AlwaysStoppedAnimation<Color>(TxaTheme.accent),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              _phase == TxaSpeedTestPhase.upload
+                  ? Colors.orangeAccent
+                  : TxaTheme.accent,
+            ),
             minHeight: 6,
           ),
         ),
-        if (_isFinished)
-          Padding(
-            padding: const EdgeInsets.only(top: 16),
-            child: Column(
-              children: [
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.greenAccent.withValues(alpha: 0.1),
-                    borderRadius: BorderRadius.circular(20),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Icon(Icons.check_circle_rounded, color: Colors.greenAccent, size: 14),
-                      const SizedBox(width: 6),
-                      Text(
-                        TxaLanguage.t('test_completed'),
-                        style: const TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
+        const SizedBox(height: 10),
+        Text(
+          _phase == TxaSpeedTestPhase.upload
+              ? TxaLanguage.t('upload_label')
+              : TxaLanguage.t('download_label'),
+          style: const TextStyle(color: Colors.white70, fontSize: 12),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildResultChart() {
+    String evaluation = '';
+    if (_download > 50) {
+      evaluation = TxaLanguage.t('speed_excellent');
+    } else if (_download > 20) {
+      evaluation = TxaLanguage.t('speed_good');
+    } else if (_download > 5) {
+      evaluation = TxaLanguage.t('speed_stable');
+    } else {
+      evaluation = TxaLanguage.t('speed_slow');
+    }
+
+    final maxSpeed = [_download, _upload, 1.0].reduce((a, b) => a > b ? a : b);
+
+    return Column(
+      key: const ValueKey('speed-result-chart'),
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+          decoration: BoxDecoration(
+            color: Colors.greenAccent.withValues(alpha: 0.1),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.check_circle_rounded,
+                color: Colors.greenAccent,
+                size: 14,
+              ),
+              const SizedBox(width: 6),
+              Text(
+                TxaLanguage.t('test_completed'),
+                style: const TextStyle(
+                  color: Colors.greenAccent,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  evaluation,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 13,
-                    fontStyle: FontStyle.italic,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ],
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        _buildChartBar(
+          TxaLanguage.t('download_label'),
+          _download,
+          maxSpeed,
+          TxaTheme.accent,
+        ),
+        const SizedBox(height: 10),
+        _buildChartBar(
+          TxaLanguage.t('upload_label'),
+          _upload,
+          maxSpeed,
+          Colors.orangeAccent,
+        ),
+        const SizedBox(height: 12),
+        Text(
+          evaluation,
+          style: const TextStyle(
+            color: Colors.white70,
+            fontSize: 13,
+            fontStyle: FontStyle.italic,
+          ),
+          textAlign: TextAlign.center,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildChartBar(
+    String label,
+    double value,
+    double maxValue,
+    Color color,
+  ) {
+    final factor = maxValue <= 0
+        ? 0.0
+        : (value / maxValue).clamp(0.0, 1.0).toDouble();
+    return Row(
+      children: [
+        SizedBox(
+          width: 92,
+          child: Text(
+            label,
+            style: const TextStyle(color: TxaTheme.textMuted, fontSize: 11),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(999),
+            child: LinearProgressIndicator(
+              value: factor,
+              minHeight: 10,
+              backgroundColor: Colors.white.withValues(alpha: 0.06),
+              valueColor: AlwaysStoppedAnimation<Color>(color),
             ),
           ),
+        ),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 58,
+          child: Text(
+            value.toStringAsFixed(1),
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: color,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
       ],
     );
   }

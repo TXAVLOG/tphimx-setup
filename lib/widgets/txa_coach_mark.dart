@@ -26,16 +26,19 @@ class TxaCoachMark {
   static int _currentStep = 0;
   static List<TxaCoachMarkTarget> _targets = [];
   static VoidCallback? _onFinish;
+  static Future<void> Function(int step)? _onStepChanged;
 
   static void show({
     required BuildContext context,
     required List<TxaCoachMarkTarget> targets,
     VoidCallback? onFinish,
+    Future<void> Function(int step)? onStepChanged,
   }) {
     if (targets.isEmpty) return;
     _targets = targets;
     _currentStep = 0;
     _onFinish = onFinish;
+    _onStepChanged = onStepChanged;
 
     _overlayEntry = OverlayEntry(
       builder: (context) => _CoachMarkOverlay(
@@ -49,11 +52,12 @@ class TxaCoachMark {
     Overlay.of(context).insert(_overlayEntry!);
   }
 
-  static void _next() {
+  static Future<void> _next() async {
     _currentStep++;
     if (_currentStep >= _targets.length) {
       _finish();
     } else {
+      await _onStepChanged?.call(_currentStep);
       _overlayEntry?.markNeedsBuild();
     }
   }
@@ -66,6 +70,7 @@ class TxaCoachMark {
     _overlayEntry?.remove();
     _overlayEntry = null;
     _onFinish?.call();
+    _onStepChanged = null;
   }
 
   static int get currentStep => _currentStep;
@@ -74,7 +79,7 @@ class TxaCoachMark {
 
 class _CoachMarkOverlay extends StatefulWidget {
   final List<TxaCoachMarkTarget> targets;
-  final VoidCallback onNext;
+  final Future<void> Function() onNext;
   final VoidCallback onSkip;
   final VoidCallback onFinish;
 
@@ -210,25 +215,6 @@ class _CoachMarkOverlayState extends State<_CoachMarkOverlay>
                         ),
                       );
                     }),
-                  ),
-                ),
-                // Skip button
-                GestureDetector(
-                  onTap: widget.onSkip,
-                  child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withValues(alpha: 0.08),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      TxaLanguage.t('skip'),
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
                   ),
                 ),
               ],
@@ -401,7 +387,11 @@ class _CoachMarkOverlayState extends State<_CoachMarkOverlay>
                     ),
                   ),
                 GestureDetector(
-                  onTap: isLast ? widget.onFinish : widget.onNext,
+                  onTap: isLast
+                      ? widget.onFinish
+                      : () {
+                          widget.onNext();
+                        },
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
                     decoration: BoxDecoration(

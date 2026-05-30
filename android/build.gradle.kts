@@ -23,7 +23,7 @@ subprojects {
     configurations.all {
         resolutionStrategy.eachDependency {
             if (requested.group == "androidx.media3") {
-                useVersion("1.4.1")
+                useVersion("1.10.1")
             }
         }
     }

@@ -32,6 +32,8 @@ class SpeedNotificationService : Service() {
         private const val CHANNEL_ID = "speed_service_channel_high"
         private const val NOTIFICATION_ID = 101
         private const val ACTION_RESTART_SERVICE = "com.tphimx.speed_service.RESTART"
+        private const val UPDATE_INTERVAL_MS = 1500L
+        private const val SAVE_INTERVAL_MS = 10_000L
     }
 
     private val handler = Handler(Looper.getMainLooper())
@@ -44,6 +46,10 @@ class SpeedNotificationService : Service() {
     private var totalDailyRx: Long = 0
     private var totalDailyTx: Long = 0
     private var lastResetDate: String = ""
+    private var lastUsageSaveTime: Long = 0
+    private var lastNotificationText: String = ""
+    private var cachedIconKey: String = ""
+    private var cachedIcon: IconCompat? = null
     
     // Config
     private var speedUnit: String = "Auto"
@@ -63,7 +69,7 @@ class SpeedNotificationService : Service() {
     private val updateRunnable = object : Runnable {
         override fun run() {
             updateNotification()
-            handler.postDelayed(this, 1000)
+            handler.postDelayed(this, UPDATE_INTERVAL_MS)
         }
     }
 
@@ -104,9 +110,7 @@ class SpeedNotificationService : Service() {
             val down = intent.getStringExtra("downSpeed") ?: "0 KB/s"
             val up = intent.getStringExtra("upSpeed") ?: "0 KB/s"
             
-            val notification = buildNotification(down, up)
-            val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-            notificationManager.notify(NOTIFICATION_ID, notification)
+            postNotification(down, up, force = true)
             return START_STICKY
         }
         
@@ -200,18 +204,11 @@ class SpeedNotificationService : Service() {
 
         val downSpeedStr = formatWithUnit(rxSpeed, speedUnit)
         val upSpeedStr = formatWithUnit(txSpeed, speedUnit)
-        val networkInfo = getNetworkType()
+        postNotification(downSpeedStr, upSpeedStr)
         
-        // Format daily usage
-        val totalUsageStr = formatWithUnit((totalDailyRx + totalDailyTx).toDouble(), "Auto", false)
-
-        val notification = buildNotification(downSpeedStr, upSpeedStr)
-        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        notificationManager.notify(NOTIFICATION_ID, notification)
-        
-        // Save every few updates to avoid heavy I/O
-        if (currentTime % 5000 < 1000) {
+        if (currentTime - lastUsageSaveTime >= SAVE_INTERVAL_MS) {
             saveUsageData()
+            lastUsageSaveTime = currentTime
         }
     }
 
@@ -306,7 +303,7 @@ class SpeedNotificationService : Service() {
         }
 
         val builder = NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(createSpeedIcon(downSpeedStr))
+            .setSmallIcon(getSpeedIcon(downSpeedStr))
             .setCustomContentView(remoteViews)
             .setCustomBigContentView(remoteViews) // Same for expanded
             .setStyle(NotificationCompat.DecoratedCustomViewStyle())
@@ -315,24 +312,45 @@ class SpeedNotificationService : Service() {
             .setOngoing(true)
             .setOnlyAlertOnce(true)
             .setSilent(true)
-            .setPriority(NotificationCompat.PRIORITY_MAX)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
             .setCategory(NotificationCompat.CATEGORY_SERVICE) // AS REQUESTED
             .setVisibility(NotificationCompat.VISIBILITY_PUBLIC)
-            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_IMMEDIATE)
+            .setForegroundServiceBehavior(NotificationCompat.FOREGROUND_SERVICE_DEFERRED)
             .setShowWhen(false)
 
         return builder.build()
     }
 
+    private fun postNotification(downSpeedStr: String, upSpeedStr: String, force: Boolean = false) {
+        val textKey = "$downSpeedStr|$upSpeedStr|${getNetworkType()}"
+        if (!force && textKey == lastNotificationText) return
+
+        lastNotificationText = textKey
+        val notification = buildNotification(downSpeedStr, upSpeedStr)
+        val notificationManager = getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+        notificationManager.notify(NOTIFICATION_ID, notification)
+    }
+
+    private fun getSpeedIcon(speedText: String): IconCompat {
+        val key = speedText.trim()
+        val currentIcon = cachedIcon
+        if (key == cachedIconKey && currentIcon != null) return currentIcon
+
+        val icon = createSpeedIcon(key)
+        cachedIconKey = key
+        cachedIcon = icon
+        return icon
+    }
+
     private fun createSpeedIcon(speedText: String): IconCompat {
         val parts = speedText.split(" ")
         var valueStr = "0"
-        var unitStr = "KB" // Default
+        var unitStr = "KB/s" // Default
         if (parts.size >= 2) {
             valueStr = parts[0]
-            // Take unit prefix: KB, MB, GB, TB, B
-            val rawUnit = parts[1].replace("/s", "")
-            unitStr = if (rawUnit.length <= 2) rawUnit.uppercase() else rawUnit.take(2).uppercase()
+            val rawUnit = parts[1].replace("/s", "").uppercase()
+            val unitPrefix = if (rawUnit.length <= 2) rawUnit else rawUnit.take(2)
+            unitStr = "$unitPrefix/s"
         }
         
         val valueFloat = valueStr.toFloatOrNull() ?: 0f
@@ -350,21 +368,21 @@ class SpeedNotificationService : Service() {
         // Android status bar icons use the ALPHA channel to colorize
         val paintValue = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = if (displayValue.length > 3) 50f else 68f
+            textSize = if (displayValue.length > 3) 46f else 58f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
 
         val paintUnit = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = 36f
+            textSize = if (unitStr.length > 3) 26f else 30f
             typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
             textAlign = Paint.Align.CENTER
         }
 
         // Draw value and unit
-        canvas.drawText(displayValue, size / 2f, size * 0.50f, paintValue)
-        canvas.drawText(unitStr, size / 2f, size * 0.90f, paintUnit)
+        canvas.drawText(displayValue, size / 2f, size * 0.48f, paintValue)
+        canvas.drawText(unitStr, size / 2f, size * 0.86f, paintUnit)
 
         return IconCompat.createWithBitmap(bitmap)
     }
@@ -372,13 +390,12 @@ class SpeedNotificationService : Service() {
     private fun createNotificationChannel() {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             val manager = getSystemService(NotificationManager::class.java)
-            // Re-create to ensure importance is updated
-            manager.deleteNotificationChannel(CHANNEL_ID)
+            if (manager.getNotificationChannel(CHANNEL_ID) != null) return
 
             val serviceChannel = NotificationChannel(
                 CHANNEL_ID,
                 txtTitle,
-                NotificationManager.IMPORTANCE_HIGH // HIGH instead of MAX to be slightly less intrusive but still primary
+                NotificationManager.IMPORTANCE_LOW
             ).apply {
                 description = "Hiển thị tốc độ mạng thời gian thực"
                 setShowBadge(false)

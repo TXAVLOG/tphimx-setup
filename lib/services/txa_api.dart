@@ -4,11 +4,11 @@ import '../services/txa_settings.dart';
 import '../utils/txa_logger.dart';
 
 class TxaApi {
-  static const String baseUrl = 'https://film.nrotxa.online';
+  static const String baseUrl = 'https://dongmephim.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '4.2.9';
-  static const String buildNumber = '429';
+  static const String apiVersion = '4.3.0';
+  static const String buildNumber = '430';
 
   // Community Links
   static const String facebookFanpage =
@@ -130,24 +130,40 @@ class TxaApi {
     }
   }
 
+  Map<String, dynamic> _safeMap(dynamic data) {
+    if (data is Map<String, dynamic>) return data;
+    TxaLogger.log(
+      'API_TYPE_ERROR: Expected Map, got ${data.runtimeType}',
+      isError: true,
+    );
+    return {};
+  }
+
   // ============ Implementation methods ============
 
   /// Lấy dữ liệu trang chủ (featured, latest, hot, anime, series, single, categories)
   Future<Map<String, dynamic>> getHome() async {
     final response = await get(home);
-    return response.data;
+    return _safeMap(response.data);
   }
 
   /// Lấy chi tiết phim
   Future<Map<String, dynamic>> getMovie(String slug) async {
     final response = await get(movieDetail(slug));
-    return response.data;
+    return _safeMap(response.data);
   }
 
   /// Lấy link tập phim
   Future<Map<String, dynamic>?> getEpisodeLink(String episodeId) async {
     try {
       final response = await get('$apiPrefix/episode/$episodeId/link');
+      if (response.data is! Map<String, dynamic>) {
+        TxaLogger.log(
+          'API_EPISODE_ERROR: Expected Map, got ${response.data.runtimeType}',
+          isError: true,
+        );
+        return null;
+      }
       return response.data['data'];
     } catch (e) {
       TxaLogger.log('Get Episode Link Error: $e', isError: true);
@@ -170,13 +186,13 @@ class TxaApi {
     if (year != null) params['year'] = year;
     if (movieType != null) params['type'] = movieType;
     final response = await get(search, queryParameters: params);
-    return response.data;
+    return _safeMap(response.data);
   }
 
   /// Lấy phim theo thể loại
   Future<Map<String, dynamic>> getCategory(String slug, {int page = 1}) async {
     final response = await get(category(slug), queryParameters: {'page': page});
-    return response.data;
+    return _safeMap(response.data);
   }
 
   /// Lấy phim theo loại (series/single)
@@ -185,31 +201,38 @@ class TxaApi {
       type(movieType),
       queryParameters: {'page': page},
     );
-    return response.data;
+    return _safeMap(response.data);
   }
 
   /// Lấy lịch chiếu
   Future<Map<String, dynamic>> getSchedule() async {
     final response = await get(schedule);
-    return response.data;
+    return _safeMap(response.data);
   }
 
   /// Lấy bộ lọc (thể loại, quốc gia, năm)
   Future<Map<String, dynamic>> getFilters() async {
     final response = await get(filters);
-    return response.data;
+    return _safeMap(response.data);
   }
 
   /// Lấy hot search (phim được tìm nhiều nhất)
   Future<Map<String, dynamic>> getHotSearch({int limit = 10}) async {
     final response = await get(hotSearch, queryParameters: {'limit': limit});
-    return response.data;
+    return _safeMap(response.data);
   }
 
   /// Kiểm tra cập nhật
   Future<Map<String, dynamic>> getCheckUpdate() async {
     final response = await get(checkUpdate);
-    return response.data;
+    if (response.data is! Map<String, dynamic>) {
+      TxaLogger.log(
+        'API_UPDATE_ERROR: Expected Map, got ${response.data.runtimeType}',
+        isError: true,
+      );
+      return {};
+    }
+    return _safeMap(response.data);
   }
 
   /// Lấy lịch sử cập nhật
@@ -235,7 +258,7 @@ class TxaApi {
       searchClick,
       data: {'movie_id': movieId, 'keyword': keyword, 'platform': 'app'},
     );
-    return response.data;
+    return _safeMap(response.data);
   }
 
   // Auth Methods
@@ -268,7 +291,7 @@ class TxaApi {
 
   Future<Map<String, dynamic>> getAuthMe() async {
     final response = await get(authMe);
-    return response.data;
+    return _safeMap(response.data);
   }
 
   Future<Map<String, dynamic>> verifyEmail(String token) async {
@@ -287,37 +310,37 @@ class TxaApi {
 
   Future<Map<String, dynamic>> markNotificationRead(String id) async {
     final response = await post(readNotification, data: {'id': id});
-    return response.data;
+    return _safeMap(response.data);
   }
 
   Future<Map<String, dynamic>> clearNotifications() async {
     final response = await post(clearNotificationsUrl);
-    return response.data;
+    return _safeMap(response.data);
   }
 
   Future<Map<String, dynamic>> markAllRead() async {
     final response = await post(readAllNotificationsUrl);
-    return response.data;
+    return _safeMap(response.data);
   }
 
   Future<Map<String, dynamic>> getFavorites() async {
     final response = await get(favorites);
-    return response.data;
+    return _safeMap(response.data);
   }
 
   Future<Map<String, dynamic>> toggleFavorite(int movieId) async {
     final response = await post(toggleFavoriteUrl, data: {'movie_id': movieId});
-    return response.data;
+    return _safeMap(response.data);
   }
 
   Future<Map<String, dynamic>> getWatchHistory() async {
     final response = await get(watchHistory);
-    return response.data;
+    return _safeMap(response.data);
   }
 
   Future<Map<String, dynamic>> clearWatchHistory() async {
     final response = await post(clearWatchHistoryUrl);
-    return response.data;
+    return _safeMap(response.data);
   }
 
   Future<Map<String, dynamic>> updateWatchHistory({
@@ -335,7 +358,7 @@ class TxaApi {
         'duration': duration,
       },
     );
-    return response.data;
+    return _safeMap(response.data);
   }
 
   /// Ghi log lỗi từ client về server
@@ -351,7 +374,7 @@ class TxaApi {
           'type': type,
           'message': message,
           'extra': extra,
-          'device_info': 'TPhimX-App-V4.2.9',
+          'device_info': 'TPhimX-App-V4.3.0',
           'timestamp': DateTime.now().toIso8601String(),
         },
       );

@@ -17,11 +17,9 @@ import 'services/txa_settings.dart';
 import 'services/txa_network.dart';
 import 'services/search_provider.dart';
 import 'theme/txa_theme.dart';
-import 'services/txa_mini_player_provider.dart';
 import 'services/txa_shortcut_service.dart';
 import 'services/favorite_provider.dart';
 import 'services/notification_provider.dart';
-import 'widgets/txa_mini_player.dart';
 import 'utils/txa_logger.dart';
 import 'pages/home_screen.dart';
 import 'pages/movie_detail_screen.dart';
@@ -43,23 +41,26 @@ void main() async {
   print('TXA_BOOT: main() started');
   final widgetsBinding = WidgetsFlutterBinding.ensureInitialized();
   print('TXA_BOOT: WidgetsBinding initialized');
-  
+
   TxaLogger.init();
   print('TXA_BOOT: TxaLogger.init() called');
-  
+
   FlutterNativeSplash.preserve(widgetsBinding: widgetsBinding);
   print('TXA_BOOT: NativeSplash preserved');
 
   try {
     print('TXA_BOOT: Initializing Settings...');
-    await TxaSettings.init().timeout(const Duration(seconds: 5), onTimeout: () {
-      print('TXA_BOOT: Settings Init TIMEOUT!');
-      throw Exception('Settings Init Timeout');
-    });
+    await TxaSettings.init().timeout(
+      const Duration(seconds: 5),
+      onTimeout: () {
+        print('TXA_BOOT: Settings Init TIMEOUT!');
+        throw Exception('Settings Init Timeout');
+      },
+    );
     print('TXA_BOOT: Settings initialized.');
 
     // TxaLanguage.init(), TxaDownloadManager().init() and Timezone moved to SplashScreen for faster initial boot
-    
+
     print('TXA_BOOT: Initializing Background Service...');
     TxaBackgroundService.init()
         .then((_) {
@@ -75,7 +76,9 @@ void main() async {
         .then((_) {
           print('TXA_BOOT: Speed Service initialized.');
           TxaSpeedService.toggleSpeedNotification(
-            TxaSettings.isInitialized ? TxaSettings.showSpeedInNotification : false,
+            TxaSettings.isInitialized
+                ? TxaSettings.showSpeedInNotification
+                : false,
           );
         })
         .catchError((e) {
@@ -105,13 +108,15 @@ void main() async {
 
   // Set System UI Mode for better Nav Bar behavior
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
-    systemNavigationBarColor: Colors.transparent,
-    systemNavigationBarDividerColor: Colors.transparent,
-    systemNavigationBarIconBrightness: Brightness.light,
-    statusBarColor: Colors.transparent,
-    statusBarIconBrightness: Brightness.light,
-  ));
+  SystemChrome.setSystemUIOverlayStyle(
+    const SystemUiOverlayStyle(
+      systemNavigationBarColor: Colors.transparent,
+      systemNavigationBarDividerColor: Colors.transparent,
+      systemNavigationBarIconBrightness: Brightness.light,
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.light,
+    ),
+  );
 
   // Handle Deep Links
   final appLinks = AppLinks();
@@ -127,15 +132,14 @@ void main() async {
           ProxyProvider2<TxaApi, TxaNetwork, TxaHistorySyncService>(
             update: (_, api, network, _) => TxaHistorySyncService(api, network),
           ),
-          ChangeNotifierProvider<SearchProvider>(create: (_) => SearchProvider()),
+          ChangeNotifierProvider<SearchProvider>(
+            create: (_) => SearchProvider(),
+          ),
           ChangeNotifierProvider<FavoriteProvider>(
             create: (context) => FavoriteProvider(context.read<TxaApi>()),
           ),
           ChangeNotifierProvider<NotificationProvider>(
             create: (context) => NotificationProvider(context.read<TxaApi>()),
-          ),
-          ChangeNotifierProvider<TxaMiniPlayerProvider>(
-            create: (_) => TxaMiniPlayerProvider(),
           ),
           ChangeNotifierProvider<TxaDownloadManager>.value(
             value: TxaDownloadManager(),
@@ -148,17 +152,19 @@ void main() async {
   } catch (e) {
     TxaLogger.log('Fatal Error in runApp: $e', isError: true, tag: 'FATAL');
     // Ensure we at least show something
-    runApp(MaterialApp(
-      home: Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: Text(
-            'Fatal Startup Error: $e',
-            style: const TextStyle(color: Colors.redAccent),
+    runApp(
+      MaterialApp(
+        home: Scaffold(
+          backgroundColor: Colors.black,
+          body: Center(
+            child: Text(
+              'Fatal Startup Error: $e',
+              style: const TextStyle(color: Colors.redAccent),
+            ),
           ),
         ),
       ),
-    ));
+    );
   }
 }
 
@@ -171,7 +177,6 @@ class TPhimXApp extends StatefulWidget {
 }
 
 class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
-  final GlobalKey<NavigatorState> _navigatorKey = GlobalKey<NavigatorState>();
   late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
 
@@ -213,23 +218,25 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
       // Check if we are already on a route that is SplashScreen
       // (This prevents infinite push loops)
       bool alreadyOnSplash = false;
-      _navigatorKey.currentState?.popUntil((route) {
+      TxaSettings.navigatorKey.currentState?.popUntil((route) {
         if (route.settings.name == 'SplashScreen') {
           alreadyOnSplash = true;
         }
-        return true; 
+        return true;
       });
 
       if (alreadyOnSplash) return;
 
-      TxaLogger.log('[Permission] Mandatory permission revoked, returning to Splash');
+      TxaLogger.log(
+        '[Permission] Mandatory permission revoked, returning to Splash',
+      );
 
-      _navigatorKey.currentState?.pushAndRemoveUntil(
+      TxaSettings.navigatorKey.currentState?.pushAndRemoveUntil(
         MaterialPageRoute(
           settings: const RouteSettings(name: 'SplashScreen'),
           builder: (ctx) => SplashScreen(
             onFinish: () {
-              _navigatorKey.currentState?.pushAndRemoveUntil(
+              TxaSettings.navigatorKey.currentState?.pushAndRemoveUntil(
                 MaterialPageRoute(builder: (ctx) => const MainEntry()),
                 (route) => false,
               );
@@ -297,9 +304,9 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
     int attempts = 0;
     Timer.periodic(const Duration(milliseconds: 300), (timer) {
       attempts++;
-      if (_navigatorKey.currentState != null) {
+      if (TxaSettings.navigatorKey.currentState != null) {
         timer.cancel();
-        _navigatorKey.currentState?.push(
+        TxaSettings.navigatorKey.currentState?.push(
           MaterialPageRoute(builder: (ctx) => MovieDetailScreen(slug: slug)),
         );
       } else if (attempts > 15) {
@@ -325,7 +332,7 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
     if (uri.path.contains('verify-email')) {
       final token = uri.queryParameters['token'];
       if (token != null) {
-        _navigatorKey.currentState?.push(
+        TxaSettings.navigatorKey.currentState?.push(
           MaterialPageRoute(
             builder: (ctx) => EmailVerificationScreen(token: token),
           ),
@@ -344,7 +351,9 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
 
   @override
   Widget build(BuildContext context) {
-    final String fontFamily = TxaSettings.isInitialized ? TxaSettings.fontFamily : 'Outfit';
+    final String fontFamily = TxaSettings.isInitialized
+        ? TxaSettings.fontFamily
+        : 'Outfit';
     TextTheme? textTheme;
 
     switch (fontFamily) {
@@ -409,7 +418,7 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
     }
 
     return MaterialApp(
-      navigatorKey: _navigatorKey,
+      navigatorKey: TxaSettings.navigatorKey,
       title: 'TPhimX Premium',
       debugShowCheckedModeBanner: false,
       theme: TxaTheme.darkTheme.copyWith(textTheme: textTheme),
@@ -426,7 +435,6 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
                 children: [
                   child ?? const SizedBox.shrink(),
                   const TxaDownloadMiniProgress(),
-                  const TxaMiniPlayer(),
                 ],
               ),
             ),
@@ -513,15 +521,7 @@ class _MainEntryState extends State<MainEntry> {
     _checkConnectivity();
     TxaShortcutService.init((type) {
       if (!mounted) return;
-      final miniProvider = context.read<TxaMiniPlayerProvider>();
-
       switch (type) {
-        case 'action_player_play_pause':
-          miniProvider.playPause();
-          break;
-        case 'action_player_close':
-          miniProvider.close();
-          break;
         case 'action_check_update':
           TxaBackgroundService.manualCheckUpdate();
           break;

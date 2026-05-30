@@ -73,3 +73,10 @@ app.*.map.json
 **/ios/Flutter/Flutter.podspec
 **/ios/DerivedData/
 **/ios/.generated/
+
+.vercel
+
+# Node.js related
+node_modules/
+package.json
+package-lock.json

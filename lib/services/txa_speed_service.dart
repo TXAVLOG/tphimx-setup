@@ -1,19 +1,18 @@
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
-import 'package:speed_checker_plugin/speed_checker_plugin.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
 import '../utils/txa_logger.dart';
 import '../services/txa_settings.dart';
 import '../services/txa_language.dart';
 import '../services/txa_api.dart';
 
+enum TxaSpeedTestPhase { ping, download, upload, complete }
+
 class TxaSpeedService {
   static const MethodChannel _channel = MethodChannel(
     'com.tphimx/speed_service',
   );
-  static final _speedChecker = SpeedCheckerPlugin();
 
   static double _currentDownload = 0;
   static double _currentUpload = 0;
@@ -81,6 +80,23 @@ class TxaSpeedService {
   static Future<bool> checkSpeed({
     Function(double down, double up, double progress)? onProgress,
   }) async {
+    return checkSpeedPhased(
+      onProgress: (phase, down, up, progress) {
+        onProgress?.call(down, up, phase == TxaSpeedTestPhase.upload
+            ? 0.5 + progress * 0.5
+            : progress * 0.5);
+      },
+    );
+  }
+
+  static Future<bool> checkSpeedPhased({
+    Function(
+      TxaSpeedTestPhase phase,
+      double down,
+      double up,
+      double progress,
+    )? onProgress,
+  }) async {
     if (_isTesting) return false;
 
     if (Platform.isAndroid) {
@@ -99,66 +115,40 @@ class TxaSpeedService {
     _currentDownload = 0;
     _currentUpload = 0;
 
-    final completer = Completer<bool>();
-    StreamSubscription? subscription;
-
     try {
-      subscription = _speedChecker.speedTestResultStream.listen(
-        (result) {
-          final dynamic res = result;
-          double progress = 0;
-          try {
-            if (res is Map) {
-              _currentDownload = (res['downloadSpeed'] as num?)?.toDouble() ?? 0;
-              _currentUpload = (res['uploadSpeed'] as num?)?.toDouble() ?? 0;
-              progress = (res['progress'] as num?)?.toDouble() ?? 0;
-            } else {
-              _currentDownload = (res.downloadSpeed as num?)?.toDouble() ?? 0;
-              _currentUpload = (res.uploadSpeed as num?)?.toDouble() ?? 0;
-              // Some versions might not have progress field, we estimate
-              progress = (_currentDownload > 0 ? 0.5 : 0) + (_currentUpload > 0 ? 0.5 : 0);
-            }
-          } catch (e) {
-            TxaLogger.log('Error parsing speed result: $e');
-          }
-
-          if (onProgress != null) onProgress(_currentDownload, _currentUpload, progress);
-        },
-        onError: (e) {
-          TxaLogger.log('Speed test stream error: $e');
-          if (!completer.isCompleted) completer.complete(false);
-        },
-        onDone: () {
-          if (!completer.isCompleted) completer.complete(true);
+      await _checkSpeedByDownload(
+        onProgress: (down, up, progress) {
+          onProgress?.call(
+            TxaSpeedTestPhase.download,
+            down,
+            up,
+            progress.clamp(0.0, 1.0).toDouble(),
+          );
         },
       );
 
-      _speedChecker.startSpeedTest();
-
-      // Wait until completer finishes or timeout (60s)
-      final result = await completer.future.timeout(
-        const Duration(seconds: 60),
-        onTimeout: () {
-          TxaLogger.log('Speed test timed out, falling back to download test');
-          return false;
+      await _checkSpeedByUpload(
+        onProgress: (down, up, progress) {
+          onProgress?.call(
+            TxaSpeedTestPhase.upload,
+            down,
+            up,
+            progress.clamp(0.0, 1.0).toDouble(),
+          );
         },
       );
 
-      if (!result) {
-        // Fallback to manual download test
-        return await _checkSpeedByDownload(onProgress: onProgress);
-      }
-      return true;
+      onProgress?.call(
+        TxaSpeedTestPhase.complete,
+        _currentDownload,
+        _currentUpload,
+        1,
+      );
+      return _currentDownload > 0 || _currentUpload > 0;
     } catch (e) {
-      TxaLogger.log('Speed test error: $e');
-      // Final attempt fallback on any exception
-      try {
-        return await _checkSpeedByDownload(onProgress: onProgress);
-      } catch (_) {
-        return false;
-      }
+      TxaLogger.log('Manual speed test error: $e');
+      return false;
     } finally {
-      subscription?.cancel();
       _isTesting = false;
     }
   }
@@ -190,6 +180,53 @@ class TxaSpeedService {
       return true;
     } catch (e) {
       TxaLogger.log('Fallback speed test error: $e');
+      return false;
+    } finally {
+      client.close();
+    }
+  }
+
+  static Future<bool> _checkSpeedByUpload({
+    Function(double down, double up, double progress)? onProgress,
+  }) async {
+    TxaLogger.log('Starting upload speed test...');
+    final client = HttpClient();
+    final stopwatch = Stopwatch()..start();
+    const totalBytes = 4 * 1024 * 1024;
+    const chunkSize = 64 * 1024;
+    final chunk = List<int>.filled(chunkSize, 7);
+    int uploadedBytes = 0;
+
+    try {
+      final request = await client.postUrl(
+        Uri.parse('https://speed.cloudflare.com/__up'),
+      );
+      request.headers.contentType = ContentType.binary;
+      request.contentLength = totalBytes;
+
+      while (uploadedBytes < totalBytes) {
+        final remaining = totalBytes - uploadedBytes;
+        final currentChunk = remaining >= chunkSize
+            ? chunk
+            : List<int>.filled(remaining, 7);
+        request.add(currentChunk);
+        uploadedBytes += currentChunk.length;
+        await request.flush();
+
+        final elapsedSec = stopwatch.elapsedMilliseconds / 1000.0;
+        if (elapsedSec > 0) {
+          _currentUpload = (uploadedBytes * 8 / (1024 * 1024)) / elapsedSec;
+          final progress = uploadedBytes / totalBytes;
+          onProgress?.call(_currentDownload, _currentUpload, progress);
+        }
+      }
+
+      final response = await request.close();
+      await response.drain<void>();
+      stopwatch.stop();
+      return response.statusCode >= 200 && response.statusCode < 400;
+    } catch (e) {
+      TxaLogger.log('Upload speed test error: $e');
       return false;
     } finally {
       client.close();

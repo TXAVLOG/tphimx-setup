@@ -12,7 +12,6 @@ import '../widgets/txa_error_widget.dart';
 import 'package:share_plus/share_plus.dart';
 import '../services/txa_settings.dart';
 import '../utils/txa_logger.dart';
-import '../services/txa_mini_player_provider.dart';
 import '../services/favorite_provider.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
@@ -114,9 +113,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
           initialTime = (history['current_time'] as num).toDouble();
         }
 
-        final miniProvider = context.read<TxaMiniPlayerProvider>();
-        if (!miniProvider.isClosed) miniProvider.close();
-
         Navigator.push(
           context,
           MaterialPageRoute(
@@ -170,7 +166,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
     final movie = _data!['movie'];
     final bannerUrl = movie['poster_url'] ?? movie['thumb_url'] ?? '';
     final shareText =
-        '${movie['name']} - ${TxaLanguage.t('app_slogan')}\nXem ngay tại: https://film.nrotxa.online/movie/${widget.slug}';
+        '${movie['name']} - ${TxaLanguage.t('app_slogan')}\nXem ngay tại: https://dongmephim.online/movies/${widget.slug}';
 
     if (bannerUrl.isEmpty) {
       SharePlus.instance.share(
@@ -395,10 +391,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                           final s = _data!['servers'] as List? ?? [];
                           if (s.isNotEmpty &&
                               (s[0]['server_data'] as List).isNotEmpty) {
-                            final miniProvider = context
-                                .read<TxaMiniPlayerProvider>();
-                            if (!miniProvider.isClosed) miniProvider.close();
-
                             final history = _data!['history'];
                             String epId = s[0]['server_data'][0]['id']
                                 .toString();
@@ -453,10 +445,58 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                               );
                             },
                           ),
-                          _IconBtn(
-                            icon: Icons.download_rounded,
-                            label: TxaLanguage.t('download'),
-                            onTap: _showDownloadSelection,
+                          Consumer<TxaDownloadManager>(
+                            builder: (context, downloadManager, child) {
+                              final movieId = _data!['movie']['id'].toString();
+                              final servers = _data!['servers'] as List? ?? [];
+                              final totalEpisodes = servers.isNotEmpty
+                                  ? (servers[0]['server_data'] as List? ?? [])
+                                        .length
+                                  : 0;
+
+                              final status = downloadManager
+                                  .getMovieDownloadStatus(
+                                    movieId,
+                                    totalEpisodes,
+                                  );
+                              final downloadedCount =
+                                  status['downloadedEpisodes'] as int;
+                              final isFullyDownloaded =
+                                  status['isFullyDownloaded'] as bool;
+                              final isPartiallyDownloaded =
+                                  status['isPartiallyDownloaded'] as bool;
+                              final hasActive =
+                                  status['hasActiveDownloads'] as bool;
+
+                              IconData icon;
+                              String label;
+                              Color? color;
+
+                              if (isFullyDownloaded) {
+                                icon = Icons.check_circle_rounded;
+                                label = 'Đã tải xong';
+                                color = Colors.greenAccent;
+                              } else if (hasActive) {
+                                icon = Icons.downloading_rounded;
+                                label = 'Đang tải...';
+                                color = TxaTheme.accent;
+                              } else if (isPartiallyDownloaded) {
+                                icon = Icons.download_done_rounded;
+                                label = '$downloadedCount/$totalEpisodes tập';
+                                color = Colors.orangeAccent;
+                              } else {
+                                icon = Icons.download_rounded;
+                                label = TxaLanguage.t('download');
+                                color = Colors.white;
+                              }
+
+                              return _IconBtn(
+                                icon: icon,
+                                label: label,
+                                color: color,
+                                onTap: _showDownloadSelection,
+                              );
+                            },
                           ),
                           _IconBtn(
                             icon: Icons.share_rounded,
@@ -819,11 +859,6 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                 return GestureDetector(
                   onTap: () {
                     if (servers.isNotEmpty) {
-                      // CLOSE MINI PLAYER IF ACTIVE
-                      final miniProvider = context
-                          .read<TxaMiniPlayerProvider>();
-                      if (!miniProvider.isClosed) miniProvider.close();
-
                       Navigator.push(
                         context,
                         MaterialPageRoute(
@@ -1208,7 +1243,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
 
                                     if (downloadUrl != null &&
                                         downloadUrl.isNotEmpty) {
-                                      TxaDownloadManager().addTask(
+                                      await TxaDownloadManager().addTask(
                                         movieId: movieData['movie']['id']
                                             .toString(),
                                         movieTitle: movieData['movie']['name'],
@@ -1225,7 +1260,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                       failCount++;
                                       TxaLogger.log(
                                         'No link found for episode $epId (${movieData['movie']['slug']})',
-                                        type: 'download',
+                                        type: 'downloads',
                                         isError: true,
                                       );
                                     }
@@ -1233,7 +1268,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                     failCount++;
                                     TxaLogger.log(
                                       'Download All Loop Error: $e',
-                                      type: 'download',
+                                      type: 'downloads',
                                       isError: true,
                                     );
                                   }
@@ -1248,7 +1283,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                     TxaLogger.log(
                                       'Started downloading all episodes for movie: ${movieData['movie']['name']}',
                                       tag: 'DOWNLOAD',
-                                      type: 'download',
+                                      type: 'downloads',
                                     );
                                     TxaToast.show(
                                       context,
@@ -1352,10 +1387,13 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                               ),
                             );
 
-                            final isDownloading = txaTask.id.isNotEmpty && 
-                                (txaTask.status == DownloadStatus.downloading || 
-                                 txaTask.status == DownloadStatus.pending);
-                            final isDone = txaTask.id.isNotEmpty && txaTask.status == DownloadStatus.completed;
+                            final isDownloading =
+                                txaTask.id.isNotEmpty &&
+                                (txaTask.status == DownloadStatus.downloading ||
+                                    txaTask.status == DownloadStatus.pending);
+                            final isDone =
+                                txaTask.id.isNotEmpty &&
+                                txaTask.status == DownloadStatus.completed;
 
                             return ListTile(
                               contentPadding: EdgeInsets.zero,
@@ -1372,7 +1410,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                     ? txaTask.statusDisplay
                                     : currentServer['server_name'],
                                 style: TextStyle(
-                                  color: isDownloading ? TxaTheme.accent : TxaTheme.textMuted,
+                                  color: isDownloading
+                                      ? TxaTheme.accent
+                                      : TxaTheme.textMuted,
                                   fontSize: 10,
                                 ),
                               ),
@@ -1383,19 +1423,23 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                         vertical: 4,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: (isDone ? Colors.green : TxaTheme.accent).withValues(
-                                          alpha: 0.1,
-                                        ),
+                                        color:
+                                            (isDone
+                                                    ? Colors.green
+                                                    : TxaTheme.accent)
+                                                .withValues(alpha: 0.1),
                                         borderRadius: BorderRadius.circular(8),
                                       ),
                                       child: Text(
-                                        isDone 
+                                        isDone
                                             ? TxaLanguage.t('downloaded')
-                                            : isDownloading 
-                                                ? TxaLanguage.t('downloading')
-                                                : TxaLanguage.t('paused'),
+                                            : isDownloading
+                                            ? TxaLanguage.t('downloading')
+                                            : TxaLanguage.t('paused'),
                                         style: TextStyle(
-                                          color: isDone ? Colors.green : TxaTheme.accent,
+                                          color: isDone
+                                              ? Colors.green
+                                              : TxaTheme.accent,
                                           fontSize: 11,
                                           fontWeight: FontWeight.bold,
                                         ),
@@ -1404,7 +1448,9 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                   : Container(
                                       padding: const EdgeInsets.all(8),
                                       decoration: BoxDecoration(
-                                        color: Colors.white.withValues(alpha: 0.05),
+                                        color: Colors.white.withValues(
+                                          alpha: 0.05,
+                                        ),
                                         shape: BoxShape.circle,
                                       ),
                                       child: const Icon(
@@ -1421,7 +1467,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
 
                                       TxaLogger.log(
                                         'Manual download triggered for Ep $epId',
-                                        type: 'download',
+                                        type: 'downloads',
                                       );
 
                                       String? downloadUrl;
@@ -1429,12 +1475,14 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                       try {
                                         linkData = await TxaApi()
                                             .getEpisodeLink(epId)
-                                            .timeout(const Duration(seconds: 10));
+                                            .timeout(
+                                              const Duration(seconds: 10),
+                                            );
                                         downloadUrl = linkData?['link'];
                                       } catch (e) {
                                         TxaLogger.log(
                                           'Single Link Fetch Error: $e',
-                                          type: 'download',
+                                          type: 'downloads',
                                           isError: true,
                                         );
                                       }
@@ -1451,25 +1499,38 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
 
                                       if (downloadUrl != null &&
                                           downloadUrl.isNotEmpty) {
-                                        await TxaDownloadManager().addTask(
-                                          movieId: movieData['movie']['id'].toString(),
-                                          movieTitle: movieData['movie']['name'],
-                                          episodeId: epId,
-                                          episodeTitle: epName,
-                                          url: downloadUrl,
-                                          poster: movieData['movie']['thumb_url'],
-                                          format: downloadUrl.contains('.m3u8')
-                                              ? 'm3u8'
-                                              : 'mp4',
-                                        );
-
-                                        if (mounted) {
-                                          _showDownloadProgressBottomSheet(
-                                            context,
-                                            "${movieData['movie']['id']}_$epId",
+                                        try {
+                                          await TxaDownloadManager().addTask(
+                                            movieId: movieData['movie']['id']
+                                                .toString(),
+                                            movieTitle:
+                                                movieData['movie']['name'],
+                                            episodeId: epId,
+                                            episodeTitle: epName,
+                                            url: downloadUrl,
+                                            poster:
+                                                movieData['movie']['thumb_url'],
+                                            format: downloadUrl.contains('.m3u8')
+                                                ? 'm3u8'
+                                                : 'mp4',
                                           );
+
+                                          if (mounted) {
+                                            _showDownloadProgressBottomSheet(
+                                              context,
+                                              "${movieData['movie']['id']}_$epId",
+                                            );
+                                          }
+                                          setModalState(() {});
+                                        } catch (e) {
+                                          if (mounted) {
+                                            TxaToast.show(
+                                              context,
+                                              "${TxaLanguage.t('cannot_download_episode')}: $e",
+                                              isError: true,
+                                            );
+                                          }
                                         }
-                                        setModalState(() {});
                                       } else {
                                         if (mounted) {
                                           TxaToast.show(
@@ -1545,21 +1606,21 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                           color: isDone
                               ? TxaTheme.accent.withValues(alpha: 0.1)
                               : isError
-                                  ? Colors.redAccent.withValues(alpha: 0.1)
-                                  : Colors.white.withValues(alpha: 0.05),
+                              ? Colors.redAccent.withValues(alpha: 0.1)
+                              : Colors.white.withValues(alpha: 0.05),
                           borderRadius: BorderRadius.circular(12),
                         ),
                         child: Icon(
                           isDone
                               ? Icons.download_done_rounded
                               : isError
-                                  ? Icons.error_outline_rounded
-                                  : Icons.downloading_rounded,
+                              ? Icons.error_outline_rounded
+                              : Icons.downloading_rounded,
                           color: isDone
                               ? TxaTheme.accent
                               : isError
-                                  ? Colors.redAccent
-                                  : Colors.white70,
+                              ? Colors.redAccent
+                              : Colors.white70,
                         ),
                       ),
                       const SizedBox(width: 12),
@@ -1582,8 +1643,8 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                 color: isDone
                                     ? TxaTheme.accent
                                     : isError
-                                        ? Colors.redAccent
-                                        : TxaTheme.textMuted,
+                                    ? Colors.redAccent
+                                    : TxaTheme.textMuted,
                                 fontSize: 13,
                               ),
                             ),
@@ -1644,6 +1705,34 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                           ),
                       ],
                     ),
+                    if (task.status == DownloadStatus.downloading) ...[
+                      const SizedBox(height: 8),
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              const Icon(Icons.speed_rounded, color: TxaTheme.textMuted, size: 12),
+                              const SizedBox(width: 4),
+                              Text(
+                                TxaFormat.formatSpeed(task.networkSpeed)['display'],
+                                style: const TextStyle(color: TxaTheme.textMuted, fontSize: 10),
+                              ),
+                            ],
+                          ),
+                          Row(
+                            children: [
+                              const Icon(Icons.timer_outlined, color: TxaTheme.textMuted, size: 12),
+                              const SizedBox(width: 4),
+                              Text(
+                                task.timeRemaining != null ? TxaFormat.formatTime(task.timeRemaining!.inSeconds) : '--:--',
+                                style: const TextStyle(color: TxaTheme.textMuted, fontSize: 10),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ],
                   ],
                 ],
               ),

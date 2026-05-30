@@ -139,4 +139,8 @@ class TxaLogger {
 
     await log(buffer.toString(), isError: isError, tag: 'API', type: 'api');
   }
+
+  static Future<String> getActiveLogPath() async {
+    return await _logPath;
+  }
 }

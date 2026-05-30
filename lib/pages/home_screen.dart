@@ -73,17 +73,25 @@ class _HomeScreenState extends State<HomeScreen> {
   final GlobalKey _movieSectionKey = GlobalKey();
   final GlobalKey _navKey = GlobalKey();
 
-  late List<Widget> _tabs;
-
   Timer? _updateTimer;
 
   @override
   void initState() {
     super.initState();
+    TxaSettings().addListener(_onSettingsChanged);
     _homeScrollController.addListener(_onHomeScroll);
     _initQuickActions();
-    _tabs = [
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _checkUpdate();
+      _startUpdateTimer();
+    });
+  }
+
+  List<Widget> _buildTabs() {
+    final authToken = TxaSettings.authToken;
+    return [
       _HomeTab(
+        key: ValueKey('home_$authToken'),
         scrollController: _homeScrollController,
         heroKey: _heroKey,
         filterKey: _filterKey,
@@ -97,17 +105,20 @@ class _HomeScreenState extends State<HomeScreen> {
       const AccountScreen(),
       if (Platform.isIOS) const PremiumScreen(),
     ];
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _checkUpdate();
-      _startUpdateTimer();
-    });
+  }
+
+  void _onSettingsChanged() {
+    if (!mounted) return;
+    setState(() {});
   }
 
   void _onHomeScroll() {
     if (!_homeScrollController.hasClients) return;
     final double offset = _homeScrollController.offset;
     final double newOpacity = (offset / 150).clamp(0.0, 1.0);
-    if (newOpacity != _headerOpacity) {
+    if ((newOpacity - _headerOpacity).abs() >= 0.05 ||
+        newOpacity == 0.0 && _headerOpacity != 0.0 ||
+        newOpacity == 1.0 && _headerOpacity != 1.0) {
       setState(() {
         _headerOpacity = newOpacity;
       });
@@ -134,8 +145,8 @@ class _HomeScreenState extends State<HomeScreen> {
 
       if (appData == null) return;
 
-      final bool isAppActive = Platform.isIOS 
-          ? (appData['ios_active'] ?? true) 
+      final bool isAppActive = Platform.isIOS
+          ? (appData['ios_active'] ?? true)
           : (appData['is_active'] ?? true);
       final bool isBanned = appData['is_banned'] == true;
 
@@ -145,7 +156,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
         TxaModal.show(
           context,
-          title: !isAppActive ? TxaLanguage.t('maintenance_title') : TxaLanguage.t('account_banned_title'),
+          title: !isAppActive
+              ? TxaLanguage.t('maintenance_title')
+              : TxaLanguage.t('account_banned_title'),
           barrierDismissible: false,
           content: Column(
             mainAxisSize: MainAxisSize.min,
@@ -157,18 +170,27 @@ class _HomeScreenState extends State<HomeScreen> {
                   shape: BoxShape.circle,
                 ),
                 child: Icon(
-                  !isAppActive ? Icons.construction_rounded : Icons.block_flipped,
+                  !isAppActive
+                      ? Icons.construction_rounded
+                      : Icons.block_flipped,
                   color: Colors.redAccent,
                   size: 48,
                 ),
               ),
               const SizedBox(height: 20),
               Text(
-                !isAppActive 
-                  ? (TxaLanguage.currentLang == 'vi' ? 'Hệ thống đang bảo trì để nâng cấp. Vui lòng quay lại sau!' : 'System is under maintenance. Please check back later!')
-                  : (TxaLanguage.currentLang == 'vi' ? 'Tài khoản của bạn đã bị khóa do vi phạm chính sách.' : 'Your account has been banned due to policy violation.'),
+                !isAppActive
+                    ? (TxaLanguage.currentLang == 'vi'
+                          ? 'Hệ thống đang bảo trì để nâng cấp. Vui lòng quay lại sau!'
+                          : 'System is under maintenance. Please check back later!')
+                    : (TxaLanguage.currentLang == 'vi'
+                          ? 'Tài khoản của bạn đã bị khóa do vi phạm chính sách.'
+                          : 'Your account has been banned due to policy violation.'),
                 textAlign: TextAlign.center,
-                style: const TextStyle(color: TxaTheme.textSecondary, height: 1.5),
+                style: const TextStyle(
+                  color: TxaTheme.textSecondary,
+                  height: 1.5,
+                ),
               ),
             ],
           ),
@@ -177,12 +199,17 @@ class _HomeScreenState extends State<HomeScreen> {
               onPressed: () => SystemNavigator.pop(),
               style: ElevatedButton.styleFrom(
                 backgroundColor: Colors.redAccent,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 minimumSize: const Size(double.infinity, 50),
               ),
               child: Text(
                 TxaLanguage.t('exit_app'),
-                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ],
@@ -196,6 +223,7 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void dispose() {
     _updateTimer?.cancel();
+    TxaSettings().removeListener(_onSettingsChanged);
     _homeScrollController.removeListener(_onHomeScroll);
     _homeScrollController.dispose();
     super.dispose();
@@ -270,11 +298,43 @@ class _HomeScreenState extends State<HomeScreen> {
             tooltipPosition: CoachMarkPosition.top,
           ),
         ],
+        onStepChanged: _handleCoachStepChanged,
         onFinish: () {
           TxaSettings.hasSeenCoachMark = true;
         },
       );
     });
+  }
+
+  Future<void> _handleCoachStepChanged(int step) async {
+    if (!mounted) return;
+    if (step != 4) return;
+    if (!_homeScrollController.hasClients) return;
+
+    var targetContext = _movieSectionKey.currentContext;
+    if (targetContext == null) {
+      final viewportHeight = MediaQuery.of(context).size.height;
+      final nextOffset = (_homeScrollController.offset + viewportHeight * 0.85)
+          .clamp(0.0, _homeScrollController.position.maxScrollExtent);
+      await _homeScrollController.animateTo(
+        nextOffset,
+        duration: const Duration(milliseconds: 420),
+        curve: Curves.easeOutCubic,
+      );
+      await Future<void>.delayed(const Duration(milliseconds: 80));
+      targetContext = _movieSectionKey.currentContext;
+    }
+
+    if (targetContext == null) return;
+
+    await Scrollable.ensureVisible(
+      targetContext,
+      duration: const Duration(milliseconds: 520),
+      curve: Curves.easeOutCubic,
+      alignment: 0.18,
+    );
+
+    await Future<void>.delayed(const Duration(milliseconds: 80));
   }
 
   void _showSpeedTestDialog() {
@@ -600,7 +660,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
 
                 Positioned.fill(
-                  child: IndexedStack(index: _currentIndex, children: _tabs),
+                  child: IndexedStack(
+                    index: _currentIndex,
+                    children: _buildTabs(),
+                  ),
                 ),
 
                 if (_currentIndex == 0) _buildHomeHeader(),
@@ -652,13 +715,17 @@ class _HomeScreenState extends State<HomeScreen> {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    Colors.black.withValues(alpha: 0.85 * _headerOpacity + 0.35),
+                    Colors.black.withValues(
+                      alpha: 0.85 * _headerOpacity + 0.35,
+                    ),
                     Colors.black.withValues(alpha: 0.6 * _headerOpacity),
                   ],
                 ),
                 border: Border(
                   bottom: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.12 * _headerOpacity),
+                    color: Colors.white.withValues(
+                      alpha: 0.12 * _headerOpacity,
+                    ),
                     width: 0.5,
                   ),
                 ),
@@ -703,7 +770,8 @@ class _HomeScreenState extends State<HomeScreen> {
                         ),
                         const SizedBox(width: 8),
                         FutureBuilder<bool>(
-                          future: TxaPermission.isIgnoringBatteryOptimizations(),
+                          future:
+                              TxaPermission.isIgnoringBatteryOptimizations(),
                           builder: (context, snapshot) {
                             if (snapshot.data == false && Platform.isAndroid) {
                               return Padding(
@@ -711,7 +779,9 @@ class _HomeScreenState extends State<HomeScreen> {
                                 child: _GlassIconBtn(
                                   icon: Icons.battery_alert_rounded,
                                   color: Colors.orangeAccent,
-                                  tooltip: TxaLanguage.t('battery_optimization'),
+                                  tooltip: TxaLanguage.t(
+                                    'battery_optimization',
+                                  ),
                                   onTap: () async {
                                     _showBatteryOptimizationWarning();
                                   },
@@ -774,7 +844,10 @@ class _HomeScreenState extends State<HomeScreen> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text(TxaLanguage.t('cancel'), style: const TextStyle(color: Colors.white70)),
+          child: Text(
+            TxaLanguage.t('cancel'),
+            style: const TextStyle(color: Colors.white70),
+          ),
         ),
         ElevatedButton(
           onPressed: () async {
@@ -785,11 +858,16 @@ class _HomeScreenState extends State<HomeScreen> {
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: TxaTheme.accent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
           child: Text(
             TxaLanguage.t('grant'),
-            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
@@ -992,8 +1070,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                   final version = snapshot.data?.version ?? '4.2.9';
-                   final build = snapshot.data?.buildNumber ?? '429';
+                  final version = snapshot.data?.version ?? '4.3.0';
+                  final build = snapshot.data?.buildNumber ?? '430';
                   return InkWell(
                     onTap: () => Navigator.push(
                       context,
@@ -1031,6 +1109,7 @@ class _HomeTab extends StatefulWidget {
   final VoidCallback? onDataLoaded;
 
   const _HomeTab({
+    super.key,
     required this.scrollController,
     required this.heroKey,
     required this.filterKey,
@@ -1310,45 +1389,47 @@ class _HomeTabState extends State<_HomeTab> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         children: [
                           _FilterChip(
-                          label: TxaLanguage.t('recommendation'),
-                          isActive: _activeFilter == 'all',
-                          onTap: () => setState(() => _activeFilter = 'all'),
-                        ),
-                        _FilterChip(
-                          label: TxaLanguage.t('series_movies'),
-                          isActive: _activeFilter == 'series',
-                          onTap: () => setState(() => _activeFilter = 'series'),
-                        ),
-                        _FilterChip(
-                          label: TxaLanguage.t('single_movies'),
-                          isActive: _activeFilter == 'single',
-                          onTap: () => setState(() => _activeFilter = 'single'),
-                        ),
-                        ...categories
-                            .take(6)
-                            .map<Widget>(
-                              (cat) => _FilterChip(
-                                label: cat['name'] ?? '',
-                                isActive: false,
-                                onTap: () {
-                                  Navigator.push(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (ctx) => CategoryListScreen(
-                                        title: cat['name'] ?? '',
-                                        slug: cat['slug'],
+                            label: TxaLanguage.t('recommendation'),
+                            isActive: _activeFilter == 'all',
+                            onTap: () => setState(() => _activeFilter = 'all'),
+                          ),
+                          _FilterChip(
+                            label: TxaLanguage.t('series_movies'),
+                            isActive: _activeFilter == 'series',
+                            onTap: () =>
+                                setState(() => _activeFilter = 'series'),
+                          ),
+                          _FilterChip(
+                            label: TxaLanguage.t('single_movies'),
+                            isActive: _activeFilter == 'single',
+                            onTap: () =>
+                                setState(() => _activeFilter = 'single'),
+                          ),
+                          ...categories
+                              .take(6)
+                              .map<Widget>(
+                                (cat) => _FilterChip(
+                                  label: cat['name'] ?? '',
+                                  isActive: false,
+                                  onTap: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (ctx) => CategoryListScreen(
+                                          title: cat['name'] ?? '',
+                                          slug: cat['slug'],
+                                        ),
                                       ),
-                                    ),
-                                  );
-                                },
+                                    );
+                                  },
+                                ),
                               ),
-                            ),
-                      ],
+                        ],
+                      ),
                     ),
                   ),
                 ),
               ),
-            ),
 
               if (categories.isNotEmpty)
                 SliverToBoxAdapter(
@@ -1481,22 +1562,20 @@ class _HomeTabState extends State<_HomeTab> {
                 ),
 
               // Movie Sections
-              ...filteredSections.asMap().entries.map(
-                (entry) {
-                  final section = entry.value;
-                  final isFirst = entry.key == 0;
-                  return SliverToBoxAdapter(
-                    child: Container(
-                      key: isFirst ? widget.movieSectionKey : null,
-                      child: _MovieSection(
-                        title: section['title'],
-                        movies: section['movies'],
-                        sectionKey: section['key'],
-                      ),
+              ...filteredSections.asMap().entries.map((entry) {
+                final section = entry.value;
+                final isFirst = entry.key == 0;
+                return SliverToBoxAdapter(
+                  child: Container(
+                    key: isFirst ? widget.movieSectionKey : null,
+                    child: _MovieSection(
+                      title: section['title'],
+                      movies: section['movies'],
+                      sectionKey: section['key'],
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              }),
             ],
 
             // Bottom spacer

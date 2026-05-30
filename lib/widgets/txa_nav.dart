@@ -187,19 +187,21 @@ class _NavItem extends StatelessWidget {
                   ),
               ],
             ),
-            const SizedBox(height: 4),
-            // Label section
-            Text(
-              label,
-              style: TextStyle(
-                color: isActive ? TxaTheme.accent : Colors.white.withValues(alpha: 0.5),
-                fontSize: 10,
-                fontWeight: isActive ? FontWeight.bold : FontWeight.w500,
-                letterSpacing: 0.2,
+            if (isActive)
+              Padding(
+                padding: const EdgeInsets.only(top: 4),
+                child: Text(
+                  label,
+                  style: const TextStyle(
+                    color: TxaTheme.accent,
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 0,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-            ),
           ],
         ),
       ),

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'dart:convert';
 import 'package:provider/provider.dart';
-import 'package:permission_handler/permission_handler.dart';
 import 'package:dio/dio.dart';
 import 'dart:io';
 import '../theme/txa_theme.dart';
@@ -307,7 +306,6 @@ class _AccountScreenState extends State<AccountScreen> {
           ),
 
           // Profile content is now inside the ListView via _PremiumProfileCard
-
           Expanded(
             child: ListView(
               physics: const BouncingScrollPhysics(),
@@ -319,19 +317,36 @@ class _AccountScreenState extends State<AccountScreen> {
 
                 // Watching List (History Preview)
                 if (TxaSettings.authToken.isNotEmpty) _buildWatchingSection(),
-                if (TxaSettings.authToken.isNotEmpty) const SizedBox(height: 24),
-                
+                if (TxaSettings.authToken.isNotEmpty)
+                  const SizedBox(height: 24),
+
                 // Settings Groups
-                _buildMenuSection(TxaLanguage.t('general_settings'), ['favorites', 'downloads', 'history'], menuItems),
+                _buildMenuSection(TxaLanguage.t('general_settings'), [
+                  'favorites',
+                  'downloads',
+                  'history',
+                ], menuItems),
                 const SizedBox(height: 24),
-                _buildMenuSection(TxaLanguage.t('app_settings'), ['global_settings', 'player_settings', 'tv_login'], menuItems),
+                _buildMenuSection(TxaLanguage.t('app_settings'), [
+                  'global_settings',
+                  'player_settings',
+                  'tv_login',
+                ], menuItems),
                 const SizedBox(height: 24),
-                _buildMenuSection(TxaLanguage.t('community_support'), ['fb_fanpage', 'tg_channel', 'tg_group'], menuItems),
+                _buildMenuSection(TxaLanguage.t('community_support'), [
+                  'fb_fanpage',
+                  'tg_channel',
+                  'tg_group',
+                ], menuItems),
                 const SizedBox(height: 24),
-                _buildMenuSection(TxaLanguage.t('legal'), ['terms', 'privacy', 'update_history'], menuItems),
+                _buildMenuSection(TxaLanguage.t('legal'), [
+                  'terms',
+                  'privacy',
+                  'update_history',
+                ], menuItems),
 
                 const SizedBox(height: 32),
-                
+
                 // Logout / Cache Actions
                 if (TxaSettings.authToken.isNotEmpty)
                   Padding(
@@ -346,13 +361,15 @@ class _AccountScreenState extends State<AccountScreen> {
                         padding: const EdgeInsets.symmetric(vertical: 14),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(16),
-                          side: BorderSide(color: Colors.redAccent.withValues(alpha: 0.3)),
+                          side: BorderSide(
+                            color: Colors.redAccent.withValues(alpha: 0.3),
+                          ),
                         ),
                         elevation: 0,
                       ),
                     ),
                   ),
-                
+
                 ElevatedButton.icon(
                   onPressed: () => _showClearCacheConfirm(context),
                   icon: const Icon(Icons.delete_sweep_rounded, size: 18),
@@ -363,12 +380,14 @@ class _AccountScreenState extends State<AccountScreen> {
                     padding: const EdgeInsets.symmetric(vertical: 14),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: Colors.white.withValues(alpha: 0.1)),
+                      side: BorderSide(
+                        color: Colors.white.withValues(alpha: 0.1),
+                      ),
                     ),
                     elevation: 0,
                   ),
                 ),
-                
+
                 const SizedBox(height: 100),
               ],
             ),
@@ -381,8 +400,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.2.9';
-                  final buildNumber = snapshot.data?.buildNumber ?? '429';
+                  final version = snapshot.data?.version ?? '4.3.0';
+                  final buildNumber = snapshot.data?.buildNumber ?? '430';
                   return InkWell(
                     onTap: () => Navigator.push(
                       context,
@@ -426,7 +445,10 @@ class _AccountScreenState extends State<AccountScreen> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text(TxaLanguage.t('cancel'), style: const TextStyle(color: Colors.white70)),
+          child: Text(
+            TxaLanguage.t('cancel'),
+            style: const TextStyle(color: Colors.white70),
+          ),
         ),
         ElevatedButton(
           onPressed: () {
@@ -439,11 +461,16 @@ class _AccountScreenState extends State<AccountScreen> {
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: Colors.redAccent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
           child: Text(
             TxaLanguage.t('logout'),
-            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
@@ -461,7 +488,10 @@ class _AccountScreenState extends State<AccountScreen> {
       actions: [
         TextButton(
           onPressed: () => Navigator.pop(context),
-          child: Text(TxaLanguage.t('cancel'), style: const TextStyle(color: Colors.white70)),
+          child: Text(
+            TxaLanguage.t('cancel'),
+            style: const TextStyle(color: Colors.white70),
+          ),
         ),
         ElevatedButton(
           onPressed: () async {
@@ -470,18 +500,27 @@ class _AccountScreenState extends State<AccountScreen> {
           },
           style: ElevatedButton.styleFrom(
             backgroundColor: TxaTheme.accent,
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(10),
+            ),
           ),
           child: Text(
             TxaLanguage.t('clear'),
-            style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+            style: const TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
           ),
         ),
       ],
     );
   }
 
-  Widget _buildMenuSection(String title, List<String> itemIds, List<Map<String, dynamic>> allItems) {
+  Widget _buildMenuSection(
+    String title,
+    List<String> itemIds,
+    List<Map<String, dynamic>> allItems,
+  ) {
     final items = allItems.where((i) => itemIds.contains(i['id'])).toList();
     if (items.isEmpty) return const SizedBox.shrink();
 
@@ -524,14 +563,29 @@ class _AccountScreenState extends State<AccountScreen> {
                     color: TxaTheme.glassBg,
                     borderRadius: BorderRadius.circular(10),
                   ),
-                  child: Icon(item['icon'] as IconData, color: TxaTheme.textPrimary, size: 18),
+                  child: Icon(
+                    item['icon'] as IconData,
+                    color: TxaTheme.textPrimary,
+                    size: 18,
+                  ),
                 ),
                 title: Text(
                   item['label'] as String,
-                  style: const TextStyle(color: TxaTheme.textPrimary, fontSize: 14, fontWeight: FontWeight.w500),
+                  style: const TextStyle(
+                    color: TxaTheme.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                  ),
                 ),
-                trailing: const Icon(Icons.chevron_right_rounded, color: TxaTheme.textMuted, size: 18),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 2),
+                trailing: const Icon(
+                  Icons.chevron_right_rounded,
+                  color: TxaTheme.textMuted,
+                  size: 18,
+                ),
+                contentPadding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 2,
+                ),
               );
             },
           ),
@@ -539,8 +593,6 @@ class _AccountScreenState extends State<AccountScreen> {
       ],
     );
   }
-
-
 
   Widget _buildWatchingSection() {
     return Column(
@@ -693,68 +745,9 @@ class _PlayerSettingsBottomSheet extends StatefulWidget {
 
 class _PlayerSettingsBottomSheetState
     extends State<_PlayerSettingsBottomSheet> {
-  bool _hasOverlayPermission = true;
-
   @override
   void initState() {
     super.initState();
-    if (Platform.isAndroid) {
-      _checkPermission();
-    }
-  }
-
-  Future<void> _checkPermission() async {
-    final status = await Permission.systemAlertWindow.status;
-    setState(() {
-      _hasOverlayPermission = status.isGranted;
-      // If missing, auto disable
-      if (!_hasOverlayPermission && TxaSettings.autoPiP) {
-        TxaSettings.autoPiP = false;
-      }
-    });
-  }
-
-  Future<void> _requestOverlayPermission() async {
-    final status = await Permission.systemAlertWindow.request();
-    if (status.isGranted) {
-      if (mounted) {
-        setState(() {
-          _hasOverlayPermission = true;
-          TxaSettings.autoPiP = true;
-        });
-      }
-    } else {
-      if (mounted) {
-        TxaModal.show(
-          context,
-          title: TxaLanguage.t('permission_overlay_label'),
-          content: Text(
-            TxaLanguage.t('permission_overlay_desc'),
-            style: const TextStyle(color: TxaTheme.textSecondary),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: Text(TxaLanguage.t('close'), style: const TextStyle(color: Colors.white70)),
-            ),
-            ElevatedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                openAppSettings();
-              },
-              style: ElevatedButton.styleFrom(
-                backgroundColor: TxaTheme.accent,
-                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
-              ),
-              child: Text(
-                TxaLanguage.t('go_to_settings'),
-                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-              ),
-            ),
-          ],
-        );
-      }
-    }
   }
 
   @override
@@ -827,28 +820,6 @@ class _PlayerSettingsBottomSheetState
             value: TxaSettings.autoNextEpisode,
             onChanged: (v) => setState(() => TxaSettings.autoNextEpisode = v),
           ),
-
-          const Divider(color: Colors.white10, height: 32),
-
-          // 3. Auto PiP (Android Only) - Powered by floating package
-          if (Platform.isAndroid)
-            _SettingToggle(
-              label: TxaLanguage.t('auto_pip_label'),
-              value: TxaSettings.autoPiP,
-              onChanged: (v) {
-                if (v && !_hasOverlayPermission) {
-                  _requestOverlayPermission();
-                } else {
-                  setState(() => TxaSettings.autoPiP = v);
-                }
-              },
-            ),
-          if (Platform.isAndroid) const SizedBox(height: 8),
-          if (Platform.isAndroid)
-            Text(
-              TxaLanguage.t('auto_pip_desc'),
-              style: const TextStyle(color: TxaTheme.textMuted, fontSize: 11),
-            ),
 
           const SizedBox(height: 24),
           ElevatedButton(
@@ -998,17 +969,25 @@ class _PremiumProfileCard extends StatelessWidget {
                         context,
                         MaterialPageRoute(builder: (ctx) => const AuthScreen()),
                       );
+                      if (!context.mounted) return;
                       if (result == true) {
-                        // AccountScreen listener will handle the rebuild
+                        final state = context
+                            .findAncestorStateOfType<_AccountScreenState>();
+                        state?._onSettingsChanged();
                       }
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.white,
                       foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       elevation: 0,
                     ),
-                    child: Text(TxaLanguage.t('login'), style: const TextStyle(fontWeight: FontWeight.bold)),
+                    child: Text(
+                      TxaLanguage.t('login'),
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 12),
@@ -1017,16 +996,23 @@ class _PremiumProfileCard extends StatelessWidget {
                     onPressed: () async {
                       final result = await Navigator.push(
                         context,
-                        MaterialPageRoute(builder: (ctx) => const AuthScreen(isRegister: true)),
+                        MaterialPageRoute(
+                          builder: (ctx) => const AuthScreen(isRegister: true),
+                        ),
                       );
+                      if (!context.mounted) return;
                       if (result == true) {
-                        // AccountScreen listener will handle the rebuild
+                        final state = context
+                            .findAncestorStateOfType<_AccountScreenState>();
+                        state?._onSettingsChanged();
                       }
                     },
                     style: OutlinedButton.styleFrom(
                       side: const BorderSide(color: Colors.white24),
                       foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                     ),
                     child: Text(TxaLanguage.t('register')),
                   ),
@@ -1052,7 +1038,8 @@ class _PremiumProfileCard extends StatelessWidget {
         if (user == null) {
           if (snapshot.hasError) {
             return _buildErrorCard(context, snapshot.error?.toString(), () {
-              final state = context.findAncestorStateOfType<_AccountScreenState>();
+              final state = context
+                  .findAncestorStateOfType<_AccountScreenState>();
               (state as dynamic)?.setState(() {});
             });
           }
@@ -1106,13 +1093,18 @@ class _PremiumProfileCard extends StatelessWidget {
                     child: CircleAvatar(
                       radius: 35,
                       backgroundColor: TxaTheme.accent.withValues(alpha: 0.2),
-                      backgroundImage: (avatar != null && avatar.toString().isNotEmpty)
+                      backgroundImage:
+                          (avatar != null && avatar.toString().isNotEmpty)
                           ? CachedNetworkImageProvider(avatar)
                           : null,
                       child: (avatar == null || avatar.toString().isEmpty)
                           ? Text(
                               name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                              style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                color: Colors.white,
+                                fontSize: 24,
+                                fontWeight: FontWeight.bold,
+                              ),
                             )
                           : null,
                     ),
@@ -1122,8 +1114,15 @@ class _PremiumProfileCard extends StatelessWidget {
                     right: 0,
                     child: Container(
                       padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle),
-                      child: const Icon(Icons.check, color: Colors.white, size: 10),
+                      decoration: const BoxDecoration(
+                        color: Colors.green,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.check,
+                        color: Colors.white,
+                        size: 10,
+                      ),
                     ),
                   ),
                 ],
@@ -1138,22 +1137,35 @@ class _PremiumProfileCard extends StatelessWidget {
                         Expanded(
                           child: Text(
                             name,
-                            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                            ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                           ),
                         ),
                         if (isExpired)
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 6,
+                              vertical: 2,
+                            ),
                             decoration: BoxDecoration(
                               color: Colors.red.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
-                              border: Border.all(color: Colors.red.withValues(alpha: 0.3)),
+                              border: Border.all(
+                                color: Colors.red.withValues(alpha: 0.3),
+                              ),
                             ),
                             child: const Text(
                               '!',
-                              style: TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                              style: TextStyle(
+                                color: Colors.redAccent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ),
                       ],
@@ -1161,25 +1173,41 @@ class _PremiumProfileCard extends StatelessWidget {
                     const SizedBox(height: 4),
                     Text(
                       email,
-                      style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13),
+                      style: const TextStyle(
+                        color: TxaTheme.textMuted,
+                        fontSize: 13,
+                      ),
                     ),
                     const SizedBox(height: 8),
                     if (isVerified)
                       Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 3,
+                        ),
                         decoration: BoxDecoration(
                           color: Colors.green.withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(6),
-                          border: Border.all(color: Colors.green.withValues(alpha: 0.3)),
+                          border: Border.all(
+                            color: Colors.green.withValues(alpha: 0.3),
+                          ),
                         ),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.verified_rounded, color: Colors.greenAccent, size: 12),
+                            const Icon(
+                              Icons.verified_rounded,
+                              color: Colors.greenAccent,
+                              size: 12,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               TxaLanguage.t('email_verified'),
-                              style: const TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold),
+                              style: const TextStyle(
+                                color: Colors.greenAccent,
+                                fontSize: 10,
+                                fontWeight: FontWeight.bold,
+                              ),
                             ),
                           ],
                         ),
@@ -1195,7 +1223,11 @@ class _PremiumProfileCard extends StatelessWidget {
   }
 }
 
-Widget _buildErrorCard(BuildContext context, dynamic message, VoidCallback onRetry) {
+Widget _buildErrorCard(
+  BuildContext context,
+  dynamic message,
+  VoidCallback onRetry,
+) {
   final is401 =
       message.toString().contains('401') ||
       message.toString().toLowerCase().contains('unauthenticated');
@@ -1273,5 +1305,3 @@ Widget _buildErrorCard(BuildContext context, dynamic message, VoidCallback onRet
     ),
   );
 }
-
-

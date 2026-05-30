@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:better_player_plus/better_player_plus.dart';
@@ -7,7 +7,6 @@ import 'package:screen_brightness/screen_brightness.dart';
 import 'package:volume_controller/volume_controller.dart';
 import '../services/txa_settings.dart';
 import '../services/txa_language.dart';
-import '../services/txa_mini_player_provider.dart';
 import '../utils/txa_format.dart';
 import '../theme/txa_theme.dart';
 import 'package:provider/provider.dart';
@@ -24,7 +23,6 @@ import 'package:no_screen_mirror/no_screen_mirror.dart';
 import 'package:cast_plus/cast.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:app_settings/app_settings.dart' as app_settings_lib;
-import 'package:floating/floating.dart';
 import 'package:permission_handler/permission_handler.dart';
 import '../services/txa_permission.dart';
 import 'txa_watermark.dart';
@@ -60,8 +58,7 @@ class TxaPlayer extends StatefulWidget {
 class _TxaPlayerState extends State<TxaPlayer>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   BetterPlayerController? _betterPlayerController;
-  final GlobalKey _betterPlayerKey = GlobalKey();
-  final Floating _floating = Floating();
+
   bool _error = false;
   bool _isInitialized = false;
   bool _isRefreshing = false;
@@ -182,19 +179,6 @@ class _TxaPlayerState extends State<TxaPlayer>
     _startHistorySync();
     _initMiracast();
     WidgetsBinding.instance.addObserver(this);
-
-    // Listen for settings changes to reactively update PiP registration
-    TxaSettings().addListener(_onSettingsChanged);
-  }
-
-  void _onSettingsChanged() {
-    if (!mounted) return;
-    if (TxaSettings.autoPiP) {
-      _enableAutoPiP();
-    } else {
-      _floating.cancelOnLeavePiP();
-    }
-    setState(() {});
   }
 
   void _startHistorySync() {
@@ -255,7 +239,6 @@ class _TxaPlayerState extends State<TxaPlayer>
 
   @override
   void dispose() {
-    TxaSettings().removeListener(_onSettingsChanged);
     TxaPlayer.isPlayerActive = false;
     _toggleDND(false);
     _historySyncTimer?.cancel();
@@ -269,11 +252,7 @@ class _TxaPlayerState extends State<TxaPlayer>
     // Final history synchronization
     _syncHistory();
 
-    final TxaMiniPlayerProvider miniProvider =
-        Provider.of<TxaMiniPlayerProvider>(context, listen: false);
-    if (miniProvider.controller != _betterPlayerController) {
-      _betterPlayerController?.dispose();
-    }
+    _betterPlayerController?.dispose();
 
     _betterPlayerController?.removeEventsListener(_onPlayerEvent);
     VolumeController.instance.removeListener();
@@ -288,9 +267,6 @@ class _TxaPlayerState extends State<TxaPlayer>
       DeviceOrientation.landscapeRight,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-
-    // Cancel autoPiP on dispose
-    _floating.cancelOnLeavePiP();
 
     _batterySubscription?.cancel();
     _mirrorSubscription?.cancel();
@@ -313,51 +289,9 @@ class _TxaPlayerState extends State<TxaPlayer>
           _betterPlayerController?.videoPlayerController?.value.isPlaying ??
           false;
 
-      // Ensure PiP is cancelled if setting is OFF
-      if (!TxaSettings.autoPiP) {
-        _floating.cancelOnLeavePiP();
+      if (isPlaying) {
+        _betterPlayerController?.pause();
       }
-
-      if (TxaSettings.autoPiP && isPlaying) {
-        // Enable native BetterPlayer PiP
-        try {
-          if (!_isEmbed && _betterPlayerController != null) {
-            _betterPlayerController!.enablePictureInPicture(_betterPlayerKey);
-          }
-        } catch (e) {
-          debugPrint('PiP Error: $e');
-        }
-      } else {
-        // If autoPiP is off or video is already paused, we pause properly
-        if (isPlaying) {
-          _betterPlayerController?.pause();
-        }
-      }
-    } else if (state == AppLifecycleState.resumed) {
-      _checkPiPReturn();
-      // Re-enable auto PiP for next leave ONLY if setting is ON and not disposed
-      if (TxaSettings.autoPiP && mounted && _isInitialized) {
-        _enableAutoPiP();
-      }
-    }
-  }
-
-  void _enableAutoPiP() {
-    if (!_isInitialized || _error || _isEmbed) return;
-    if (!TxaSettings.autoPiP) return;
-
-    try {
-      _floating.enable(OnLeavePiP(aspectRatio: const Rational(16, 9)));
-    } catch (e) {
-      TxaLogger.log('Auto PiP enable error: $e', isError: true);
-    }
-  }
-
-  void _checkPiPReturn() async {
-    // Check if we are still in PiP mode when user returns
-    final status = await _floating.pipStatus;
-    if (status == PiPStatus.disabled) {
-      // Back to full screen - nothing to do
     }
   }
 
@@ -654,7 +588,7 @@ class _TxaPlayerState extends State<TxaPlayer>
       url,
       headers: {
         "X-TXC-Client": "TPhimX-App-V6",
-        "Referer": "https://film.nrotxa.online/",
+        "Referer": "https://dongmephim.online/",
       },
       cacheConfiguration: const BetterPlayerCacheConfiguration(useCache: true),
       subtitles: subtitles,
@@ -720,7 +654,6 @@ class _TxaPlayerState extends State<TxaPlayer>
           _error = false;
           _isRefreshing = false;
         });
-        _enableAutoPiP();
       }
     } catch (e) {
       if (isLast) {
@@ -925,7 +858,7 @@ class _TxaPlayerState extends State<TxaPlayer>
       final epSlug = ep['slug']?.toString() ?? ep['id']?.toString() ?? '';
 
       final shareText =
-          '${m['name']} - Tập ${ep['name']}\nXem ngay tại: https://film.nrotxa.online/xem-phim/$slug/$epSlug';
+          '${m['name']} - Tập ${ep['name']}\nXem ngay tại: https://dongmephim.online/movies/$slug?ep=${Uri.encodeComponent(ep['name']?.toString() ?? epSlug)}&sv=${_currentServerIndex + 1}';
 
       final bannerUrl = m['poster_url'] ?? m['thumb_url'] ?? '';
       if (bannerUrl.isNotEmpty) {
@@ -1189,7 +1122,7 @@ class _TxaPlayerState extends State<TxaPlayer>
 
       // Using the new professional web cast receiver page
       final castWebUrl =
-          'https://film.nrotxa.online/cast?url=$encodedUrl&title=$encodedTitle&poster=$encodedPoster';
+          'https://dongmephim.online/cast?url=$encodedUrl&title=$encodedTitle&poster=$encodedPoster';
       final uri = Uri.parse(castWebUrl);
 
       TxaToast.show(context, TxaLanguage.t('opening_external_browser'));
@@ -1223,8 +1156,11 @@ class _TxaPlayerState extends State<TxaPlayer>
     // 1. Request Nearby Devices permission (Android only)
     final hasNearby = await TxaPermission.requestNearby();
     if (!hasNearby && mounted) {
-      TxaToast.show(context, TxaLanguage.t('permission_nearby_devices_denied'),
-          isError: true);
+      TxaToast.show(
+        context,
+        TxaLanguage.t('permission_nearby_devices_denied'),
+        isError: true,
+      );
       return;
     }
 
@@ -1381,11 +1317,6 @@ class _TxaPlayerState extends State<TxaPlayer>
       });
       _loadMarkers();
       _initializePlayer();
-      // Sync with MiniPlayerProvider if active
-      final mini = Provider.of<TxaMiniPlayerProvider>(context, listen: false);
-      if (!mini.isClosed) {
-        mini.updateEpisode(_currentEpisodeIndex);
-      }
     }
   }
 
@@ -1400,11 +1331,6 @@ class _TxaPlayerState extends State<TxaPlayer>
       });
       _loadMarkers();
       _initializePlayer();
-      // Sync with MiniPlayerProvider if active
-      final mini = Provider.of<TxaMiniPlayerProvider>(context, listen: false);
-      if (!mini.isClosed) {
-        mini.updateEpisode(_currentEpisodeIndex);
-      }
     } else {
       _syncHistory(); // Final sync on exit
       _handleBack();
@@ -1413,20 +1339,6 @@ class _TxaPlayerState extends State<TxaPlayer>
 
   void _handleBack() async {
     await _syncHistory();
-
-    if (_betterPlayerController != null &&
-        _isInitialized &&
-        TxaSettings.autoPiP &&
-        !_isEmbed) {
-      final mini = Provider.of<TxaMiniPlayerProvider>(context, listen: false);
-      mini.switchToMini(
-        controller: _betterPlayerController!,
-        movie: widget.movie,
-        servers: widget.servers,
-        serverIndex: _currentServerIndex,
-        episodeIndex: _currentEpisodeIndex,
-      );
-    }
 
     if (mounted) {
       // Restore orientation
@@ -1574,12 +1486,6 @@ class _TxaPlayerState extends State<TxaPlayer>
     });
     _loadMarkers();
     _initializePlayer();
-    // Sync with MiniPlayerProvider if active
-    final mini = Provider.of<TxaMiniPlayerProvider>(context, listen: false);
-    if (!mini.isClosed) {
-      mini.updateServer(_currentServerIndex);
-      mini.updateEpisode(_currentEpisodeIndex);
-    }
   }
 
   // --- ASPECT RATIO ---
@@ -1717,7 +1623,7 @@ class _TxaPlayerState extends State<TxaPlayer>
         // Pause playback before opening Android settings to request DND access
         _betterPlayerController?.pause();
         if (!mounted) return;
-        TxaToast.show(context, TxaLanguage.t('pip_permission_missing'));
+        TxaToast.show(context, TxaLanguage.t('permission_dnd_label'));
       }
       await _dndChannel.invokeMethod('setDND', {'enable': enable});
     } catch (e) {
@@ -1739,229 +1645,221 @@ class _TxaPlayerState extends State<TxaPlayer>
         }
       },
       child: Scaffold(
-          backgroundColor: Colors.black,
-          body: GestureDetector(
-            onTapUp: (d) => _handleTap(d, width),
-            onVerticalDragUpdate: (d) => _handleVerticalDrag(d, width),
-            onDoubleTapDown: (d) => _onDoubleTap(d, width),
-            onLongPressStart: (_) => _onLongPress(true),
-            onLongPressEnd: (_) => _onLongPress(false),
-            child: TxaWatermark(
-              child: Stack(
-                children: [
-                  // 1. VIDEO
-                  Center(
-                    child: _isInitialized
-                        ? Stack(
-                            children: [
-                              _isEmbed
-                                  ? WebViewWidget(
-                                      controller: _webViewController!,
-                                    )
-                                  : BetterPlayer(
-                                      controller: _betterPlayerController!,
-                                    ),
-                              if (_isBuffering && !_isEmbed)
-                                Container(
-                                  color: Colors.black26,
-                                  child: _buildLoadingUI(),
-                                ),
-                            ],
-                          )
-                        : _error
-                        ? _buildErrorUI()
-                        : _buildLoadingUI(),
+        backgroundColor: Colors.black,
+        body: GestureDetector(
+          onTapUp: (d) => _handleTap(d, width),
+          onVerticalDragUpdate: (d) => _handleVerticalDrag(d, width),
+          onDoubleTapDown: (d) => _onDoubleTap(d, width),
+          onLongPressStart: (_) => _onLongPress(true),
+          onLongPressEnd: (_) => _onLongPress(false),
+          child: TxaWatermark(
+            child: Stack(
+              children: [
+                // 1. VIDEO
+                Center(
+                  child: _isInitialized
+                      ? Stack(
+                          children: [
+                            _isEmbed
+                                ? WebViewWidget(controller: _webViewController!)
+                                : BetterPlayer(
+                                    controller: _betterPlayerController!,
+                                  ),
+                            if (_isBuffering && !_isEmbed)
+                              Container(
+                                color: Colors.black26,
+                                child: _buildLoadingUI(),
+                              ),
+                          ],
+                        )
+                      : _error
+                      ? _buildErrorUI()
+                      : _buildLoadingUI(),
+                ),
+
+                // 2.5 CLOCK (Top-Left)
+                if (TxaSettings.showClock)
+                  Positioned(
+                    top: 40,
+                    left: 20,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 4,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black26,
+                        borderRadius: BorderRadius.circular(6),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text(
+                            TxaFormat.formatDate(
+                              _now,
+                              pattern: TxaSettings.clockFormat,
+                            ),
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              letterSpacing: 1.0,
+                            ),
+                          ),
+                          const SizedBox(width: 10),
+                          _buildBatteryIndicator(),
+                        ],
+                      ),
+                    ),
                   ),
 
-
-
-                  // 2.5 CLOCK (Top-Left)
-                  if (TxaSettings.showClock)
-                    Positioned(
-                      top: 40,
-                      left: 20,
+                // 2.6 MOVIE INFO (Top-Center) - Show only when controls are HIDDEN
+                if (!_showControls && !_isLocked && _isInitialized && !_error)
+                  Positioned(
+                    top: 35,
+                    left: 0,
+                    right: 0,
+                    child: Center(
                       child: Container(
                         padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 4,
+                          horizontal: 16,
+                          vertical: 6,
                         ),
                         decoration: BoxDecoration(
                           color: Colors.black26,
-                          borderRadius: BorderRadius.circular(6),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Text(
-                              TxaFormat.formatDate(
-                                _now,
-                                pattern: TxaSettings.clockFormat,
-                              ),
-                              style: const TextStyle(
-                                color: Colors.white70,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                letterSpacing: 1.0,
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            _buildBatteryIndicator(),
-                          ],
-                        ),
-                      ),
-                    ),
-
-                  // 2.6 MOVIE INFO (Top-Center) - Show only when controls are HIDDEN
-                  if (!_showControls && !_isLocked && _isInitialized && !_error)
-                    Positioned(
-                      top: 35,
-                      left: 0,
-                      right: 0,
-                      child: Center(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 6,
+                          borderRadius: BorderRadius.circular(20),
+                          border: Border.all(
+                            color: Colors.white.withValues(alpha: 0.05),
                           ),
-                          decoration: BoxDecoration(
-                            color: Colors.black26,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: Colors.white.withValues(alpha: 0.05),
-                            ),
-                          ),
-                          child: Builder(
-                            builder: (ctx) {
-                              String movieName = widget.movie['name'] ?? '';
-                              String episodeName = '';
-                              String serverName = '';
+                        ),
+                        child: Builder(
+                          builder: (ctx) {
+                            String movieName = widget.movie['name'] ?? '';
+                            String episodeName = '';
+                            String serverName = '';
 
-                              if (widget.localPath != null) {
-                                episodeName = widget.localTitle ?? 'Offline';
-                                serverName = TxaLanguage.t('downloaded');
-                              } else if (widget.servers.isNotEmpty &&
-                                  _currentServerIndex < widget.servers.length) {
-                                final server =
-                                    widget.servers[_currentServerIndex];
-                                serverName = server['server_name'] ?? 'Server';
-                                final episodes =
-                                    server['server_data'] as List? ?? [];
-                                if (_currentEpisodeIndex < episodes.length) {
-                                  final ep = episodes[_currentEpisodeIndex];
-                                  episodeName = TxaFormat.formatEpisodeName(
-                                    ep['name']?.toString(),
-                                  );
-                                }
+                            if (widget.localPath != null) {
+                              episodeName = widget.localTitle ?? 'Offline';
+                              serverName = TxaLanguage.t('downloaded');
+                            } else if (widget.servers.isNotEmpty &&
+                                _currentServerIndex < widget.servers.length) {
+                              final server =
+                                  widget.servers[_currentServerIndex];
+                              serverName = server['server_name'] ?? 'Server';
+                              final episodes =
+                                  server['server_data'] as List? ?? [];
+                              if (_currentEpisodeIndex < episodes.length) {
+                                final ep = episodes[_currentEpisodeIndex];
+                                episodeName = TxaFormat.formatEpisodeName(
+                                  ep['name']?.toString(),
+                                );
                               }
+                            }
 
-                              return Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  if (widget.localPath != null) ...[
-                                    const Icon(
-                                      Icons.download_done_rounded,
-                                      color: TxaTheme.accent,
-                                      size: 10,
-                                    ),
-                                    const SizedBox(width: 4),
-                                  ],
-                                  Text(
-                                    "$movieName • $episodeName${serverName.isNotEmpty ? ' ($serverName)' : ''}",
-                                    style: TextStyle(
-                                      color: Colors.white.withValues(
-                                        alpha: 0.5,
-                                      ),
-                                      fontSize: 10,
-                                      fontWeight: FontWeight.w600,
-                                      letterSpacing: 0.8,
-                                    ),
+                            return Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                if (widget.localPath != null) ...[
+                                  const Icon(
+                                    Icons.download_done_rounded,
+                                    color: TxaTheme.accent,
+                                    size: 10,
                                   ),
+                                  const SizedBox(width: 4),
                                 ],
-                              );
-                            },
-                          ),
+                                Text(
+                                  "$movieName • $episodeName${serverName.isNotEmpty ? ' ($serverName)' : ''}",
+                                  style: TextStyle(
+                                    color: Colors.white.withValues(alpha: 0.5),
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w600,
+                                    letterSpacing: 0.8,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
                         ),
                       ),
                     ),
+                  ),
 
-                  // 3. GESTURE FEEDBACK OVERLAY
-                  if (_overlayLabel != null || _overlayIcon != null)
-                    Center(
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 20,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(_overlayIcon, color: Colors.white, size: 40),
+                // 3. GESTURE FEEDBACK OVERLAY
+                if (_overlayLabel != null || _overlayIcon != null)
+                  Center(
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 20,
+                        vertical: 12,
+                      ),
+                      decoration: BoxDecoration(
+                        color: Colors.black54,
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(_overlayIcon, color: Colors.white, size: 40),
+                          const SizedBox(height: 8),
+                          Text(
+                            _overlayLabel!,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          if (_overlayValue != null) ...[
                             const SizedBox(height: 8),
-                            Text(
-                              _overlayLabel!,
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
+                            SizedBox(
+                              width: 100,
+                              child: LinearProgressIndicator(
+                                value: _overlayValue,
+                                backgroundColor: Colors.white24,
+                                color: TxaTheme.accent,
                               ),
                             ),
-                            if (_overlayValue != null) ...[
-                              const SizedBox(height: 8),
-                              SizedBox(
-                                width: 100,
-                                child: LinearProgressIndicator(
-                                  value: _overlayValue,
-                                  backgroundColor: Colors.white24,
-                                  color: TxaTheme.accent,
-                                ),
-                              ),
-                            ],
                           ],
-                        ),
+                        ],
                       ),
                     ),
+                  ),
 
-                  // 4. CUSTOM CONTROLS
-                  if (_showControls && _isInitialized && !_error) ...[
-                    _buildControlOverlay(),
-                  ],
-
-                  // 4.5 EPISODE DRAWER
-                  if (_showEpisodeDrawer && _isInitialized && !_error)
-                    _buildEpisodeSelectionOverlay(),
-
-                  // 4.6 SERVER DRAWER
-                  if (_showServerDrawer && _isInitialized && !_error)
-                    _buildServerSelectionOverlay(),
-
-                  // 6. AUTO NEXT PREVIEW (PREMIUM)
-                  if (_showAutoNextCountdownOverlay &&
-                      _isInitialized &&
-                      !_error)
-                    _buildAutoNextOverlay(),
-
-                  // 7. SKIP BUTTONS
-                  if (_showSkipIntro)
-                    _buildSkipOverlay(TxaLanguage.t('skip_intro'), () {
-                      _betterPlayerController!.seekTo(
-                        Duration(seconds: _introEnd.toInt()),
-                      );
-                    }, Alignment.bottomRight),
-                  if (_showSkipOutro)
-                    _buildSkipOverlay(
-                      TxaLanguage.t('skip_outro_next'),
-                      _playNext,
-                      Alignment.bottomRight,
-                    ),
+                // 4. CUSTOM CONTROLS
+                if (_showControls && _isInitialized && !_error) ...[
+                  _buildControlOverlay(),
                 ],
-              ),
+
+                // 4.5 EPISODE DRAWER
+                if (_showEpisodeDrawer && _isInitialized && !_error)
+                  _buildEpisodeSelectionOverlay(),
+
+                // 4.6 SERVER DRAWER
+                if (_showServerDrawer && _isInitialized && !_error)
+                  _buildServerSelectionOverlay(),
+
+                // 6. AUTO NEXT PREVIEW (PREMIUM)
+                if (_showAutoNextCountdownOverlay && _isInitialized && !_error)
+                  _buildAutoNextOverlay(),
+
+                // 7. SKIP BUTTONS
+                if (_showSkipIntro)
+                  _buildSkipOverlay(TxaLanguage.t('skip_intro'), () {
+                    _betterPlayerController!.seekTo(
+                      Duration(seconds: _introEnd.toInt()),
+                    );
+                  }, Alignment.bottomRight),
+                if (_showSkipOutro)
+                  _buildSkipOverlay(
+                    TxaLanguage.t('skip_outro_next'),
+                    _playNext,
+                    Alignment.bottomRight,
+                  ),
+              ],
             ),
           ),
         ),
-      );
+      ),
+    );
   }
 
   Widget _buildAutoNextOverlay() {
@@ -2194,18 +2092,7 @@ class _TxaPlayerState extends State<TxaPlayer>
                     ),
                   ),
                   const Spacer(),
-                  _HeaderIcon(
-                    icon: Icons.picture_in_picture_alt_rounded,
-                    onTap: () async {
-                      if (_betterPlayerController != null && _isInitialized) {
-                        await _syncHistory(); // Sync before PiP
-                          // Native BetterPlayer PiP
-                          _betterPlayerController!.enablePictureInPicture(
-                            _betterPlayerKey,
-                          );
-                      }
-                    },
-                  ),
+
                   _HeaderIcon(
                     icon: Icons.share_rounded,
                     onTap: _shareCurrentMovie,
@@ -2892,11 +2779,6 @@ class _TxaPlayerState extends State<TxaPlayer>
                                 });
                                 _loadMarkers();
                                 _initializePlayer();
-                                  // Sync with MiniPlayerProvider if active
-                                  final mini = Provider.of<TxaMiniPlayerProvider>(context, listen: false);
-                                  if (!mini.isClosed) {
-                                    mini.updateEpisode(i);
-                                  }
                               },
                               child: AnimatedContainer(
                                 duration: const Duration(milliseconds: 200),

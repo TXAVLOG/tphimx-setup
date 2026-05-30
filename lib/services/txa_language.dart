@@ -21,6 +21,23 @@ class TxaLanguage extends ChangeNotifier {
       'check_update': 'Kiểm tra cập nhật',
       'downloading': 'Đang tải',
       'downloading_status': 'Đang tải: %p%% • %s% • ETA: %e%',
+      'pending': 'Đang chờ',
+      'paused': 'Đã tạm dừng',
+      'notification_canceled': 'Đã hủy thông báo',
+      'opening_external_browser': 'Đang mở trình duyệt ngoài...',
+      'offline_no_downloads_title': 'Chưa có phim tải về',
+      'offline_no_downloads_msg':
+          'Bạn đang ngoại tuyến và chưa có phim nào được tải xuống để xem.',
+      'login_required': 'Vui lòng đăng nhập để tiếp tục.',
+      'account_banned_title': 'Tài khoản bị khóa',
+      'exit_app': 'Thoát ứng dụng',
+      'verify_email': 'Xác thực email',
+      'verifying_email': 'Đang xác thực email...',
+      'verify_success': 'Xác thực thành công',
+      'verify_success_msg': 'Email của bạn đã được xác thực thành công.',
+      'verify_failed': 'Xác thực thất bại',
+      'verify_failed_msg':
+          'Không thể xác thực email. Liên kết có thể đã hết hạn hoặc không hợp lệ.',
       'error': 'Lỗi',
       'success': 'Thành công',
       'permissions_required': 'Yêu cầu quyền truy cập',
@@ -70,8 +87,6 @@ class TxaLanguage extends ChangeNotifier {
       'permission_install_label': 'Cài đặt ứng dụng',
       'permission_install_desc':
           'Bắt buộc để ứng dụng có thể tự động nâng cấp phiên bản mới.',
-      'permission_overlay_desc':
-          'Quyền này cần thiết để chế độ PiP (thu nhỏ) có thể hoạt động khi bạn thoát app.',
       'permission_nearby_devices_label': 'Thiết bị ở gần (Nearby)',
       'permission_nearby_devices_desc':
           'Bắt buộc để tìm kiếm và kết nối với các thiết bị Cast/TV trong mạng local.',
@@ -80,11 +95,8 @@ class TxaLanguage extends ChangeNotifier {
           'Cần thiết để phát hiện các thiết bị truyền tải không dây xung quanh.',
       'permission_nearby_devices_denied':
           'Quyền truy cập thiết bị ở gần bị từ chối. Không thể dò TV.',
-      'pip_permission_missing': 'Thiếu quyền vẽ lên ứng dụng khác để bật PiP.',
       'screenshot_detected': 'Đã chụp màn hình',
       'share_screenshot': 'Chia sẻ ảnh chụp',
-      'pip_mode': 'Chế độ thu nhỏ',
-      'now_playing_pip': 'Đang phát: %title%',
       'press_back_again': 'Nhấn lần nữa để thoát ứng dụng',
       'player_settings': 'Cài đặt trình phát',
       'language': 'Ngôn ngữ',
@@ -257,12 +269,6 @@ class TxaLanguage extends ChangeNotifier {
       'player_show_clock': 'Đồng hồ',
       'player_clock_format': 'Định dạng giờ',
       'player_dnd_auto': 'Tự động "Không làm phiền"',
-      'auto_pip_label': 'Tự động bật PiP',
-      'miracast_detected':
-          'Phát hiện phản chiếu màn hình. Vui lòng tắt Miracast để tiếp tục xem.',
-      'auto_pip_desc':
-          'Tự động kích hoạt thu nhỏ màn hình khi thoát app đang xem phim',
-      'permission_overlay_label': 'Cấp quyền hiển thị',
       'player_episodes': 'Danh sách tập',
       'player_gesture_hint': 'Vuốt để chỉnh độ sáng/âm lượng',
       'player_fast_forward_2x': 'Đang tua nhanh 2x',
@@ -498,13 +504,16 @@ class TxaLanguage extends ChangeNotifier {
       'downloaded': 'Đã tải về',
       'delete': 'Xóa',
       'download_summary': 'Đang tải %n% phim',
+      'downloading_count': 'Đang tải %n% phim',
       'episodes_completed': 'Đã tải %c%/%t% tập',
       'all_downloaded': 'Đã tải xong',
       'download_eta': 'ETA: %e%',
       'movies': 'Phim',
       'no_history_msg': 'Phim bạn tải xuống sẽ xuất hiện tại đây',
-      'delete_selected_movies_msg': 'Hành động này sẽ xóa các tập phim đã chọn khỏi thiết bị.',
-      'delete_all_episodes_msg': 'Hành động này sẽ xóa tất cả các tập phim của bộ này.',
+      'delete_selected_movies_msg':
+          'Hành động này sẽ xóa các tập phim đã chọn khỏi thiết bị.',
+      'delete_all_episodes_msg':
+          'Hành động này sẽ xóa tất cả các tập phim của bộ này.',
       'local_playback_error':
           'Lỗi phát file cục bộ. File có thể bị hỏng hoặc thiếu dữ liệu (HLS segments).',
       'test_completed': 'Kiểm tra hoàn tất',
@@ -515,20 +524,27 @@ class TxaLanguage extends ChangeNotifier {
       'speed_slow': 'Kết nối chậm. Có thể giật lag.',
       'api_server': 'Server API',
       'image_server': 'Server Ảnh',
-      'no_notifications_desc': 'Bạn chưa có thông báo nào mới. Hãy theo dõi các bộ phim yêu thích để nhận tin tức mới nhất!',
+      'no_notifications_desc':
+          'Bạn chưa có thông báo nào mới. Hãy theo dõi các bộ phim yêu thích để nhận tin tức mới nhất!',
       // Coach Mark
       'coach_menu_title': 'Menu chính',
-      'coach_menu_desc': 'Chạm vào đây để mở menu: cài đặt ngôn ngữ, kiểm tra quyền, và nhiều tùy chọn khác.',
+      'coach_menu_desc':
+          'Chạm vào đây để mở menu: cài đặt ngôn ngữ, kiểm tra quyền, và nhiều tùy chọn khác.',
       'coach_search_title': 'Tìm kiếm phim',
-      'coach_search_desc': 'Chạm vào đây để tìm kiếm phim, diễn viên hoặc thể loại bạn yêu thích.',
+      'coach_search_desc':
+          'Chạm vào đây để tìm kiếm phim, diễn viên hoặc thể loại bạn yêu thích.',
       'coach_hero_title': 'Phim nổi bật',
-      'coach_hero_desc': 'Vuốt để khám phá những bộ phim đang hot và được đề xuất dành cho bạn.',
+      'coach_hero_desc':
+          'Vuốt để khám phá những bộ phim đang hot và được đề xuất dành cho bạn.',
       'coach_filter_title': 'Bộ lọc thể loại',
-      'coach_filter_desc': 'Chọn thể loại phim bạn muốn xem: phim bộ, phim lẻ, hoạt hình, chiếu rạp...',
+      'coach_filter_desc':
+          'Chọn thể loại phim bạn muốn xem: phim bộ, phim lẻ, hoạt hình, chiếu rạp...',
       'coach_movie_title': 'Danh sách phim',
-      'coach_movie_desc': 'Chạm vào bất kỳ bộ phim nào để xem chi tiết, tải xuống hoặc thêm vào yêu thích.',
+      'coach_movie_desc':
+          'Chạm vào bất kỳ bộ phim nào để xem chi tiết, tải xuống hoặc thêm vào yêu thích.',
       'coach_nav_title': 'Thanh điều hướng',
-      'coach_nav_desc': 'Di chuyển giữa Trang chủ, Tìm kiếm, Lịch chiếu, và Tài khoản tại đây.',
+      'coach_nav_desc':
+          'Di chuyển giữa Trang chủ, Tìm kiếm, Lịch chiếu, và Tài khoản tại đây.',
       'got_it': 'Đã hiểu!',
       'next': 'Tiếp theo',
     },
@@ -545,6 +561,23 @@ class TxaLanguage extends ChangeNotifier {
       'download_downloading_segments': 'Downloading segment %c%/%t%...',
       'download_merging_video': 'Merging video...',
       'downloading_status': 'Downloading: %p%% • %s% • ETA: %e%',
+      'pending': 'Pending',
+      'paused': 'Paused',
+      'notification_canceled': 'Notification canceled',
+      'opening_external_browser': 'Opening external browser...',
+      'offline_no_downloads_title': 'No downloads yet',
+      'offline_no_downloads_msg':
+          'You are offline and have no downloaded movies available.',
+      'login_required': 'Please login to continue.',
+      'account_banned_title': 'Account banned',
+      'exit_app': 'Exit app',
+      'verify_email': 'Verify email',
+      'verifying_email': 'Verifying email...',
+      'verify_success': 'Verification successful',
+      'verify_success_msg': 'Your email has been verified successfully.',
+      'verify_failed': 'Verification failed',
+      'verify_failed_msg':
+          'Could not verify your email. The link may be expired or invalid.',
       'error': 'Error',
       'success': 'Success',
       'permissions_required': 'Permissions Required',
@@ -592,8 +625,6 @@ class TxaLanguage extends ChangeNotifier {
           'Receive notifications for new episodes or schedules.',
       'permission_install_label': 'Install Applications',
       'permission_install_desc': 'Required for automatic version upgrades.',
-      'permission_overlay_desc':
-          'Required for Picture-in-Picture mode to work when leaving the app.',
       'permission_nearby_devices_label': 'Nearby Devices',
       'permission_nearby_devices_desc':
           'Required to search and connect to Cast/TV devices in the local network.',
@@ -602,7 +633,6 @@ class TxaLanguage extends ChangeNotifier {
           'Necessary to detect wireless casting devices nearby.',
       'permission_nearby_devices_denied':
           'Nearby devices permission denied. Cannot scan for TV.',
-      'pip_permission_missing': 'Missing overlay permission for Auto PiP.',
       'press_back_again': 'Press back again to exit',
       'player_settings': 'Player Settings',
       'language': 'Language',
@@ -758,10 +788,6 @@ class TxaLanguage extends ChangeNotifier {
       'player_show_clock': 'Clock',
       'player_clock_format': 'Clock Format',
       'player_dnd_auto': 'Auto "Do Not Disturb"',
-      'auto_pip_label': 'Auto PiP Mode',
-      'auto_pip_desc':
-          'Automatically minimize to a floating window when leaving the app while watching',
-      'permission_overlay_label': 'Display permission',
       'player_episodes': 'Episode List',
       'player_gesture_hint': 'Swipe to adjust brightness/volume',
       'player_fast_forward_2x': 'Fast Forwarding 2x',
@@ -822,8 +848,7 @@ class TxaLanguage extends ChangeNotifier {
       'error_loading_notifications': 'Could not load notifications',
       'screenshot_detected': 'Screenshot detected',
       'share_screenshot': 'Share screenshot',
-      'pip_mode': 'PiP Mode',
-      'now_playing_pip': 'Now playing: %title%',
+
       'exact_alarm_permission_denied': 'Missing exact alarm permission.',
       'notification_permission_denied': 'Notification permission denied.',
       'notification_scheduled': 'Reminder set 🔔',
@@ -1017,28 +1042,37 @@ class TxaLanguage extends ChangeNotifier {
       'downloaded': 'Downloaded',
       'delete': 'Delete',
       'download_summary': 'Downloading %n% movies',
+      'downloading_count': 'Downloading %n% movies',
       'episodes_completed': '%c%/%t% episodes downloaded',
       'all_downloaded': 'All downloaded',
       'download_eta': 'ETA: %e%',
       'movies': 'Movies',
       'no_history_msg': 'Movies you download will appear here',
-      'delete_selected_movies_msg': 'This action will delete selected episodes from your device.',
-      'delete_all_episodes_msg': 'This action will delete all episodes of this movie.',
+      'delete_selected_movies_msg':
+          'This action will delete selected episodes from your device.',
+      'delete_all_episodes_msg':
+          'This action will delete all episodes of this movie.',
       'local_playback_error':
           'Local playback error. File might be corrupted or missing data (HLS segments).',
       // Coach Mark
       'coach_menu_title': 'Main Menu',
-      'coach_menu_desc': 'Tap here to open the menu: language settings, permission check, and more options.',
+      'coach_menu_desc':
+          'Tap here to open the menu: language settings, permission check, and more options.',
       'coach_search_title': 'Search Movies',
-      'coach_search_desc': 'Tap here to search for movies, actors, or genres you love.',
+      'coach_search_desc':
+          'Tap here to search for movies, actors, or genres you love.',
       'coach_hero_title': 'Featured Movies',
-      'coach_hero_desc': 'Swipe to discover trending movies and personalized recommendations.',
+      'coach_hero_desc':
+          'Swipe to discover trending movies and personalized recommendations.',
       'coach_filter_title': 'Genre Filters',
-      'coach_filter_desc': 'Choose the movie genre you want: series, singles, anime, theaters...',
+      'coach_filter_desc':
+          'Choose the movie genre you want: series, singles, anime, theaters...',
       'coach_movie_title': 'Movie List',
-      'coach_movie_desc': 'Tap any movie to view details, download, or add to favorites.',
+      'coach_movie_desc':
+          'Tap any movie to view details, download, or add to favorites.',
       'coach_nav_title': 'Navigation Bar',
-      'coach_nav_desc': 'Navigate between Home, Search, Schedule, and Account here.',
+      'coach_nav_desc':
+          'Navigate between Home, Search, Schedule, and Account here.',
       'got_it': 'Got it!',
       'next': 'Next',
     },
