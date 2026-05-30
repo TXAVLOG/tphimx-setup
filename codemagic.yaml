@@ -95,3 +95,79 @@ workflows:
           echo "✅ iOS Release and Upload completed successfully."
     artifacts:
       - build/ios/ipa/*.ipa
+
+  premium-github-release-only:
+    name: "🚀 [TPhimX] iOS Premium GitHub Release Only"
+    instance_type: mac_mini_m1
+    max_build_duration: 10
+    environment:
+      groups:
+        - txa
+      vars:
+        PACKAGE_NAME: "TPHIMX-Premium"
+        REPO_ID: "TXAVLOG/tphimx-setup"
+        IPA_URL: ""
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+    scripts:
+      - name: 🏷 Prepare Version & Git Tag
+        script: |
+          VERSION=$(grep "^version: " pubspec.yaml | sed 's/version: //' | tr -d '\r')
+          TAG="v${VERSION//+/_}"
+          echo "VERSION=$VERSION" >> $CM_ENV
+          echo "TAG=$TAG" >> $CM_ENV
+          echo "Current version identified: $VERSION (Tag: $TAG)"
+      - name: 📥 Download Existing IPA
+        script: |
+          set -e
+          if [ -z "$IPA_URL" ]; then
+            echo "❌ Error: IPA_URL is not set. Please pass the download URL of the IPA file when triggering."
+            exit 1
+          fi
+          echo "Downloading IPA from $IPA_URL..."
+          mkdir -p build/ios/ipa
+          curl -L -o "build/ios/ipa/$PACKAGE_NAME-v$VERSION.ipa" "$IPA_URL"
+          echo "✅ IPA downloaded successfully."
+      - name: 🚀 Create GitHub Tags & Release
+        script: |
+          set -e
+          if [ -z "$GITHUB_TOKEN" ]; then
+            echo "❌ Error: GITHUB_TOKEN is not set."
+            exit 1
+          fi
+          
+          export GITHUB_TOKEN=$GITHUB_TOKEN
+          
+          # Git Tagging with Token Auth
+          echo "Tagging current commit with $TAG..."
+          git tag "$TAG" || echo "Tag already exists"
+          
+          echo "Pushing tag to remote..."
+          git push https://x-access-token:$GITHUB_TOKEN@github.com/$REPO_ID.git "$TAG" || echo "Tag already pushed"
+
+          echo "Generating changelog..."
+          CHANGELOG=$(git log -1 --pretty=format:"%s%n%nFull changes:%n- %b")
+          
+          IPA_FILE="build/ios/ipa/$PACKAGE_NAME-v$VERSION.ipa"
+
+          if [ ! -f "$IPA_FILE" ]; then
+            echo "❌ Error: IPA file $IPA_FILE NOT FOUND."
+            exit 1
+          fi
+
+          echo "Creating Release $TAG on GitHub (as Latest)..."
+          gh release create "$TAG" \
+            --repo "$REPO_ID" \
+            --title "TPhimX Premium iOS v$VERSION" \
+            --notes "$CHANGELOG" \
+            --latest || echo "Release $TAG already exists."
+
+          echo "Uploading IPA: $IPA_FILE"
+          gh release upload "$TAG" "$IPA_FILE" \
+            --repo "$REPO_ID" \
+            --clobber
+          
+          echo "✅ iOS Release and Upload completed successfully."
+    artifacts:
+      - build/ios/ipa/*.ipa
