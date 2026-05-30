@@ -210,6 +210,37 @@ class TxaSettings extends ChangeNotifier {
   static String get udid => _prefs?.getString('ios_device_udid') ?? '';
   static set udid(String v) => _prefs?.setString('ios_device_udid', v);
 
+  /// Kiểm tra xem có thể hiển thị màn donate hôm nay không (Giới hạn 5 lần/ngày)
+  static bool canShowDonate() {
+    if (_prefs == null) return false;
+    final now = DateTime.now();
+    final todayStr = "${now.year}-${now.month}-${now.day}";
+    final savedDate = _prefs!.getString('donate_show_date') ?? '';
+    if (savedDate != todayStr) {
+      _prefs!.setString('donate_show_date', todayStr);
+      _prefs!.setInt('donate_show_count', 0);
+      return true;
+    }
+    final count = _prefs!.getInt('donate_show_count') ?? 0;
+    return count < 5;
+  }
+
+  /// Tăng số lần hiển thị màn donate hôm nay
+  static void incrementDonateCount() {
+    if (_prefs == null) return;
+    final now = DateTime.now();
+    final todayStr = "${now.year}-${now.month}-${now.day}";
+    final savedDate = _prefs!.getString('donate_show_date') ?? '';
+    int count = 0;
+    if (savedDate == todayStr) {
+      count = _prefs!.getInt('donate_show_count') ?? 0;
+    } else {
+      _prefs!.setString('donate_show_date', todayStr);
+    }
+    _prefs!.setInt('donate_show_count', count + 1);
+  }
+
+
   // --- App State flags for Background Tasks ---
   static bool get isUpdateDownloading =>
       _prefs?.getBool('is_update_downloading') ?? false;

@@ -20,6 +20,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import '../services/txa_download_manager.dart';
 import '../services/txa_api.dart';
 import 'txa_maintenance_screen.dart';
+import 'txa_donate_screen.dart';
 import '../utils/txa_logger.dart';
 import '../widgets/txa_modal.dart';
 
@@ -37,6 +38,7 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
   String? _fatalError;
   bool _isIosLocked = false;
   bool _isMaintenance = false;
+  bool _showDonate = false;
   late AppLinks _appLinks;
   StreamSubscription<Uri>? _linkSubscription;
 
@@ -216,7 +218,17 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
         _progress = 1.0;
         _status = TxaLanguage.t('success');
       });
-      Future.delayed(const Duration(seconds: 1), widget.onFinish);
+      Future.delayed(const Duration(seconds: 1), () {
+        if (!mounted) return;
+        if (Platform.isIOS && TxaSettings.canShowDonate()) {
+          TxaSettings.incrementDonateCount();
+          setState(() {
+            _showDonate = true;
+          });
+        } else {
+          widget.onFinish();
+        }
+      });
     } catch (e, stack) {
       debugPrint('[SplashError] $e\n$stack');
       setState(() {
@@ -664,6 +676,11 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
 
     if (_fatalError != null) {
       return _buildErrorView();
+    }
+
+    // iOS: Show donate screen after splash completes
+    if (_showDonate) {
+      return TxaDonateScreen(onFinish: widget.onFinish);
     }
 
     return Scaffold(
