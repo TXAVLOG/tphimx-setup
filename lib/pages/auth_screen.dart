@@ -7,6 +7,7 @@ import '../services/txa_settings.dart';
 import '../services/txa_language.dart';
 import '../theme/txa_theme.dart';
 import '../utils/txa_toast.dart';
+import '../utils/txa_logger.dart';
 
 class AuthScreen extends StatefulWidget {
   final bool isRegister;
@@ -102,6 +103,13 @@ class _AuthScreenState extends State<AuthScreen>
           Navigator.pop(context, true);
         }
       } else {
+        // Log login failure
+        TxaLogger.log(
+          'Login Failed: ${res.data['message'] ?? TxaLanguage.t('error_login')}',
+          isError: true,
+          tag: 'AUTH',
+          type: 'auth',
+        );
         if (mounted) {
           TxaToast.show(
             context,
@@ -111,6 +119,14 @@ class _AuthScreenState extends State<AuthScreen>
         }
       }
     } on DioException catch (e) {
+      // Log login error
+      TxaLogger.log(
+        'Login Error: ${e.type} - ${e.message} - Response: ${e.response?.data}',
+        isError: true,
+        tag: 'AUTH',
+        type: 'auth',
+      );
+
       if (e.response?.data != null && e.response?.data['data'] != null) {
         final errorCode = e.response?.data['data']['error_code'];
         setState(() {
@@ -194,8 +210,31 @@ class _AuthScreenState extends State<AuthScreen>
           TxaToast.show(context, TxaLanguage.t('register_success'));
           _tabController.animateTo(0);
         }
+      } else {
+        // Log register failure
+        TxaLogger.log(
+          'Register Failed: Status Code ${res.statusCode} - Response: ${res.data}',
+          isError: true,
+          tag: 'AUTH',
+          type: 'auth',
+        );
+        if (mounted) {
+          TxaToast.show(
+            context,
+            res.data['message'] ?? TxaLanguage.t('error_register'),
+            isError: true,
+          );
+        }
       }
     } on DioException catch (e) {
+      // Log register error
+      TxaLogger.log(
+        'Register Error: ${e.type} - ${e.message} - Response: ${e.response?.data}',
+        isError: true,
+        tag: 'AUTH',
+        type: 'auth',
+      );
+
       if (e.response?.statusCode == 422) {
         final errors = e.response?.data['errors'];
         setState(() {

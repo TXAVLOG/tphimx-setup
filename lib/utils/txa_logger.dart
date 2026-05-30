@@ -3,6 +3,9 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/foundation.dart';
+import 'package:device_info_plus/device_info_plus.dart';
+import 'package:dio/dio.dart';
+import '../services/txa_settings.dart';
 
 class TxaLogger {
   static String? _cachedLogPath;
@@ -62,18 +65,29 @@ class TxaLogger {
     // 1. Catch Flutter Framework Errors
     FlutterError.onError = (FlutterErrorDetails details) {
       FlutterError.presentError(details);
-      log('FLUTTER ERROR: ${details.exceptionAsString()}\n${details.stack}', 
-          isError: true, tag: 'CRASH', type: 'error');
+      log(
+        'FLUTTER ERROR: ${details.exceptionAsString()}\n${details.stack}',
+        isError: true,
+        tag: 'CRASH',
+        type: 'error',
+      );
     };
 
     // 2. Catch Platform Errors (Asynchronous)
     PlatformDispatcher.instance.onError = (error, stack) {
-      log('PLATFORM ERROR: $error\n$stack', 
-          isError: true, tag: 'CRASH', type: 'error');
+      log(
+        'PLATFORM ERROR: $error\n$stack',
+        isError: true,
+        tag: 'CRASH',
+        type: 'error',
+      );
       return true;
     };
 
-    log('================================================================', tag: 'SESSION');
+    log(
+      '================================================================',
+      tag: 'SESSION',
+    );
     log('TxaLogger initialized. Global error tracking active.', tag: 'LOGGER');
   }
 
@@ -108,6 +122,11 @@ class TxaLogger {
           ? '❌ [$timestamp] [TPHIMX-$type]'
           : 'ℹ️ [$timestamp] [TPHIMX-$type]';
       debugPrint('$consolePrefix $tagStr$message');
+
+      // Auto-submit error logs to server
+      if (isError) {
+        submitErrorLog(type: type, message: message, tag: tag);
+      }
     } catch (e) {
       if (kDebugMode) debugPrint('CRITICAL: Failed to write to log file: $e');
     }
@@ -142,5 +161,104 @@ class TxaLogger {
 
   static Future<String> getActiveLogPath() async {
     return await _logPath;
+  }
+
+  // Get device information
+  static Future<Map<String, dynamic>> getDeviceInfo() async {
+    final deviceInfo = DeviceInfoPlugin();
+    Map<String, dynamic> info = {
+      'platform': Platform.isIOS ? 'iOS' : 'Android',
+      'udid': TxaSettings.udid,
+    };
+
+    try {
+      if (Platform.isIOS) {
+        final iosInfo = await deviceInfo.iosInfo;
+        info['device_name'] = iosInfo.name;
+        info['device_model'] = iosInfo.model;
+        info['system_version'] = iosInfo.systemVersion;
+      } else if (Platform.isAndroid) {
+        final androidInfo = await deviceInfo.androidInfo;
+        info['device_name'] = androidInfo.brand;
+        info['device_model'] = androidInfo.model;
+        info['system_version'] = androidInfo.version.release;
+      }
+    } catch (e) {
+      debugPrint('Failed to get device info: $e');
+    }
+
+    return info;
+  }
+
+  // Get IP and location info
+  static Future<Map<String, dynamic>> getIpLocation() async {
+    try {
+      final dio = Dio();
+      final response = await dio.get(
+        'https://ipapi.co/json/',
+        options: Options(connectTimeout: const Duration(seconds: 5)),
+      );
+      if (response.data != null) {
+        return {
+          'ip': response.data['ip'] ?? 'unknown',
+          'city': response.data['city'] ?? 'unknown',
+          'region': response.data['region'] ?? 'unknown',
+          'country': response.data['country_name'] ?? 'unknown',
+          'latitude': response.data['latitude']?.toString() ?? 'unknown',
+          'longitude': response.data['longitude']?.toString() ?? 'unknown',
+        };
+      }
+    } catch (e) {
+      debugPrint('Failed to get IP/location: $e');
+    }
+    return {
+      'ip': 'unknown',
+      'city': 'unknown',
+      'region': 'unknown',
+      'country': 'unknown',
+      'latitude': 'unknown',
+      'longitude': 'unknown',
+    };
+  }
+
+  // Submit error log to server
+  static Future<void> submitErrorLog({
+    required String type,
+    required String message,
+    String? tag,
+    Map<String, dynamic>? extra,
+  }) async {
+    try {
+      final deviceInfo = await getDeviceInfo();
+      final locationInfo = await getIpLocation();
+
+      final dio = Dio();
+      await dio.post(
+        'https://dongmephim.online/api/app/client-error',
+        data: {
+          'type': type,
+          'message': message,
+          'tag': tag,
+          'extra': {
+            ...?extra,
+            'device_info': deviceInfo,
+            'location_info': locationInfo,
+          },
+          'device_info': 'TPhimX-App-V4.4.0',
+          'timestamp': DateTime.now().toIso8601String(),
+        },
+        options: Options(
+          headers: {
+            'X-TXA-API-KEY': 'tphimx-mobile-2026-secure',
+            'X-TXC-Client': 'TPhimX-App',
+            'X-TXC-Platform': Platform.isIOS ? 'iOS' : 'Android',
+            'X-TXA-UDID': TxaSettings.udid,
+          },
+          connectTimeout: const Duration(seconds: 10),
+        ),
+      );
+    } catch (e) {
+      debugPrint('Failed to submit error log: $e');
+    }
   }
 }
