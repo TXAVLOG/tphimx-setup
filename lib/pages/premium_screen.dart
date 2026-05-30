@@ -90,7 +90,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
         deviceName = "iOS Device";
       }
       final String url =
-          "https://asset.nrotxa.online/uuid?device_name=${Uri.encodeComponent(deviceName)}";
+          "https://api.dongmephim.online/uuid?device_name=${Uri.encodeComponent(deviceName)}";
       if (!context.mounted) return;
       await _launchUrl(context, url);
     }

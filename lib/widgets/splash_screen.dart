@@ -623,7 +623,7 @@ class _SplashScreenState extends State<SplashScreen> with WidgetsBindingObserver
     }
 
     final String url =
-        "https://asset.nrotxa.online/uuid?device_name=${Uri.encodeComponent(deviceName)}";
+        "https://api.dongmephim.online/uuid?device_name=${Uri.encodeComponent(deviceName)}";
     final Uri uri = Uri.parse(url);
     if (!await launchUrl(uri, mode: LaunchMode.externalApplication)) {
       if (!context.mounted) return;
