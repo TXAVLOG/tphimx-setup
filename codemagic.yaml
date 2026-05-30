@@ -106,7 +106,7 @@ workflows:
       vars:
         PACKAGE_NAME: "TPHIMX-Premium"
         REPO_ID: "TXAVLOG/tphimx-setup"
-        IPA_URL: ""
+        IPA_URL: "https://placeholder-url-please-replace.com"
       flutter: stable
       xcode: latest
       cocoapods: default
@@ -121,7 +121,7 @@ workflows:
       - name: 📥 Download Existing IPA
         script: |
           set -e
-          if [ -z "$IPA_URL" ]; then
+          if [ -z "$IPA_URL" ] || [ "$IPA_URL" = "https://placeholder-url-please-replace.com" ]; then
             echo "❌ Error: IPA_URL is not set. Please pass the download URL of the IPA file when triggering."
             exit 1
           fi
