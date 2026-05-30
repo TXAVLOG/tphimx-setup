@@ -7,8 +7,8 @@ class TxaApi {
   static const String baseUrl = 'https://dongmephim.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '4.3.0';
-  static const String buildNumber = '430';
+  static const String apiVersion = '4.3.1';
+  static const String buildNumber = '431';
 
   // Community Links
   static const String facebookFanpage =
@@ -374,7 +374,7 @@ class TxaApi {
           'type': type,
           'message': message,
           'extra': extra,
-          'device_info': 'TPhimX-App-V4.3.0',
+          'device_info': 'TPhimX-App-V4.3.1',
           'timestamp': DateTime.now().toIso8601String(),
         },
       );

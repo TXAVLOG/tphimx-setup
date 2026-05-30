@@ -1070,8 +1070,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.3.0';
-                  final build = snapshot.data?.buildNumber ?? '430';
+                  final version = snapshot.data?.version ?? '4.3.1';
+                  final build = snapshot.data?.buildNumber ?? '431';
                   return InkWell(
                     onTap: () => Navigator.push(
                       context,
