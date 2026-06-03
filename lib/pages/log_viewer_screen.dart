@@ -16,7 +16,7 @@ class LogEntry {
   final String message;
   final Color color;
   final IconData icon;
-  
+
   // Parsed API details (optional)
   final String? apiMethod;
   final String? apiUrl;
@@ -48,46 +48,54 @@ class LogViewerScreen extends StatefulWidget {
   State<LogViewerScreen> createState() => _LogViewerScreenState();
 }
 
-class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProviderStateMixin {
+class _LogViewerScreenState extends State<LogViewerScreen>
+    with SingleTickerProviderStateMixin {
   late TabController _tabController;
   List<LogEntry> _appLogs = [];
   List<LogEntry> _apiLogs = [];
   List<LogEntry> _downloadLogs = [];
+  List<LogEntry> _searchLogs = [];
   bool _loading = true;
 
   final ScrollController _appScroll = ScrollController();
   final ScrollController _apiScroll = ScrollController();
   final ScrollController _downloadScroll = ScrollController();
+  final ScrollController _searchScroll = ScrollController();
 
   // Search & Filtering State
   String _searchApp = '';
   String _searchApi = '';
   String _searchDownload = '';
+  String _searchSearch = '';
 
   String _filterApp = 'ALL';
   String _filterApi = 'ALL';
   String _filterDownload = 'ALL';
+  final String _filterSearch = 'ALL';
 
   // Toggle Auto Scroll state
   bool _autoScrollApp = true;
   bool _autoScrollApi = true;
   bool _autoScrollDownload = true;
+  bool _autoScrollSearch = true;
 
   // Track Expanded Log Indices
   final Set<int> _expandedApp = {};
   final Set<int> _expandedApi = {};
   final Set<int> _expandedDownload = {};
+  final Set<int> _expandedSearch = {};
 
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _loadLogs();
 
     // Setup listener to toggle FAB show/hide depending on scroll pos
     _appScroll.addListener(() => _checkScrollPos('app'));
     _apiScroll.addListener(() => _checkScrollPos('api'));
     _downloadScroll.addListener(() => _checkScrollPos('downloads'));
+    _searchScroll.addListener(() => _checkScrollPos('search'));
   }
 
   @override
@@ -96,6 +104,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
     _appScroll.dispose();
     _apiScroll.dispose();
     _downloadScroll.dispose();
+    _searchScroll.dispose();
     super.dispose();
   }
 
@@ -103,18 +112,18 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
     if (mounted) setState(() {});
   }
 
-
-
   Future<void> _loadLogs() async {
     setState(() => _loading = true);
     try {
       final appRaw = await _readLogFile('app');
       final apiRaw = await _readLogFile('api');
       final downloadRaw = await _readLogFile('downloads');
-      
+      final searchRaw = await _readLogFile('search');
+
       List<LogEntry> parsedApp = [];
       List<LogEntry> parsedApi = [];
       List<LogEntry> parsedDownloads = [];
+      List<LogEntry> parsedSearch = [];
 
       try {
         parsedApp = _parseLogs(appRaw);
@@ -134,16 +143,24 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
         debugPrint('Error parsing DOWNLOADS logs: $e');
       }
 
+      try {
+        parsedSearch = _parseLogs(searchRaw);
+      } catch (e) {
+        debugPrint('Error parsing SEARCH logs: $e');
+      }
+
       setState(() {
         _appLogs = parsedApp;
         _apiLogs = parsedApi;
         _downloadLogs = parsedDownloads;
+        _searchLogs = parsedSearch;
         _loading = false;
-        
+
         // Reset expanded cards on reload
         _expandedApp.clear();
         _expandedApi.clear();
         _expandedDownload.clear();
+        _expandedSearch.clear();
       });
 
       // Scroll to bottom after build if autoScroll is enabled
@@ -153,6 +170,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
         }
         if (_autoScrollApi && _apiScroll.hasClients) {
           _apiScroll.jumpTo(_apiScroll.position.maxScrollExtent);
+        }
+        if (_autoScrollSearch && _searchScroll.hasClients) {
+          _searchScroll.jumpTo(_searchScroll.position.maxScrollExtent);
         }
         if (_autoScrollDownload && _downloadScroll.hasClients) {
           _downloadScroll.jumpTo(_downloadScroll.position.maxScrollExtent);
@@ -166,7 +186,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
   List<LogEntry> _parseLogs(String raw) {
     final List<LogEntry> entries = [];
     if (raw.trim().isEmpty) return entries;
-    
+
     final lines = raw.split('\n');
     final regExp = RegExp(r'^\[([\d:.]+)\] \[(\w+)\s*\] (?:\[(\w+)\] )?(.*)$');
 
@@ -205,18 +225,25 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
         try {
           final now = DateTime.now();
           final timeParts = timeStr.split(':');
-          final time = DateTime(now.year, now.month, now.day, 
-            int.parse(timeParts[0]), int.parse(timeParts[1]), 
-            int.parse(timeParts[2].split('.')[0]));
-            
-          entries.add(LogEntry(
-            time: time,
-            level: level.trim(),
-            tag: tag,
-            message: msg,
-            color: color,
-            icon: icon,
-          ));
+          final time = DateTime(
+            now.year,
+            now.month,
+            now.day,
+            int.parse(timeParts[0]),
+            int.parse(timeParts[1]),
+            int.parse(timeParts[2].split('.')[0]),
+          );
+
+          entries.add(
+            LogEntry(
+              time: time,
+              level: level.trim(),
+              tag: tag,
+              message: msg,
+              color: color,
+              icon: icon,
+            ),
+          );
         } catch (_) {}
       } else {
         // Handle multi-line messages (stack traces)
@@ -239,7 +266,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
   List<LogEntry> _parseApiLogs(String raw) {
     final List<LogEntry> entries = [];
     if (raw.trim().isEmpty) return entries;
-    
+
     final lines = raw.split('\n');
     final regExp = RegExp(r'^\[([\d:.]+)\] \[(\w+)\s*\] (?:\[(\w+)\] )?(.*)$');
 
@@ -267,9 +294,14 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
           try {
             final now = DateTime.now();
             final timeParts = timeStr.split(':');
-            final time = DateTime(now.year, now.month, now.day, 
-              int.parse(timeParts[0]), int.parse(timeParts[1]), 
-              int.parse(timeParts[2].split('.')[0]));
+            final time = DateTime(
+              now.year,
+              now.month,
+              now.day,
+              int.parse(timeParts[0]),
+              int.parse(timeParts[1]),
+              int.parse(timeParts[2].split('.')[0]),
+            );
 
             currentEntry = LogEntry(
               time: time,
@@ -309,7 +341,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
     String url = '';
     String status = '';
     String? timeStr;
-    
+
     bool inRequest = false;
     bool inResponse = false;
     List<String> bodyLines = [];
@@ -317,7 +349,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
 
     for (var line in details) {
       final trimmed = line.trim();
-      
+
       if (trimmed.startsWith('URL:')) {
         url = trimmed.replaceFirst('URL:', '').trim();
       } else if (trimmed.startsWith('STATUS:')) {
@@ -334,7 +366,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
         inResponse = true;
         final content = trimmed.replaceFirst('RESPONSE:', '').trim();
         if (content.isNotEmpty) respLines.add(content);
-      } else if (trimmed.startsWith('──────────────────────────────────────────────')) {
+      } else if (trimmed.startsWith(
+        '──────────────────────────────────────────────',
+      )) {
         inRequest = false;
         inResponse = false;
       } else {
@@ -391,7 +425,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
       final path = await TxaLogger.getActiveLogPath();
       final dir = Directory(path);
       if (await dir.exists()) {
-        for (var f in dir.listSync()) { if (f is File) await f.delete(); }
+        for (var f in dir.listSync()) {
+          if (f is File) await f.delete();
+        }
       }
       _loadLogs();
     } catch (_) {}
@@ -402,8 +438,14 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
       context: context,
       builder: (ctx) => AlertDialog(
         backgroundColor: TxaTheme.cardBg,
-        title: Text(TxaLanguage.t('clear_logs_confirm'), style: const TextStyle(color: Colors.white)),
-        content: Text(TxaLanguage.t('clear_logs_msg'), style: const TextStyle(color: Colors.white70)),
+        title: Text(
+          TxaLanguage.t('clear_logs_confirm'),
+          style: const TextStyle(color: Colors.white),
+        ),
+        content: Text(
+          TxaLanguage.t('clear_logs_msg'),
+          style: const TextStyle(color: Colors.white70),
+        ),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(ctx),
@@ -414,7 +456,10 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
               Navigator.pop(ctx);
               _clearLogs();
             },
-            child: Text(TxaLanguage.t('clear'), style: const TextStyle(color: Colors.red)),
+            child: Text(
+              TxaLanguage.t('clear'),
+              style: const TextStyle(color: Colors.red),
+            ),
           ),
         ],
       ),
@@ -432,10 +477,55 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
       final file = File(filePath);
 
       if (await file.exists()) {
+        final rawContent = await file.readAsString();
+
+        // Fetch detailed device specs and IP geolocation
+        final deviceInfo = await TxaLogger.getDeviceInfo();
+        final locationInfo = await TxaLogger.getIpLocation();
+
+        final buffer = StringBuffer();
+        buffer.writeln('===============================================');
+        buffer.writeln('          TPHIMX APP DIAGNOSTIC LOG          ');
+        buffer.writeln('===============================================');
+        buffer.writeln('DATE: $date');
+        buffer.writeln('LOG TYPE: ${type.toUpperCase()}');
+        buffer.writeln('-----------------------------------------------');
+        buffer.writeln('DEVICE INFORMATION:');
+        buffer.writeln('  Platform: ${deviceInfo['platform'] ?? 'Unknown'}');
+        buffer.writeln(
+          '  Device Name: ${deviceInfo['device_name'] ?? 'Unknown'}',
+        );
+        buffer.writeln(
+          '  Device Model: ${deviceInfo['device_model'] ?? 'Unknown'}',
+        );
+        buffer.writeln(
+          '  OS Version: ${deviceInfo['system_version'] ?? 'Unknown'}',
+        );
+        buffer.writeln('  Device UDID: ${deviceInfo['udid'] ?? 'Unknown'}');
+        buffer.writeln('-----------------------------------------------');
+        buffer.writeln('NETWORK / LOCATION:');
+        buffer.writeln('  IP Address: ${locationInfo['ip'] ?? 'Unknown'}');
+        buffer.writeln(
+          '  Location: ${locationInfo['city'] ?? 'Unknown'}, ${locationInfo['region'] ?? 'Unknown'}, ${locationInfo['country'] ?? 'Unknown'}',
+        );
+        buffer.writeln('===============================================');
+        buffer.writeln();
+        buffer.writeln(rawContent);
+
+        // Create temporary diagnostic log file to share
+        final tempDir = await Directory.systemTemp.createTemp();
+        final tempFile = File(
+          '${tempDir.path}/${type}_logs_diagnostics_$date.log',
+        );
+        await tempFile.writeAsString(buffer.toString());
+
         await SharePlus.instance.share(
           ShareParams(
-            files: [XFile(filePath, name: '${type}_logs_$date.log')],
-            subject: 'TPhimX ${type.toUpperCase()} Logs - $date',
+            files: [
+              XFile(tempFile.path, name: '${type}_logs_diagnostics_$date.log'),
+            ],
+            subject:
+                'TPhimX ${type.toUpperCase()} Logs with Diagnostics - $date',
           ),
         );
       } else {
@@ -453,13 +543,18 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
     }
   }
 
-  List<LogEntry> _getFilteredLogs(List<LogEntry> logs, String query, String levelFilter) {
+  List<LogEntry> _getFilteredLogs(
+    List<LogEntry> logs,
+    String query,
+    String levelFilter,
+  ) {
     return logs.where((entry) {
       // 1. Level Filter
       if (levelFilter != 'ALL') {
-        final isErr = entry.level.contains('ERROR') || entry.color == Colors.redAccent;
+        final isErr =
+            entry.level.contains('ERROR') || entry.color == Colors.redAccent;
         final isWarn = entry.level.contains('WARN') || entry.level == 'WARN';
-        
+
         if (levelFilter == 'ERROR' && !isErr) return false;
         if (levelFilter == 'WARN' && !isWarn) return false;
         if (levelFilter == 'INFO' && (isErr || isWarn)) return false;
@@ -479,8 +574,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
   }
 
   // Visual metrics calculation
-  int _getErrorCount(List<LogEntry> logs) =>
-      logs.where((l) => l.level.contains('ERROR') || l.color == Colors.redAccent).length;
+  int _getErrorCount(List<LogEntry> logs) => logs
+      .where((l) => l.level.contains('ERROR') || l.color == Colors.redAccent)
+      .length;
   int _getWarnCount(List<LogEntry> logs) =>
       logs.where((l) => l.level.contains('WARN') || l.level == 'WARN').length;
 
@@ -493,18 +589,26 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
         elevation: 0,
         title: Text(
           TxaLanguage.t('logs'),
-          style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 18, letterSpacing: 0.8),
+          style: const TextStyle(
+            fontWeight: FontWeight.bold,
+            fontSize: 18,
+            letterSpacing: 0.8,
+          ),
         ),
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
           indicatorColor: TxaTheme.accent,
           indicatorWeight: 3,
-          labelStyle: const TextStyle(fontWeight: FontWeight.bold, letterSpacing: 0.5),
+          labelStyle: const TextStyle(
+            fontWeight: FontWeight.bold,
+            letterSpacing: 0.5,
+          ),
           unselectedLabelStyle: const TextStyle(fontWeight: FontWeight.normal),
           tabs: [
             Tab(text: 'APP (${_appLogs.length})'),
             Tab(text: 'API (${_apiLogs.length})'),
+            Tab(text: 'SEARCH (${_searchLogs.length})'),
             Tab(text: 'DOWNLOADS (${_downloadLogs.length})'),
           ],
         ),
@@ -520,26 +624,37 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
             tooltip: TxaLanguage.t('share_logs'),
           ),
           IconButton(
-            icon: const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 22),
+            icon: const Icon(
+              Icons.delete_sweep_rounded,
+              color: Colors.redAccent,
+              size: 22,
+            ),
             onPressed: _showClearDialog,
             tooltip: 'Xóa toàn bộ',
           ),
         ],
       ),
       body: _loading
-          ? const Center(child: CircularProgressIndicator(color: TxaTheme.accent))
+          ? const Center(
+              child: CircularProgressIndicator(color: TxaTheme.accent),
+            )
           : TabBarView(
               controller: _tabController,
               children: [
                 _buildLogTab('app', _appLogs, _appScroll),
                 _buildLogTab('api', _apiLogs, _apiScroll),
+                _buildLogTab('search', _searchLogs, _searchScroll),
                 _buildLogTab('downloads', _downloadLogs, _downloadScroll),
               ],
             ),
     );
   }
 
-  Widget _buildLogTab(String type, List<LogEntry> rawLogs, ScrollController scrollController) {
+  Widget _buildLogTab(
+    String type,
+    List<LogEntry> rawLogs,
+    ScrollController scrollController,
+  ) {
     // 1. Get search and filter state
     String query = '';
     String filter = 'ALL';
@@ -556,6 +671,11 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
       filter = _filterApi;
       autoScroll = _autoScrollApi;
       expanded = _expandedApi;
+    } else if (type == 'search') {
+      query = _searchSearch;
+      filter = _filterSearch;
+      autoScroll = _autoScrollSearch;
+      expanded = _expandedSearch;
     } else {
       query = _searchDownload;
       filter = _filterDownload;
@@ -566,8 +686,10 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
     final filtered = _getFilteredLogs(rawLogs, query, filter);
 
     // Dynamic show FAB if user has scrolled up
-    final showFab = scrollController.hasClients &&
-        scrollController.position.pixels < scrollController.position.maxScrollExtent - 200;
+    final showFab =
+        scrollController.hasClients &&
+        scrollController.position.pixels <
+            scrollController.position.maxScrollExtent - 200;
 
     return Stack(
       children: [
@@ -575,7 +697,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
           children: [
             // Statistics Dashboard Metric Box
             _buildStatsDashboard(rawLogs),
-            
+
             // Search and level filter chips
             _buildFilterBar(type, query, filter, autoScroll),
 
@@ -586,27 +708,45 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
                       child: Column(
                         mainAxisAlignment: MainAxisAlignment.center,
                         children: [
-                          Icon(Icons.feed_outlined, size: 48, color: Colors.white.withValues(alpha: 0.15)),
+                          Icon(
+                            Icons.feed_outlined,
+                            size: 48,
+                            color: Colors.white.withValues(alpha: 0.15),
+                          ),
                           const SizedBox(height: 12),
                           Text(
                             TxaLanguage.t('no_logs_found'),
-                            style: TextStyle(color: Colors.white.withValues(alpha: 0.3), fontSize: 13),
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.3),
+                              fontSize: 13,
+                            ),
                           ),
                         ],
                       ),
                     )
                   : ListView.builder(
                       controller: scrollController,
-                      padding: const EdgeInsets.only(left: 12, right: 12, top: 4, bottom: 80),
+                      padding: const EdgeInsets.only(
+                        left: 12,
+                        right: 12,
+                        top: 4,
+                        bottom: 80,
+                      ),
                       itemCount: filtered.length,
                       itemBuilder: (context, index) {
-                        return _buildLogCard(index, filtered[index], expanded, query, type);
+                        return _buildLogCard(
+                          index,
+                          filtered[index],
+                          expanded,
+                          query,
+                          type,
+                        );
                       },
                     ),
             ),
           ],
         ),
-        
+
         // Smart Floating FAB for auto-scroll
         if (showFab)
           Positioned(
@@ -644,19 +784,44 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
       margin: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       child: Row(
         children: [
-          _buildStatCard('Tổng', total.toString(), Colors.blueAccent, Icons.assessment_outlined),
+          _buildStatCard(
+            'Tổng',
+            total.toString(),
+            Colors.blueAccent,
+            Icons.assessment_outlined,
+          ),
           const SizedBox(width: 8),
-          _buildStatCard('Lỗi', errors.toString(), Colors.redAccent, Icons.error_outline_rounded),
+          _buildStatCard(
+            'Lỗi',
+            errors.toString(),
+            Colors.redAccent,
+            Icons.error_outline_rounded,
+          ),
           const SizedBox(width: 8),
-          _buildStatCard('Cảnh báo', warnings.toString(), Colors.orangeAccent, Icons.warning_amber_rounded),
+          _buildStatCard(
+            'Cảnh báo',
+            warnings.toString(),
+            Colors.orangeAccent,
+            Icons.warning_amber_rounded,
+          ),
           const SizedBox(width: 8),
-          _buildStatCard('Thông tin', infos.toString(), Colors.greenAccent, Icons.info_outline_rounded),
+          _buildStatCard(
+            'Thông tin',
+            infos.toString(),
+            Colors.greenAccent,
+            Icons.info_outline_rounded,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatCard(String label, String value, Color color, IconData icon) {
+  Widget _buildStatCard(
+    String label,
+    String value,
+    Color color,
+    IconData icon,
+  ) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(8),
@@ -675,14 +840,22 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
                 Container(
                   width: 5,
                   height: 5,
-                  decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+                  decoration: BoxDecoration(
+                    color: color,
+                    shape: BoxShape.circle,
+                  ),
                 ),
               ],
             ),
             const SizedBox(height: 6),
             Text(
               value,
-              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold, fontFamily: 'monospace'),
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+                fontFamily: 'monospace',
+              ),
             ),
             Text(
               label,
@@ -694,7 +867,12 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildFilterBar(String type, String query, String filter, bool autoScroll) {
+  Widget _buildFilterBar(
+    String type,
+    String query,
+    String filter,
+    bool autoScroll,
+  ) {
     final searchController = TextEditingController(text: query);
     searchController.selection = TextSelection.fromPosition(
       TextPosition(offset: searchController.text.length),
@@ -716,16 +894,28 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
                     style: const TextStyle(color: Colors.white, fontSize: 13),
                     decoration: InputDecoration(
                       hintText: 'Tìm kiếm nội dung logs...',
-                      hintStyle: const TextStyle(color: Colors.white30, fontSize: 12),
+                      hintStyle: const TextStyle(
+                        color: Colors.white30,
+                        fontSize: 12,
+                      ),
                       border: InputBorder.none,
-                      icon: const Icon(Icons.search_rounded, color: TxaTheme.textMuted, size: 16),
+                      icon: const Icon(
+                        Icons.search_rounded,
+                        color: TxaTheme.textMuted,
+                        size: 16,
+                      ),
                       suffixIcon: query.isNotEmpty
                           ? IconButton(
-                              icon: const Icon(Icons.clear_rounded, color: TxaTheme.textMuted, size: 14),
+                              icon: const Icon(
+                                Icons.clear_rounded,
+                                color: TxaTheme.textMuted,
+                                size: 14,
+                              ),
                               onPressed: () {
                                 setState(() {
                                   if (type == 'app') _searchApp = '';
                                   if (type == 'api') _searchApi = '';
+                                  if (type == 'search') _searchSearch = '';
                                   if (type == 'downloads') _searchDownload = '';
                                 });
                               },
@@ -736,6 +926,7 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
                       setState(() {
                         if (type == 'app') _searchApp = val;
                         if (type == 'api') _searchApi = val;
+                        if (type == 'search') _searchSearch = val;
                         if (type == 'downloads') _searchDownload = val;
                       });
                     },
@@ -743,28 +934,39 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
                 ),
               ),
               const SizedBox(width: 8),
-              
+
               // Auto scroll lock toggle button
               InkWell(
                 onTap: () {
                   setState(() {
                     if (type == 'app') _autoScrollApp = !_autoScrollApp;
                     if (type == 'api') _autoScrollApi = !_autoScrollApi;
-                    if (type == 'downloads') _autoScrollDownload = !_autoScrollDownload;
+                    if (type == 'search') {
+                      _autoScrollSearch = !_autoScrollSearch;
+                    }
+                    if (type == 'downloads') {
+                      _autoScrollDownload = !_autoScrollDownload;
+                    }
                   });
                 },
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
                   padding: const EdgeInsets.all(10),
                   decoration: BoxDecoration(
-                    color: autoScroll ? TxaTheme.accent.withValues(alpha: 0.15) : TxaTheme.cardBg.withValues(alpha: 0.4),
+                    color: autoScroll
+                        ? TxaTheme.accent.withValues(alpha: 0.15)
+                        : TxaTheme.cardBg.withValues(alpha: 0.4),
                     borderRadius: BorderRadius.circular(10),
                     border: Border.all(
-                      color: autoScroll ? TxaTheme.accent.withValues(alpha: 0.3) : Colors.white10,
+                      color: autoScroll
+                          ? TxaTheme.accent.withValues(alpha: 0.3)
+                          : Colors.white10,
                     ),
                   ),
                   child: Icon(
-                    autoScroll ? Icons.vertical_align_bottom_rounded : Icons.vertical_align_center_rounded,
+                    autoScroll
+                        ? Icons.vertical_align_bottom_rounded
+                        : Icons.vertical_align_center_rounded,
                     color: autoScroll ? TxaTheme.accent : TxaTheme.textMuted,
                     size: 16,
                   ),
@@ -795,7 +997,12 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildFilterChip(String type, String label, String value, String currentValue) {
+  Widget _buildFilterChip(
+    String type,
+    String label,
+    String value,
+    String currentValue,
+  ) {
     final active = value == currentValue;
     Color chipColor = TxaTheme.textMuted;
     if (active) {
@@ -822,10 +1029,14 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
         duration: const Duration(milliseconds: 200),
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
         decoration: BoxDecoration(
-          color: active ? chipColor.withValues(alpha: 0.15) : Colors.transparent,
+          color: active
+              ? chipColor.withValues(alpha: 0.15)
+              : Colors.transparent,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
-            color: active ? chipColor.withValues(alpha: 0.5) : Colors.white.withValues(alpha: 0.08),
+            color: active
+                ? chipColor.withValues(alpha: 0.5)
+                : Colors.white.withValues(alpha: 0.08),
             width: 1,
           ),
         ),
@@ -841,7 +1052,13 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
     );
   }
 
-  Widget _buildLogCard(int index, LogEntry entry, Set<int> expandedSet, String query, String type) {
+  Widget _buildLogCard(
+    int index,
+    LogEntry entry,
+    Set<int> expandedSet,
+    String query,
+    String type,
+  ) {
     final isExpanded = expandedSet.contains(index);
     final isApi = entry.apiUrl != null;
 
@@ -855,7 +1072,9 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
         color: cardBg,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-          color: isExpanded ? itemColor.withValues(alpha: 0.25) : Colors.white.withValues(alpha: 0.04),
+          color: isExpanded
+              ? itemColor.withValues(alpha: 0.25)
+              : Colors.white.withValues(alpha: 0.04),
         ),
       ),
       child: ClipRRect(
@@ -888,20 +1107,31 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
                             color: itemColor,
                             borderRadius: BorderRadius.circular(2),
                             boxShadow: [
-                              BoxShadow(color: itemColor.withValues(alpha: 0.4), blurRadius: 4, spreadRadius: 1),
+                              BoxShadow(
+                                color: itemColor.withValues(alpha: 0.4),
+                                blurRadius: 4,
+                                spreadRadius: 1,
+                              ),
                             ],
                           ),
                         ),
                         const SizedBox(width: 8),
-                        
+
                         // Icon
                         Icon(entry.icon, size: 13, color: itemColor),
                         const SizedBox(width: 6),
-                        
+
                         // Timestamp
                         Text(
-                          TxaFormat.formatDate(entry.time, pattern: 'HH:mm:ss.SSS'),
-                          style: const TextStyle(color: TxaTheme.textMuted, fontSize: 10, fontFamily: 'monospace'),
+                          TxaFormat.formatDate(
+                            entry.time,
+                            pattern: 'HH:mm:ss.SSS',
+                          ),
+                          style: const TextStyle(
+                            color: TxaTheme.textMuted,
+                            fontSize: 10,
+                            fontFamily: 'monospace',
+                          ),
                         ),
                         const SizedBox(width: 8),
 
@@ -915,47 +1145,73 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
                           const SizedBox(width: 6),
                           Text(
                             '#${entry.tag}',
-                            style: const TextStyle(color: Colors.white30, fontSize: 9, fontWeight: FontWeight.w500),
+                            style: const TextStyle(
+                              color: Colors.white30,
+                              fontSize: 9,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                         ],
-                        
+
                         const Spacer(),
-                        
+
                         // Up/Down Chevron Icon
                         Icon(
-                          isExpanded ? Icons.keyboard_arrow_up_rounded : Icons.keyboard_arrow_down_rounded,
+                          isExpanded
+                              ? Icons.keyboard_arrow_up_rounded
+                              : Icons.keyboard_arrow_down_rounded,
                           color: TxaTheme.textMuted,
                           size: 16,
                         ),
                       ],
                     ),
                     const SizedBox(height: 6),
-                    
+
                     // Summary title/message
                     Text(
-                      isApi ? entry.apiUrl ?? entry.message : _getSingleLineSummary(entry.message),
+                      isApi
+                          ? entry.apiUrl ?? entry.message
+                          : _getSingleLineSummary(entry.message),
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: TextStyle(color: Colors.white.withValues(alpha: 0.9), fontSize: 12),
+                      style: TextStyle(
+                        color: Colors.white.withValues(alpha: 0.9),
+                        fontSize: 12,
+                      ),
                     ),
 
                     if (isApi && entry.apiStatus != null) ...[
                       const SizedBox(height: 4),
                       Row(
                         children: [
-                          Icon(Icons.check_circle_outline_rounded, color: itemColor, size: 11),
+                          Icon(
+                            Icons.check_circle_outline_rounded,
+                            color: itemColor,
+                            size: 11,
+                          ),
                           const SizedBox(width: 4),
                           Text(
                             'Status: ${entry.apiStatus}',
-                            style: TextStyle(color: itemColor.withValues(alpha: 0.8), fontSize: 10, fontWeight: FontWeight.w500),
+                            style: TextStyle(
+                              color: itemColor.withValues(alpha: 0.8),
+                              fontSize: 10,
+                              fontWeight: FontWeight.w500,
+                            ),
                           ),
                           if (entry.apiTime != null) ...[
                             const SizedBox(width: 12),
-                            const Icon(Icons.timer_outlined, color: TxaTheme.textMuted, size: 11),
+                            const Icon(
+                              Icons.timer_outlined,
+                              color: TxaTheme.textMuted,
+                              size: 11,
+                            ),
                             const SizedBox(width: 4),
                             Text(
                               entry.apiTime!,
-                              style: const TextStyle(color: TxaTheme.textMuted, fontSize: 10),
+                              style: const TextStyle(
+                                color: TxaTheme.textMuted,
+                                fontSize: 10,
+                              ),
                             ),
                           ],
                         ],
@@ -965,17 +1221,26 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
                 ),
               ),
             ),
-            
+
             // Expand details area
             if (isExpanded)
               Container(
                 width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 12,
+                  vertical: 10,
+                ),
                 decoration: BoxDecoration(
                   color: Colors.black12,
-                  border: Border(top: BorderSide(color: Colors.white.withValues(alpha: 0.03))),
+                  border: Border(
+                    top: BorderSide(
+                      color: Colors.white.withValues(alpha: 0.03),
+                    ),
+                  ),
                 ),
-                child: isApi ? _buildApiExpandedView(entry) : _buildNormalExpandedView(entry),
+                child: isApi
+                    ? _buildApiExpandedView(entry)
+                    : _buildNormalExpandedView(entry),
               ),
           ],
         ),
@@ -993,14 +1258,109 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
       ),
       child: Text(
         label.trim().toUpperCase(),
-        style: TextStyle(color: color, fontSize: 8, fontWeight: FontWeight.bold, letterSpacing: 0.3),
+        style: TextStyle(
+          color: color,
+          fontSize: 8,
+          fontWeight: FontWeight.bold,
+          letterSpacing: 0.3,
+        ),
       ),
     );
   }
 
   String _getSingleLineSummary(String msg) {
     final firstLine = msg.split('\n')[0];
-    return firstLine.length > 120 ? '${firstLine.substring(0, 120)}...' : firstLine;
+    return firstLine.length > 120
+        ? '${firstLine.substring(0, 120)}...'
+        : firstLine;
+  }
+
+  Future<String> _generateNormalReport(LogEntry entry) async {
+    final deviceInfo = await TxaLogger.getDeviceInfo();
+    final locationInfo = await TxaLogger.getIpLocation();
+
+    final buffer = StringBuffer();
+    buffer.writeln('===============================================');
+    buffer.writeln('          TPHIMX APP DIAGNOSTIC LOG          ');
+    buffer.writeln('===============================================');
+    buffer.writeln(
+      'TIMESTAMP: ${TxaFormat.formatDate(entry.time, pattern: 'yyyy-MM-dd HH:mm:ss.SSS')}',
+    );
+    buffer.writeln('LOG LEVEL: ${entry.level.toUpperCase()}');
+    if (entry.tag != null) buffer.writeln('TAG: [${entry.tag}]');
+    buffer.writeln('-----------------------------------------------');
+    buffer.writeln('DEVICE INFORMATION:');
+    buffer.writeln('  Platform: ${deviceInfo['platform'] ?? 'Unknown'}');
+    buffer.writeln('  Device Name: ${deviceInfo['device_name'] ?? 'Unknown'}');
+    buffer.writeln(
+      '  Device Model: ${deviceInfo['device_model'] ?? 'Unknown'}',
+    );
+    buffer.writeln(
+      '  OS Version: ${deviceInfo['system_version'] ?? 'Unknown'}',
+    );
+    buffer.writeln('  Device UDID: ${deviceInfo['udid'] ?? 'Unknown'}');
+    buffer.writeln('-----------------------------------------------');
+    buffer.writeln('NETWORK / LOCATION:');
+    buffer.writeln('  IP Address: ${locationInfo['ip'] ?? 'Unknown'}');
+    buffer.writeln(
+      '  Location: ${locationInfo['city'] ?? 'Unknown'}, ${locationInfo['region'] ?? 'Unknown'}, ${locationInfo['country'] ?? 'Unknown'}',
+    );
+    buffer.writeln('-----------------------------------------------');
+    buffer.writeln('LOG MESSAGE:');
+    buffer.writeln(entry.message);
+    buffer.writeln('===============================================');
+    return buffer.toString();
+  }
+
+  Future<String> _generateApiReport(LogEntry entry) async {
+    final deviceInfo = await TxaLogger.getDeviceInfo();
+    final locationInfo = await TxaLogger.getIpLocation();
+
+    final buffer = StringBuffer();
+    buffer.writeln('===============================================');
+    buffer.writeln('      TPHIMX APP API DIAGNOSTIC LOG          ');
+    buffer.writeln('===============================================');
+    buffer.writeln(
+      'TIMESTAMP: ${TxaFormat.formatDate(entry.time, pattern: 'yyyy-MM-dd HH:mm:ss.SSS')}',
+    );
+    buffer.writeln('METHOD: ${entry.apiMethod ?? 'Unknown'}');
+    buffer.writeln('URL: ${entry.apiUrl ?? 'Unknown'}');
+    buffer.writeln('STATUS: ${entry.apiStatus ?? 'Unknown'}');
+    if (entry.apiTime != null) {
+      buffer.writeln('RESPONSE TIME: ${entry.apiTime}');
+    }
+    buffer.writeln('-----------------------------------------------');
+    buffer.writeln('DEVICE INFORMATION:');
+    buffer.writeln('  Platform: ${deviceInfo['platform'] ?? 'Unknown'}');
+    buffer.writeln('  Device Name: ${deviceInfo['device_name'] ?? 'Unknown'}');
+    buffer.writeln(
+      '  Device Model: ${deviceInfo['device_model'] ?? 'Unknown'}',
+    );
+    buffer.writeln(
+      '  OS Version: ${deviceInfo['system_version'] ?? 'Unknown'}',
+    );
+    buffer.writeln('  Device UDID: ${deviceInfo['udid'] ?? 'Unknown'}');
+    buffer.writeln('-----------------------------------------------');
+    buffer.writeln('NETWORK / LOCATION:');
+    buffer.writeln('  IP Address: ${locationInfo['ip'] ?? 'Unknown'}');
+    buffer.writeln(
+      '  Location: ${locationInfo['city'] ?? 'Unknown'}, ${locationInfo['region'] ?? 'Unknown'}, ${locationInfo['country'] ?? 'Unknown'}',
+    );
+    buffer.writeln('-----------------------------------------------');
+    if (entry.apiRequest != null && entry.apiRequest!.isNotEmpty) {
+      buffer.writeln('REQUEST BODY:');
+      buffer.writeln(entry.apiRequest);
+      buffer.writeln('-----------------------------------------------');
+    }
+    if (entry.apiResponse != null && entry.apiResponse!.isNotEmpty) {
+      buffer.writeln('RESPONSE DATA:');
+      buffer.writeln(entry.apiResponse);
+      buffer.writeln('-----------------------------------------------');
+    }
+    buffer.writeln('FULL MSG:');
+    buffer.writeln(entry.message);
+    buffer.writeln('===============================================');
+    return buffer.toString();
   }
 
   Widget _buildNormalExpandedView(LogEntry entry) {
@@ -1010,14 +1370,29 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Chi tiết logs:', style: TextStyle(color: TxaTheme.textMuted, fontSize: 10, fontWeight: FontWeight.bold)),
+            const Text(
+              'Chi tiết logs:',
+              style: TextStyle(
+                color: TxaTheme.textMuted,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
             IconButton(
-              icon: const Icon(Icons.copy_all_rounded, color: TxaTheme.textMuted, size: 14),
+              icon: const Icon(
+                Icons.copy_all_rounded,
+                color: TxaTheme.textMuted,
+                size: 14,
+              ),
               constraints: const BoxConstraints(),
               padding: EdgeInsets.zero,
-              onPressed: () {
-                Clipboard.setData(ClipboardData(text: entry.message));
-                TxaToast.show(context, 'Đã sao chép logs');
+              tooltip: 'Sao chép logs',
+              onPressed: () async {
+                final report = await _generateNormalReport(entry);
+                await Clipboard.setData(ClipboardData(text: report));
+                if (mounted) {
+                  TxaToast.show(context, 'Đã sao chép logs chẩn đoán chi tiết');
+                }
               },
             ),
           ],
@@ -1046,30 +1421,33 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
         Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            const Text('Nội dung kết nối API:', style: TextStyle(color: TxaTheme.textMuted, fontSize: 10, fontWeight: FontWeight.bold)),
-            Row(
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.copy_rounded, color: TxaTheme.textMuted, size: 14),
-                  constraints: const BoxConstraints(),
-                  padding: const EdgeInsets.only(right: 12),
-                  tooltip: 'Sao chép URL',
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: entry.apiUrl ?? ''));
-                    TxaToast.show(context, 'Đã sao chép URL');
-                  },
-                ),
-                IconButton(
-                  icon: const Icon(Icons.copy_all_rounded, color: TxaTheme.textMuted, size: 14),
-                  constraints: const BoxConstraints(),
-                  padding: EdgeInsets.zero,
-                  tooltip: 'Sao chép toàn bộ',
-                  onPressed: () {
-                    Clipboard.setData(ClipboardData(text: entry.message));
-                    TxaToast.show(context, 'Đã sao chép toàn bộ logs API');
-                  },
-                ),
-              ],
+            const Text(
+              'Nội dung kết nối API:',
+              style: TextStyle(
+                color: TxaTheme.textMuted,
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            IconButton(
+              icon: const Icon(
+                Icons.copy_all_rounded,
+                color: TxaTheme.textMuted,
+                size: 14,
+              ),
+              constraints: const BoxConstraints(),
+              padding: EdgeInsets.zero,
+              tooltip: 'Sao chép toàn bộ logs chẩn đoán',
+              onPressed: () async {
+                final report = await _generateApiReport(entry);
+                await Clipboard.setData(ClipboardData(text: report));
+                if (mounted) {
+                  TxaToast.show(
+                    context,
+                    'Đã sao chép chi tiết logs API chẩn đoán',
+                  );
+                }
+              },
             ),
           ],
         ),
@@ -1093,7 +1471,11 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
                   Expanded(
                     child: SelectableText(
                       entry.apiUrl ?? '',
-                      style: const TextStyle(color: Colors.white, fontSize: 11, fontFamily: 'monospace'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 11,
+                        fontFamily: 'monospace',
+                      ),
                     ),
                   ),
                 ],
@@ -1101,19 +1483,33 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
               const SizedBox(height: 6),
               Row(
                 children: [
-                  const Text('Status:', style: TextStyle(color: TxaTheme.textMuted, fontSize: 10)),
+                  const Text(
+                    'Status:',
+                    style: TextStyle(color: TxaTheme.textMuted, fontSize: 10),
+                  ),
                   const SizedBox(width: 4),
                   Text(
                     entry.apiStatus ?? '?',
-                    style: TextStyle(color: statusColor, fontSize: 10, fontWeight: FontWeight.bold),
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
                   if (entry.apiTime != null) ...[
                     const SizedBox(width: 16),
-                    const Text('Thời gian phản hồi:', style: TextStyle(color: TxaTheme.textMuted, fontSize: 10)),
+                    const Text(
+                      'Thời gian phản hồi:',
+                      style: TextStyle(color: TxaTheme.textMuted, fontSize: 10),
+                    ),
                     const SizedBox(width: 4),
                     Text(
                       entry.apiTime!,
-                      style: const TextStyle(color: Colors.white70, fontSize: 10, fontWeight: FontWeight.bold),
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ],
                 ],
@@ -1125,13 +1521,21 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
 
         // Request Block
         if (entry.apiRequest != null && entry.apiRequest!.isNotEmpty) ...[
-          _buildPayloadBox('Dữ liệu gửi lên (Request Body)', entry.apiRequest!, Colors.orangeAccent),
+          _buildPayloadBox(
+            'Dữ liệu gửi lên (Request Body)',
+            entry.apiRequest!,
+            Colors.orangeAccent,
+          ),
           const SizedBox(height: 8),
         ],
 
         // Response Block
         if (entry.apiResponse != null && entry.apiResponse!.isNotEmpty)
-          _buildPayloadBox('Phản hồi từ server (Response Data)', entry.apiResponse!, Colors.greenAccent),
+          _buildPayloadBox(
+            'Phản hồi từ server (Response Data)',
+            entry.apiResponse!,
+            Colors.greenAccent,
+          ),
       ],
     );
   }
@@ -1153,10 +1557,20 @@ class _LogViewerScreenState extends State<LogViewerScreen> with SingleTickerProv
             Container(
               width: 4,
               height: 4,
-              decoration: BoxDecoration(color: themeColor, shape: BoxShape.circle),
+              decoration: BoxDecoration(
+                color: themeColor,
+                shape: BoxShape.circle,
+              ),
             ),
             const SizedBox(width: 6),
-            Text(label, style: const TextStyle(color: TxaTheme.textSecondary, fontSize: 9, fontWeight: FontWeight.bold)),
+            Text(
+              label,
+              style: const TextStyle(
+                color: TxaTheme.textSecondary,
+                fontSize: 9,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ],
         ),
         const SizedBox(height: 4),

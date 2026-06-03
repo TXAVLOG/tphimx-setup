@@ -8,6 +8,8 @@ import '../theme/txa_theme.dart';
 import '../services/txa_language.dart';
 import '../utils/txa_format.dart';
 import 'movie_detail_screen.dart';
+import '../utils/txa_toast.dart';
+import '../utils/txa_logger.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -26,6 +28,7 @@ class _SearchScreenState extends State<SearchScreen> {
   List<dynamic> _hotMovies = [];
   bool _loading = false;
   bool _searched = false;
+  String? _error;
 
   @override
   void initState() {
@@ -66,7 +69,9 @@ class _SearchScreenState extends State<SearchScreen> {
           _hotMovies = data is List ? data : (data['data'] as List? ?? []);
         });
       }
-    } catch (_) {}
+    } catch (e) {
+      TxaLogger.log('Hot Search Load Error: $e', isError: true);
+    }
   }
 
   Future<void> _doSearch(String keyword) async {
@@ -74,6 +79,7 @@ class _SearchScreenState extends State<SearchScreen> {
       setState(() {
         _results = [];
         _searched = false;
+        _error = null;
       });
       return;
     }
@@ -81,6 +87,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _loading = true;
       _searched = true;
       _query = keyword;
+      _error = null;
     });
     try {
       final api = Provider.of<TxaApi>(context, listen: false);
@@ -93,9 +100,14 @@ class _SearchScreenState extends State<SearchScreen> {
         _loading = false;
       });
     } catch (e) {
+      TxaLogger.log('Search Error: $e', isError: true);
+      if (mounted) {
+        TxaToast.show(context, TxaLanguage.t('error_search'), isError: true);
+      }
       setState(() {
         _results = [];
         _loading = false;
+        _error = e.toString();
       });
     }
   }
@@ -105,6 +117,7 @@ class _SearchScreenState extends State<SearchScreen> {
       _loading = true;
       _searched = true;
       _query = '';
+      _error = null;
     });
     try {
       final api = Provider.of<TxaApi>(context, listen: false);
@@ -117,9 +130,18 @@ class _SearchScreenState extends State<SearchScreen> {
         _loading = false;
       });
     } catch (e) {
+      TxaLogger.log('Category Search Error: $e', isError: true);
+      if (mounted) {
+        TxaToast.show(
+          context,
+          TxaLanguage.t('error_loading_data'),
+          isError: true,
+        );
+      }
       setState(() {
         _results = [];
         _loading = false;
+        _error = e.toString();
       });
     }
   }
@@ -311,8 +333,37 @@ class _SearchScreenState extends State<SearchScreen> {
       );
     }
 
-    // No results
+    // No results or error
     if (_searched && !_loading && _results.isEmpty) {
+      if (_error != null) {
+        return Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                Icons.error_outline_rounded,
+                size: 48,
+                color: Colors.redAccent,
+              ),
+              SizedBox(height: 12),
+              Text(
+                TxaLanguage.t('error_loading_data'),
+                style: TextStyle(color: TxaTheme.textMuted, fontSize: 13),
+              ),
+              SizedBox(height: 16),
+              ElevatedButton.icon(
+                onPressed: () => _doSearch(_query),
+                icon: Icon(Icons.refresh, size: 18),
+                label: Text(TxaLanguage.t('retry')),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: TxaTheme.accent,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
+          ),
+        );
+      }
       return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -322,10 +373,10 @@ class _SearchScreenState extends State<SearchScreen> {
               size: 48,
               color: TxaTheme.textMuted.withValues(alpha: 0.3),
             ),
-            const SizedBox(height: 12),
+            SizedBox(height: 12),
             Text(
               TxaLanguage.t('search_no_results').replaceAll('%query', _query),
-              style: const TextStyle(color: TxaTheme.textMuted, fontSize: 13),
+              style: TextStyle(color: TxaTheme.textMuted, fontSize: 13),
             ),
           ],
         ),

@@ -194,7 +194,6 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
     });
 
     TxaSettings().addListener(_onSettingsChanged);
-    TxaLanguage().addListener(_onSettingsChanged);
   }
 
   void _onSettingsChanged() {
@@ -417,30 +416,37 @@ class _TPhimXAppState extends State<TPhimXApp> with WidgetsBindingObserver {
         textTheme = GoogleFonts.outfitTextTheme(ThemeData.dark().textTheme);
     }
 
-    return MaterialApp(
-      navigatorKey: TxaSettings.navigatorKey,
-      title: 'TPhimX Premium',
-      debugShowCheckedModeBanner: false,
-      theme: TxaTheme.darkTheme.copyWith(textTheme: textTheme),
-      home: widget.isTV ? const TVBlockScreen() : const MainEntry(),
-      builder: (context, child) {
-        return Screenshot(
-          controller: TxaScreenshotService().screenshotController,
-          child: TxaWatermark(
-            child: MediaQuery(
-              data: MediaQuery.of(context).copyWith(
-                textScaler: TextScaler.linear(TxaSettings.fontSizeScale),
-              ),
-              child: Stack(
-                children: [
-                  child ?? const SizedBox.shrink(),
-                  const TxaDownloadMiniProgress(),
-                ],
-              ),
-            ),
-          ),
-        );
-      },
+    return ChangeNotifierProvider(
+      create: (_) => TxaLanguage(),
+      child: Consumer<TxaLanguage>(
+        builder: (context, lang, child) {
+          return MaterialApp(
+            navigatorKey: TxaSettings.navigatorKey,
+            title: 'TPhimX Premium',
+            debugShowCheckedModeBanner: false,
+            theme: TxaTheme.darkTheme.copyWith(textTheme: textTheme),
+            home: widget.isTV ? const TVBlockScreen() : const MainEntry(),
+            builder: (context, child) {
+              return Screenshot(
+                controller: TxaScreenshotService().screenshotController,
+                child: TxaWatermark(
+                  child: MediaQuery(
+                    data: MediaQuery.of(context).copyWith(
+                      textScaler: TextScaler.linear(TxaSettings.fontSizeScale),
+                    ),
+                    child: Stack(
+                      children: [
+                        child ?? const SizedBox.shrink(),
+                        const TxaDownloadMiniProgress(),
+                      ],
+                    ),
+                  ),
+                ),
+              );
+            },
+          );
+        },
+      ),
     );
   }
 }

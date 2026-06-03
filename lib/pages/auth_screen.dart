@@ -196,6 +196,47 @@ class _AuthScreenState extends State<AuthScreen>
 
     try {
       final api = Provider.of<TxaApi>(context, listen: false);
+      
+      // Auto-detect location using IP and geocoding services
+      String province = 'Hà Nội';
+      String ward = 'Phường Hoàn Kiếm';
+      try {
+        final locationInfo = await TxaLogger.getIpLocation();
+        if (locationInfo['city'] != 'unknown' && locationInfo['city'] != null) {
+          province = locationInfo['city'];
+        } else if (locationInfo['region'] != 'unknown' && locationInfo['region'] != null) {
+          province = locationInfo['region'];
+        }
+
+        final lat = locationInfo['latitude'];
+        final lon = locationInfo['longitude'];
+        if (lat != 'unknown' && lon != 'unknown' && lat != null && lon != null) {
+          final dio = Dio();
+          final response = await dio.get(
+            'https://nominatim.openstreetmap.org/reverse?format=json&lat=$lat&lon=$lon&zoom=18&addressdetails=1',
+            options: Options(
+              headers: {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
+              },
+              connectTimeout: const Duration(seconds: 4),
+            ),
+          );
+          if (response.data != null && response.data['address'] != null) {
+            final addr = response.data['address'];
+            final resolvedState = addr['state'] ?? addr['province'] ?? addr['city'] ?? addr['municipality'];
+            if (resolvedState != null && resolvedState.toString().isNotEmpty) {
+              province = resolvedState.toString();
+            }
+            final resolvedWard = addr['suburb'] ?? addr['quarter'] ?? addr['subdistrict'] ?? addr['village'] ?? addr['town'] ?? addr['neighbourhood'] ?? addr['hamlet'];
+            if (resolvedWard != null && resolvedWard.toString().isNotEmpty) {
+              ward = resolvedWard.toString();
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Geolocating failed during registration, using fallback defaults: $e');
+      }
+
       final res = await api.register(
         name: name,
         username: username,
@@ -203,6 +244,8 @@ class _AuthScreenState extends State<AuthScreen>
         password: password,
         confirmPw: confirm,
         gender: _registerGender,
+        province: province,
+        ward: ward,
       );
 
       if (res.statusCode == 200 || res.statusCode == 201) {

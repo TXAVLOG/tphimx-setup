@@ -5,6 +5,8 @@ import '../services/txa_language.dart';
 import '../theme/txa_theme.dart';
 import 'movie_detail_screen.dart';
 import 'package:cached_network_image/cached_network_image.dart';
+import '../utils/txa_toast.dart';
+import '../utils/txa_logger.dart';
 
 class CategoryListScreen extends StatefulWidget {
   final String title;
@@ -27,6 +29,7 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
   bool _loading = true;
   int _page = 1;
   bool _hasMore = true;
+  String? _error;
   final ScrollController _scrollController = ScrollController();
 
   @override
@@ -54,6 +57,7 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
       _page++;
     } else {
       _page = 1;
+      _error = null;
       _items = [];
     }
 
@@ -83,8 +87,19 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
         _loading = false;
         _hasMore = list.length >= 20; // Assumption for pagination
       });
-    } catch (_) {
-      setState(() => _loading = false);
+    } catch (e) {
+      TxaLogger.log('Category Load Error: $e', isError: true);
+      if (mounted && !loadMore) {
+        TxaToast.show(
+          context,
+          TxaLanguage.t('error_loading_data'),
+          isError: true,
+        );
+      }
+      setState(() {
+        _loading = false;
+        _error = e.toString();
+      });
     }
   }
 
@@ -108,6 +123,34 @@ class _CategoryListScreenState extends State<CategoryListScreen> {
       body: _items.isEmpty && _loading
           ? const Center(
               child: CircularProgressIndicator(color: TxaTheme.accent),
+            )
+          : _error != null && _items.isEmpty
+          ? Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(
+                    Icons.error_outline_rounded,
+                    size: 48,
+                    color: Colors.redAccent,
+                  ),
+                  SizedBox(height: 16),
+                  Text(
+                    TxaLanguage.t('error_loading_data'),
+                    style: TextStyle(color: TxaTheme.textMuted),
+                  ),
+                  SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () => _loadData(),
+                    icon: Icon(Icons.refresh, size: 18),
+                    label: Text(TxaLanguage.t('retry')),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: TxaTheme.accent,
+                      foregroundColor: Colors.white,
+                    ),
+                  ),
+                ],
+              ),
             )
           : CustomScrollView(
               controller: _scrollController,

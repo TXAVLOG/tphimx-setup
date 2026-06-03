@@ -75,12 +75,18 @@ class _AccountScreenState extends State<AccountScreen> {
     final menuItems = [
       {
         'id': 'favorites',
-        'label': TxaLanguage.t('add_favorite'),
+        'label': TxaLanguage.t('favorite_list'),
         'icon': Icons.favorite_border_rounded,
         'action': () => Navigator.push(
           context,
           MaterialPageRoute(builder: (ctx) => const FavoriteListScreen()),
         ),
+      },
+      {
+        'id': 'my_list',
+        'label': TxaLanguage.t('my_list'),
+        'icon': Icons.list_rounded,
+        'action': () => _handleDev(context, TxaLanguage.t('my_list')),
       },
       {
         'id': 'downloads',
@@ -90,6 +96,12 @@ class _AccountScreenState extends State<AccountScreen> {
           context,
           MaterialPageRoute(builder: (ctx) => const DownloadManagerScreen()),
         ),
+      },
+      {
+        'id': 'earn_money',
+        'label': TxaLanguage.t('earn_money'),
+        'icon': Icons.monetization_on_rounded,
+        'action': () => _handleDev(context, TxaLanguage.t('earn_money')),
       },
       {
         'id': 'global_settings',
@@ -133,6 +145,13 @@ class _AccountScreenState extends State<AccountScreen> {
           'label': TxaLanguage.t('tg_support'),
           'icon': Icons.groups_rounded,
           'action': () => _launchUrl(context, TxaApi.telegramGroup),
+        },
+      if (TxaApi.zaloGroup.isNotEmpty)
+        {
+          'id': 'zalo_group',
+          'label': TxaLanguage.t('zalo_group'),
+          'icon': Icons.chat_rounded,
+          'action': () => _launchUrl(context, TxaApi.zaloGroup),
         },
       {
         'id': 'terms',
@@ -323,6 +342,7 @@ class _AccountScreenState extends State<AccountScreen> {
                 // Settings Groups
                 _buildMenuSection(TxaLanguage.t('general_settings'), [
                   'favorites',
+                  'my_list',
                   'downloads',
                   'history',
                 ], menuItems),
@@ -400,8 +420,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.4.0';
-                  final buildNumber = snapshot.data?.buildNumber ?? '440';
+                  final version = snapshot.data?.version ?? '4.5.0';
+                  final buildNumber = snapshot.data?.buildNumber ?? '450';
                   return InkWell(
                     onTap: () => Navigator.push(
                       context,
@@ -931,292 +951,304 @@ class _PremiumProfileCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final token = TxaSettings.authToken;
-    if (token.isEmpty) {
-      return Container(
-        padding: const EdgeInsets.all(20),
-        decoration: BoxDecoration(
-          gradient: TxaTheme.brandGradient,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: TxaTheme.accent.withValues(alpha: 0.3),
-              blurRadius: 20,
-              offset: const Offset(0, 10),
-            ),
-          ],
-        ),
-        child: Column(
-          children: [
-            const Icon(Icons.stars_rounded, color: Colors.white, size: 48),
-            const SizedBox(height: 12),
-            Text(
-              TxaLanguage.t('app_slogan'),
-              textAlign: TextAlign.center,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Row(
-              children: [
-                Expanded(
-                  child: ElevatedButton(
-                    onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(builder: (ctx) => const AuthScreen()),
-                      );
-                      if (!context.mounted) return;
-                      if (result == true) {
-                        final state = context
-                            .findAncestorStateOfType<_AccountScreenState>();
-                        state?._onSettingsChanged();
-                      }
-                    },
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: Colors.black,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: Text(
-                      TxaLanguage.t('login'),
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: OutlinedButton(
-                    onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (ctx) => const AuthScreen(isRegister: true),
-                        ),
-                      );
-                      if (!context.mounted) return;
-                      if (result == true) {
-                        final state = context
-                            .findAncestorStateOfType<_AccountScreenState>();
-                        state?._onSettingsChanged();
-                      }
-                    },
-                    style: OutlinedButton.styleFrom(
-                      side: const BorderSide(color: Colors.white24),
-                      foregroundColor: Colors.white,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                    ),
-                    child: Text(TxaLanguage.t('register')),
-                  ),
+    // Force rebuild when auth state changes
+    return ListenableBuilder(
+      listenable: TxaSettings(),
+      builder: (context, _) {
+        final currentToken = TxaSettings.authToken;
+
+        if (currentToken.isEmpty) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: TxaTheme.brandGradient,
+              borderRadius: BorderRadius.circular(24),
+              boxShadow: [
+                BoxShadow(
+                  color: TxaTheme.accent.withValues(alpha: 0.3),
+                  blurRadius: 20,
+                  offset: const Offset(0, 10),
                 ),
               ],
             ),
-          ],
-        ),
-      );
-    }
-
-    return FutureBuilder<Map<String, dynamic>>(
-      future: Provider.of<TxaApi>(context, listen: false).getAuthMe(),
-      builder: (context, snapshot) {
-        // Priority: API result > Cache
-        Map<String, dynamic>? user = snapshot.data?['data'];
-        if (user == null && TxaSettings.userData.isNotEmpty) {
-          try {
-            user = jsonDecode(TxaSettings.userData);
-          } catch (_) {}
-        }
-
-        if (user == null) {
-          if (snapshot.hasError) {
-            return _buildErrorCard(context, snapshot.error?.toString(), () {
-              final state = context
-                  .findAncestorStateOfType<_AccountScreenState>();
-              (state as dynamic)?.setState(() {});
-            });
-          }
-          return const Center(
-            child: Padding(
-              padding: EdgeInsets.all(20),
-              child: CircularProgressIndicator(strokeWidth: 2),
+            child: Column(
+              children: [
+                const Icon(Icons.stars_rounded, color: Colors.white, size: 48),
+                const SizedBox(height: 12),
+                Text(
+                  TxaLanguage.t('app_slogan'),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                Row(
+                  children: [
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (ctx) => const AuthScreen(),
+                            ),
+                          );
+                          if (!context.mounted) return;
+                          if (result == true) {
+                            final state = context
+                                .findAncestorStateOfType<_AccountScreenState>();
+                            state?._onSettingsChanged();
+                          }
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: Colors.black,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          TxaLanguage.t('login'),
+                          style: const TextStyle(fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: OutlinedButton(
+                        onPressed: () async {
+                          final result = await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (ctx) =>
+                                  const AuthScreen(isRegister: true),
+                            ),
+                          );
+                          if (!context.mounted) return;
+                          if (result == true) {
+                            final state = context
+                                .findAncestorStateOfType<_AccountScreenState>();
+                            state?._onSettingsChanged();
+                          }
+                        },
+                        style: OutlinedButton.styleFrom(
+                          side: const BorderSide(color: Colors.white24),
+                          foregroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: Text(TxaLanguage.t('register')),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
             ),
           );
         }
 
-        final name = user['name'] ?? 'TPhimX User';
-        final email = user['email'] ?? '...';
-        final isVerified = user['email_verified_at'] != null;
-        final avatar = user['avatar'];
+        return FutureBuilder<Map<String, dynamic>>(
+          future: Provider.of<TxaApi>(context, listen: false).getAuthMe(),
+          builder: (context, snapshot) {
+            // Priority: API result > Cache
+            Map<String, dynamic>? user = snapshot.data?['data'];
+            if (user == null && TxaSettings.userData.isNotEmpty) {
+              try {
+                user = jsonDecode(TxaSettings.userData);
+              } catch (_) {}
+            }
 
-        // Check for session expiration quietly
-        bool isExpired = false;
-        if (snapshot.hasError) {
-          final err = snapshot.error;
-          if (err is DioException && err.response?.statusCode == 401) {
-            isExpired = true;
-          } else if (err.toString().contains('401')) {
-            isExpired = true;
-          }
-        }
+            if (user == null) {
+              if (snapshot.hasError) {
+                return _buildErrorCard(context, snapshot.error?.toString(), () {
+                  final state = context
+                      .findAncestorStateOfType<_AccountScreenState>();
+                  (state as dynamic)?.setState(() {});
+                });
+              }
+              return const Center(
+                child: Padding(
+                  padding: EdgeInsets.all(20),
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              );
+            }
 
-        return Container(
-          padding: const EdgeInsets.all(20),
-          decoration: BoxDecoration(
-            color: TxaTheme.cardBg,
-            borderRadius: BorderRadius.circular(24),
-            border: Border.all(color: TxaTheme.glassBorder),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withValues(alpha: 0.2),
-                blurRadius: 20,
-                offset: const Offset(0, 10),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              Stack(
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      border: Border.all(color: TxaTheme.accent, width: 2),
-                    ),
-                    child: CircleAvatar(
-                      radius: 35,
-                      backgroundColor: TxaTheme.accent.withValues(alpha: 0.2),
-                      backgroundImage:
-                          (avatar != null && avatar.toString().isNotEmpty)
-                          ? CachedNetworkImageProvider(avatar)
-                          : null,
-                      child: (avatar == null || avatar.toString().isEmpty)
-                          ? Text(
-                              name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 24,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            )
-                          : null,
-                    ),
-                  ),
-                  Positioned(
-                    bottom: 0,
-                    right: 0,
-                    child: Container(
-                      padding: const EdgeInsets.all(4),
-                      decoration: const BoxDecoration(
-                        color: Colors.green,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Icon(
-                        Icons.check,
-                        color: Colors.white,
-                        size: 10,
-                      ),
-                    ),
+            final name = user['name'] ?? 'TPhimX User';
+            final email = user['email'] ?? '...';
+            final isVerified = user['email_verified_at'] != null;
+            final avatar = user['avatar'];
+
+            // Check for session expiration quietly
+            bool isExpired = false;
+            if (snapshot.hasError) {
+              final err = snapshot.error;
+              if (err is DioException && err.response?.statusCode == 401) {
+                isExpired = true;
+              } else if (err.toString().contains('401')) {
+                isExpired = true;
+              }
+            }
+
+            return Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: TxaTheme.cardBg,
+                borderRadius: BorderRadius.circular(24),
+                border: Border.all(color: TxaTheme.glassBorder),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.2),
+                    blurRadius: 20,
+                    offset: const Offset(0, 10),
                   ),
                 ],
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            name,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+              child: Row(
+                children: [
+                  Stack(
+                    children: [
+                      Container(
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(color: TxaTheme.accent, width: 2),
+                        ),
+                        child: CircleAvatar(
+                          radius: 35,
+                          backgroundColor: TxaTheme.accent.withValues(
+                            alpha: 0.2,
+                          ),
+                          backgroundImage:
+                              (avatar != null && avatar.toString().isNotEmpty)
+                              ? CachedNetworkImageProvider(avatar)
+                              : null,
+                          child: (avatar == null || avatar.toString().isEmpty)
+                              ? Text(
+                                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                )
+                              : null,
+                        ),
+                      ),
+                      Positioned(
+                        bottom: 0,
+                        right: 0,
+                        child: Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: const BoxDecoration(
+                            color: Colors.green,
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.check,
+                            color: Colors.white,
+                            size: 10,
                           ),
                         ),
-                        if (isExpired)
+                      ),
+                    ],
+                  ),
+                  const SizedBox(width: 16),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                name,
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (isExpired)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 6,
+                                  vertical: 2,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: Colors.red.withValues(alpha: 0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                  border: Border.all(
+                                    color: Colors.red.withValues(alpha: 0.3),
+                                  ),
+                                ),
+                                child: const Text(
+                                  '!',
+                                  style: TextStyle(
+                                    color: Colors.redAccent,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          email,
+                          style: const TextStyle(
+                            color: TxaTheme.textMuted,
+                            fontSize: 13,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        if (isVerified)
                           Container(
                             padding: const EdgeInsets.symmetric(
-                              horizontal: 6,
-                              vertical: 2,
+                              horizontal: 8,
+                              vertical: 3,
                             ),
                             decoration: BoxDecoration(
-                              color: Colors.red.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(4),
+                              color: Colors.green.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
                               border: Border.all(
-                                color: Colors.red.withValues(alpha: 0.3),
+                                color: Colors.green.withValues(alpha: 0.3),
                               ),
                             ),
-                            child: const Text(
-                              '!',
-                              style: TextStyle(
-                                color: Colors.redAccent,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(
+                                  Icons.verified_rounded,
+                                  color: Colors.greenAccent,
+                                  size: 12,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  TxaLanguage.t('email_verified'),
+                                  style: const TextStyle(
+                                    color: Colors.greenAccent,
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                       ],
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      email,
-                      style: const TextStyle(
-                        color: TxaTheme.textMuted,
-                        fontSize: 13,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    if (isVerified)
-                      Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 8,
-                          vertical: 3,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.green.withValues(alpha: 0.1),
-                          borderRadius: BorderRadius.circular(6),
-                          border: Border.all(
-                            color: Colors.green.withValues(alpha: 0.3),
-                          ),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.verified_rounded,
-                              color: Colors.greenAccent,
-                              size: 12,
-                            ),
-                            const SizedBox(width: 4),
-                            Text(
-                              TxaLanguage.t('email_verified'),
-                              style: const TextStyle(
-                                color: Colors.greenAccent,
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                  ],
-                ),
+                  ),
+                ],
               ),
-            ],
-          ),
+            );
+          },
         );
       },
     );

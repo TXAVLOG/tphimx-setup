@@ -33,18 +33,18 @@ class TxaNav extends StatelessWidget {
       child: Container(
         height: 66,
         decoration: BoxDecoration(
-          // Frosted glass effect: white with low opacity
-          color: Colors.white.withValues(alpha: 0.15),
+          // Glass morphism effect
+          color: Colors.black.withValues(alpha: 0.3),
           borderRadius: BorderRadius.circular(30),
           border: Border.all(
-            color: Colors.white.withValues(alpha: 0.2),
-            width: 0.8,
+            color: Colors.white.withValues(alpha: 0.15),
+            width: 1,
           ),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withValues(alpha: 0.25),
-              blurRadius: 25,
-              spreadRadius: -5,
+              color: Colors.black.withValues(alpha: 0.3),
+              blurRadius: 20,
+              spreadRadius: 0,
               offset: const Offset(0, 10),
             ),
           ],
@@ -52,16 +52,15 @@ class TxaNav extends StatelessWidget {
         child: ClipRRect(
           borderRadius: BorderRadius.circular(30),
           child: BackdropFilter(
-            // High blur for premium frost effect
-            filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
+            filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
             child: Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                   colors: [
-                    Colors.white.withValues(alpha: 0.1),
-                    Colors.white.withValues(alpha: 0.05),
+                    Colors.white.withValues(alpha: 0.08),
+                    Colors.white.withValues(alpha: 0.02),
                   ],
                 ),
               ),
@@ -148,14 +147,21 @@ class _NavItem extends StatelessWidget {
                 AnimatedContainer(
                   duration: const Duration(milliseconds: 300),
                   curve: Curves.easeInOut,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 6,
+                  ),
                   decoration: BoxDecoration(
-                    color: isActive ? TxaTheme.accent.withValues(alpha: 0.15) : Colors.transparent,
+                    color: isActive
+                        ? TxaTheme.accent.withValues(alpha: 0.15)
+                        : Colors.transparent,
                     borderRadius: BorderRadius.circular(16),
                   ),
                   child: Icon(
                     icon,
-                    color: isActive ? TxaTheme.accent : Colors.white.withValues(alpha: 0.5),
+                    color: isActive
+                        ? TxaTheme.accent
+                        : Colors.white.withValues(alpha: 0.5),
                     size: 24,
                   ),
                 ),

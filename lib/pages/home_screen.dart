@@ -731,7 +731,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 ),
               ),
               child: Padding(
-                padding: const EdgeInsets.fromLTRB(16, 8, 16, 12),
+                padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
@@ -791,25 +791,7 @@ class _HomeScreenState extends State<HomeScreen> {
                             return const SizedBox.shrink();
                           },
                         ),
-                        Container(
-                          key: _searchKey,
-                          child: _GlassIconBtn(
-                            icon: Icons.search_rounded,
-                            onTap: () => setState(() => _currentIndex = 1),
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        if (TxaSettings.authToken.isNotEmpty)
-                          Consumer<NotificationProvider>(
-                            builder: (context, notif, child) {
-                              return _GlassIconBadge(
-                                icon: Icons.notifications_rounded,
-                                badgeCount: notif.unreadCount,
-                                onTap: () => setState(() => _currentIndex = 4),
-                              );
-                            },
-                          ),
-                        const SizedBox(width: 8),
+                        // Removed duplicate search and notification buttons (already in navbar)
                         _GlassIconBtn(
                           icon: Icons.settings_rounded,
                           onTap: () {
@@ -1070,8 +1052,8 @@ class _HomeScreenState extends State<HomeScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.4.0';
-                  final build = snapshot.data?.buildNumber ?? '440';
+                  final version = snapshot.data?.version ?? '4.5.0';
+                  final build = snapshot.data?.buildNumber ?? '450';
                   return InkWell(
                     onTap: () => Navigator.push(
                       context,
@@ -1185,60 +1167,60 @@ class _HomeTabState extends State<_HomeTab> {
     }
 
     if (_data != null) {
-      final latest = getListData('latest').isEmpty
-          ? getListData('items')
-          : getListData('latest');
-      final hot = getListData('hot');
-      final anime = getListData('anime');
-      final series = getListData('series');
-      final single = getListData('single');
-      final cartoon = getListData('cartoon');
-      final tvshows = getListData('tvshows');
-      final theater = getListData('theater');
+      final latest = getListData('TXA_NEW1').isEmpty
+          ? getListData('latest')
+          : getListData('TXA_NEW1');
+      final hot = getListData('TXA_HOT1');
+      final anime = getListData('TXA_HH1');
+      final series = getListData('TXA_PB1');
+      final single = getListData('TXA_PL1');
+      final cartoon = getListData('TXA_HH1');
+      final tvshows = getListData('TXA_TV1');
+      final theater = getListData('TXA_CR1');
 
       if (latest.isNotEmpty) {
         sections.add({
-          'title': getTitle('latest', 'TXA_NEW1'),
+          'title': getTitle('TXA_NEW1', 'TXA_NEW1'),
           'movies': latest,
-          'key': 'latest',
+          'key': 'TXA_NEW1',
         });
       }
 
       if (hot.isNotEmpty) {
         sections.add({
-          'title': '🔥 ${getTitle('hot', 'TXA_HOT1')}',
+          'title': '🔥 ${getTitle('TXA_HOT1', 'TXA_HOT1')}',
           'movies': hot,
-          'key': 'hot',
+          'key': 'TXA_HOT1',
         });
       }
 
       if (anime.isNotEmpty) {
         sections.add({
-          'title': '🎌 ${getTitle('anime', 'TXA_HH1')}',
+          'title': '🎌 ${getTitle('TXA_HH1', 'TXA_HH1')}',
           'movies': anime,
-          'key': 'anime',
+          'key': 'TXA_HH1',
         });
       }
 
       if (series.isNotEmpty) {
         sections.add({
-          'title': '📺 ${getTitle('series', 'TXA_PB1')}',
+          'title': '📺 ${getTitle('TXA_PB1', 'TXA_PB1')}',
           'movies': series,
-          'key': 'series',
+          'key': 'TXA_PB1',
         });
       }
 
       if (single.isNotEmpty) {
         sections.add({
-          'title': '🎬 ${getTitle('single', 'TXA_PL1')}',
+          'title': '🎬 ${getTitle('TXA_PL1', 'TXA_PL1')}',
           'movies': single,
-          'key': 'single',
+          'key': 'TXA_PL1',
         });
       }
 
       if (cartoon.isNotEmpty) {
         sections.add({
-          'title': '✨ ${getTitle('cartoon', 'TXA_HH1')}',
+          'title': '✨ ${getTitle('TXA_HH1', 'TXA_HH1')}',
           'movies': cartoon,
           'key': 'cartoon',
         });
@@ -1246,17 +1228,17 @@ class _HomeTabState extends State<_HomeTab> {
 
       if (tvshows.isNotEmpty) {
         sections.add({
-          'title': '🎭 ${getTitle('tvshows', 'TXA_TV1')}',
+          'title': '🎭 ${getTitle('TXA_TV1', 'TXA_TV1')}',
           'movies': tvshows,
-          'key': 'tvshows',
+          'key': 'TXA_TV1',
         });
       }
 
       if (theater.isNotEmpty) {
         sections.add({
-          'title': '🍿 ${getTitle('theater', 'TXA_CR1')}',
+          'title': '🍿 ${getTitle('TXA_CR1', 'TXA_CR1')}',
           'movies': theater,
-          'key': 'theater',
+          'key': 'TXA_CR1',
         });
       }
     }
@@ -1271,7 +1253,7 @@ class _HomeTabState extends State<_HomeTab> {
             ...sections.where(
               (s) =>
                   s['key'] != _activeFilter &&
-                  (s['key'] == 'latest' || s['key'] == 'hot'),
+                  (s['key'] == 'TXA_NEW1' || s['key'] == 'TXA_HOT1'),
             ),
           ];
 
@@ -1395,15 +1377,15 @@ class _HomeTabState extends State<_HomeTab> {
                           ),
                           _FilterChip(
                             label: TxaLanguage.t('series_movies'),
-                            isActive: _activeFilter == 'series',
+                            isActive: _activeFilter == 'TXA_PB1',
                             onTap: () =>
-                                setState(() => _activeFilter = 'series'),
+                                setState(() => _activeFilter = 'TXA_PB1'),
                           ),
                           _FilterChip(
                             label: TxaLanguage.t('single_movies'),
-                            isActive: _activeFilter == 'single',
+                            isActive: _activeFilter == 'TXA_PL1',
                             onTap: () =>
-                                setState(() => _activeFilter = 'single'),
+                                setState(() => _activeFilter = 'TXA_PL1'),
                           ),
                           ...categories
                               .take(6)
@@ -1623,61 +1605,6 @@ class _GlassIconBtn extends StatelessWidget {
       return Tooltip(message: tooltip!, child: child);
     }
     return child;
-  }
-}
-
-class _GlassIconBadge extends StatelessWidget {
-  final IconData icon;
-  final int badgeCount;
-  final VoidCallback onTap;
-
-  const _GlassIconBadge({
-    required this.icon,
-    required this.badgeCount,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Stack(
-        clipBehavior: Clip.none,
-        children: [
-          Container(
-            padding: const EdgeInsets.all(6),
-            decoration: BoxDecoration(
-              color: TxaTheme.glassBg,
-              borderRadius: BorderRadius.circular(10),
-              border: Border.all(color: TxaTheme.glassBorder),
-            ),
-            child: Icon(icon, color: TxaTheme.textPrimary, size: 20),
-          ),
-          if (badgeCount > 0)
-            Positioned(
-              top: -4,
-              right: -4,
-              child: Container(
-                padding: const EdgeInsets.all(4),
-                decoration: const BoxDecoration(
-                  color: Colors.red,
-                  shape: BoxShape.circle,
-                ),
-                constraints: const BoxConstraints(minWidth: 16, minHeight: 16),
-                child: Text(
-                  badgeCount > 99 ? '99+' : badgeCount.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontSize: 8,
-                    fontWeight: FontWeight.bold,
-                  ),
-                  textAlign: TextAlign.center,
-                ),
-              ),
-            ),
-        ],
-      ),
-    );
   }
 }
 

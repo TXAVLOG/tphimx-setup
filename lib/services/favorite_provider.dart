@@ -21,7 +21,8 @@ class FavoriteProvider extends ChangeNotifier {
     return id;
   }
 
-  bool isFavorite(dynamic movieId) => _favorites[_normalizeId(movieId)] ?? false;
+  bool isFavorite(dynamic movieId) =>
+      _favorites[_normalizeId(movieId)] ?? false;
 
   /// Update the favorite status locally. Useful when data comes from an API response
   /// that already includes the status (like movie detail).
@@ -52,10 +53,12 @@ class FavoriteProvider extends ChangeNotifier {
         _favorites[key] = status;
         notifyListeners();
         return true;
+      } else {
+        throw Exception(res['message'] ?? 'Failed to toggle favorite');
       }
     } catch (e) {
       debugPrint('Toggle Favorite Error: $e');
+      rethrow; // Re-throw to let UI handle the error
     }
-    return false;
   }
 }

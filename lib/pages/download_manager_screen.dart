@@ -101,20 +101,18 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
                 SliverPadding(
                   padding: const EdgeInsets.fromLTRB(16, 24, 16, 120),
                   sliver: SliverGrid(
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 2,
-                      childAspectRatio: 0.75,
-                      crossAxisSpacing: 16,
-                      mainAxisSpacing: 20,
-                    ),
-                    delegate: SliverChildBuilderDelegate(
-                      (context, index) {
-                        final mid = movieIds[index];
-                        final movieTasks = grouped[mid]!;
-                        return _buildMovieCard(mid, movieTasks);
-                      },
-                      childCount: movieIds.length,
-                    ),
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                          crossAxisCount: 2,
+                          childAspectRatio: 0.75,
+                          crossAxisSpacing: 16,
+                          mainAxisSpacing: 20,
+                        ),
+                    delegate: SliverChildBuilderDelegate((context, index) {
+                      final mid = movieIds[index];
+                      final movieTasks = grouped[mid]!;
+                      return _buildMovieCard(mid, movieTasks);
+                    }, childCount: movieIds.length),
                   ),
                 ),
               ],
@@ -165,7 +163,10 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
     int downloadingCount = manager.tasks
         .where((t) => t.status == DownloadStatus.downloading)
         .length;
-    
+    int completedCount = manager.tasks
+        .where((t) => t.status == DownloadStatus.completed)
+        .length;
+
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: Row(
@@ -173,7 +174,7 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
           _buildStatItem(
             Icons.movie_filter_rounded,
             movieCount.toString(),
-            TxaLanguage.t('movies'),
+            TxaLanguage.t('downloaded_movies'),
           ),
           const SizedBox(width: 12),
           _buildStatItem(
@@ -182,12 +183,24 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
             TxaLanguage.t('downloading'),
             color: TxaTheme.accent,
           ),
+          const SizedBox(width: 12),
+          _buildStatItem(
+            Icons.check_circle_rounded,
+            completedCount.toString(),
+            TxaLanguage.t('download_completed'),
+            color: Colors.green,
+          ),
         ],
       ),
     );
   }
 
-  Widget _buildStatItem(IconData icon, String value, String label, {Color? color}) {
+  Widget _buildStatItem(
+    IconData icon,
+    String value,
+    String label, {
+    Color? color,
+  }) {
     return Expanded(
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -221,14 +234,17 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
 
   Widget _buildMovieCard(String mid, List<TxaDownloadTask> tasks) {
     final firstTask = tasks.first;
-    final completedCount = tasks.where((t) => t.status == DownloadStatus.completed).length;
+    final completedCount = tasks
+        .where((t) => t.status == DownloadStatus.completed)
+        .length;
     final totalCount = tasks.length;
     final isAllDone = completedCount == totalCount;
     final isSelected = _selectedMovies.contains(mid);
 
     double overallProgress = 0;
     if (totalCount > 0) {
-      overallProgress = tasks.fold(0.0, (sum, t) => sum + t.progress) / totalCount;
+      overallProgress =
+          tasks.fold(0.0, (sum, t) => sum + t.progress) / totalCount;
     }
 
     final activeTask = tasks.firstWhere(
@@ -273,7 +289,9 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
           borderRadius: BorderRadius.circular(24),
           color: TxaTheme.cardBg,
           border: Border.all(
-            color: isSelected ? TxaTheme.accent : Colors.white.withValues(alpha: 0.1),
+            color: isSelected
+                ? TxaTheme.accent
+                : Colors.white.withValues(alpha: 0.1),
             width: isSelected ? 2 : 1,
           ),
           boxShadow: [
@@ -294,7 +312,8 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
                 child: CachedNetworkImage(
                   imageUrl: firstTask.poster,
                   fit: BoxFit.cover,
-                  placeholder: (context, url) => Container(color: TxaTheme.cardBg),
+                  placeholder: (context, url) =>
+                      Container(color: TxaTheme.cardBg),
                   errorWidget: (context, url, error) => Container(
                     color: TxaTheme.cardBg,
                     child: const Icon(Icons.error, color: Colors.white10),
@@ -344,22 +363,37 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
                         child: LinearProgressIndicator(
                           value: overallProgress,
                           backgroundColor: Colors.white24,
-                          valueColor: const AlwaysStoppedAnimation<Color>(TxaTheme.accent),
+                          valueColor: const AlwaysStoppedAnimation<Color>(
+                            TxaTheme.accent,
+                          ),
                           minHeight: 4,
                         ),
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        TxaLanguage.t('episodes_completed', replace: {
-                          'c': completedCount.toString(),
-                          't': totalCount.toString(),
-                        }),
-                        style: const TextStyle(color: TxaTheme.accent, fontSize: 10, fontWeight: FontWeight.bold),
+                        TxaLanguage.t(
+                          'episodes_completed',
+                          replace: {
+                            'c': completedCount.toString(),
+                            't': totalCount.toString(),
+                          },
+                        ),
+                        style: const TextStyle(
+                          color: TxaTheme.accent,
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ] else
                       Text(
-                        TxaLanguage.t('episode_count_label', replace: {'n': totalCount.toString()}),
-                        style: const TextStyle(color: TxaTheme.textMuted, fontSize: 10),
+                        TxaLanguage.t(
+                          'episode_count_label',
+                          replace: {'n': totalCount.toString()},
+                        ),
+                        style: const TextStyle(
+                          color: TxaTheme.textMuted,
+                          fontSize: 10,
+                        ),
                       ),
                   ],
                 ),
@@ -382,7 +416,11 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
                         ),
                       ],
                     ),
-                    child: const Icon(Icons.downloading_rounded, color: Colors.white, size: 16),
+                    child: const Icon(
+                      Icons.downloading_rounded,
+                      color: Colors.white,
+                      size: 16,
+                    ),
                   ),
                 ),
               // Selection Checkbox
@@ -432,7 +470,11 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
               ),
             ),
             const SizedBox(height: 24),
-            const Icon(Icons.delete_sweep_rounded, color: Colors.redAccent, size: 48),
+            const Icon(
+              Icons.delete_sweep_rounded,
+              color: Colors.redAccent,
+              size: 48,
+            ),
             const SizedBox(height: 16),
             Text(
               TxaLanguage.t('delete_all_confirm'),
@@ -454,7 +496,10 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
                 Expanded(
                   child: TextButton(
                     onPressed: () => Navigator.pop(ctx),
-                    child: Text(TxaLanguage.t('cancel'), style: const TextStyle(color: Colors.white70)),
+                    child: Text(
+                      TxaLanguage.t('cancel'),
+                      style: const TextStyle(color: Colors.white70),
+                    ),
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -472,10 +517,18 @@ class _DownloadManagerScreenState extends State<DownloadManagerScreen> {
                     },
                     style: ElevatedButton.styleFrom(
                       backgroundColor: Colors.redAccent,
-                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
                       padding: const EdgeInsets.symmetric(vertical: 14),
                     ),
-                    child: Text(TxaLanguage.t('delete'), style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    child: Text(
+                      TxaLanguage.t('delete'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ),
               ],

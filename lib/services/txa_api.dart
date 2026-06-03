@@ -3,12 +3,20 @@ import 'package:dio/dio.dart';
 import '../services/txa_settings.dart';
 import '../utils/txa_logger.dart';
 
+class ApiException implements Exception {
+  final String message;
+  ApiException(this.message);
+
+  @override
+  String toString() => message;
+}
+
 class TxaApi {
   static const String baseUrl = 'https://dongmephim.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '4.4.0';
-  static const String buildNumber = '440';
+  static const String apiVersion = '4.5.0';
+  static const String buildNumber = '450';
 
   // Community Links
   static const String facebookFanpage =
@@ -17,6 +25,7 @@ class TxaApi {
       'https://www.facebook.com/groups/1819522938713878';
   static const String telegramChannel = 'https://t.me/tphimx';
   static const String telegramGroup = 'https://t.me/+uptNAkShrJFjMjc1';
+  static const String zaloGroup = 'https://zalo.me/g/nc4aaozaxnr5fszvnxdb';
 
   final Dio _dio = Dio(
     BaseOptions(
@@ -82,11 +91,15 @@ class TxaApi {
     Map<String, dynamic>? queryParameters,
   }) async {
     final startTime = DateTime.now();
+    final queryString = queryParameters != null && queryParameters.isNotEmpty
+        ? '?${queryParameters.entries.map((e) => '${e.key}=${e.value}').join('&')}'
+        : '';
+    final fullUrl = '$baseUrl$path$queryString';
     try {
       final response = await _dio.get(path, queryParameters: queryParameters);
       TxaLogger.logApi(
         method: 'GET',
-        path: path,
+        path: fullUrl,
         statusCode: response.statusCode,
         response: response.data,
         duration: DateTime.now().difference(startTime),
@@ -95,7 +108,7 @@ class TxaApi {
     } on DioException catch (e) {
       TxaLogger.logApi(
         method: 'GET',
-        path: path,
+        path: fullUrl,
         statusCode: e.response?.statusCode,
         response: e.response?.data,
         duration: DateTime.now().difference(startTime),
@@ -110,7 +123,7 @@ class TxaApi {
       final response = await _dio.post(path, data: data);
       TxaLogger.logApi(
         method: 'POST',
-        path: path,
+        path: '$baseUrl$path',
         statusCode: response.statusCode,
         body: data,
         response: response.data,
@@ -120,7 +133,7 @@ class TxaApi {
     } on DioException catch (e) {
       TxaLogger.logApi(
         method: 'POST',
-        path: path,
+        path: '$baseUrl$path',
         statusCode: e.response?.statusCode,
         body: data,
         response: e.response?.data,
@@ -132,11 +145,9 @@ class TxaApi {
 
   Map<String, dynamic> _safeMap(dynamic data) {
     if (data is Map<String, dynamic>) return data;
-    TxaLogger.log(
-      'API_TYPE_ERROR: Expected Map, got ${data.runtimeType}',
-      isError: true,
-    );
-    return {};
+    final errorMsg = 'API_TYPE_ERROR: Expected Map, got ${data.runtimeType}';
+    TxaLogger.log(errorMsg, isError: true);
+    throw ApiException(errorMsg);
   }
 
   // ============ Implementation methods ============
@@ -185,6 +196,9 @@ class TxaApi {
     if (region != null) params['region'] = region;
     if (year != null) params['year'] = year;
     if (movieType != null) params['type'] = movieType;
+
+    TxaLogger.log('Searching: $query', tag: 'SEARCH', type: 'search');
+
     final response = await get(search, queryParameters: params);
     return _safeMap(response.data);
   }
@@ -273,6 +287,8 @@ class TxaApi {
     required String password,
     required String confirmPw,
     required String gender,
+    String? province,
+    String? ward,
   }) async {
     return await post(
       authRegister,
@@ -285,6 +301,8 @@ class TxaApi {
         'gender': gender,
         'device_name': Platform.isIOS ? 'iPhone' : 'Android',
         'agree': 1,
+        'province': province ?? 'Hà Nội',
+        'ward': ward ?? 'Phường Hoàn Kiếm',
       },
     );
   }
@@ -374,7 +392,7 @@ class TxaApi {
           'type': type,
           'message': message,
           'extra': extra,
-          'device_info': 'TPhimX-App-V4.4.0',
+          'device_info': 'TPhimX-App-V4.5.0',
           'timestamp': DateTime.now().toIso8601String(),
         },
       );

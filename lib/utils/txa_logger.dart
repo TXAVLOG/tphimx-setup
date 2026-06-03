@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'dart:convert';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:intl/intl.dart';
@@ -91,6 +92,17 @@ class TxaLogger {
     log('TxaLogger initialized. Global error tracking active.', tag: 'LOGGER');
   }
 
+  static String _normalizeMessage(String msg) {
+    // Remove timestamps like [12:34:56.789] or [2026-05-31 ...]
+    String cleaned = msg.replaceAll(RegExp(r'\[\d{2,4}[-\d:]*[\s\d:.]*\]'), '');
+    // Remove hex codes / memory addresses (e.g. 0x7f3a8b)
+    cleaned = cleaned.replaceAll(RegExp(r'0x[a-fA-F0-9]+'), '');
+    // Remove digits to prevent matching different IDs of same error
+    cleaned = cleaned.replaceAll(RegExp(r'\d+'), '');
+    // Convert to lowercase, remove extra spaces and trim
+    return cleaned.toLowerCase().replaceAll(RegExp(r'\s+'), ' ').trim();
+  }
+
   static Future<void> log(
     String message, {
     bool isError = false,
@@ -99,34 +111,63 @@ class TxaLogger {
   }) async {
     try {
       final path = await _logPath;
-      final date = DateFormat('yyyy-MM-dd').format(DateTime.now());
-      final file = File('$path/${type}_$date.log');
-
-      // Auto-clean if file > 5MB
-      if (await file.exists() && await file.length() > 5 * 1024 * 1024) {
-        await file.delete();
-      }
-
       final now = DateTime.now();
       final timestamp = DateFormat('HH:mm:ss.SSS').format(now);
       final level = isError ? 'ERROR' : 'INFO ';
       final tagStr = tag != null ? '[$tag] ' : '';
-
-      // Build a premium formatted log line with clearer separation
       final logLine = '[$timestamp] [$level] $tagStr$message\n';
 
-      await file.writeAsString(logLine, mode: FileMode.append, flush: true);
+      // 1. ALWAYS write all logs to dynamic daily files so they appear on the app's logs viewer screen!
+      final date = DateFormat('yyyy-MM-dd').format(now);
+      final dailyFile = File('$path/${type}_$date.log');
 
-      // Also print to console for development with colors/tags
+      if (await dailyFile.exists() &&
+          await dailyFile.length() > 1 * 1024 * 1024) {
+        await dailyFile.delete();
+      }
+      await dailyFile.writeAsString(
+        logLine,
+        mode: FileMode.append,
+        flush: true,
+      );
+
+      // 2. ERROR LOGS: Also save in permanent errors.log and upload to Supabase, avoiding duplicate types
+      if (isError || type == 'error') {
+        final errorFile = File('$path/errors.log');
+        bool isDuplicate = false;
+
+        if (await errorFile.exists()) {
+          final content = await errorFile.readAsString();
+          final normalizedNew = _normalizeMessage(message);
+          final lines = content.split('\n');
+          for (var line in lines) {
+            if (line.isEmpty) continue;
+            final normalizedLine = _normalizeMessage(line);
+            if (normalizedLine == normalizedNew ||
+                (normalizedNew.length > 8 &&
+                    normalizedLine.contains(normalizedNew))) {
+              isDuplicate = true;
+              break;
+            }
+          }
+        }
+
+        if (!isDuplicate) {
+          await errorFile.writeAsString(
+            logLine,
+            mode: FileMode.append,
+            flush: true,
+          );
+          // Auto-submit unique error logs directly to Supabase
+          submitErrorLog(type: type, message: message, tag: tag);
+        }
+      }
+
+      // Print to console with developer colors/tags
       final consolePrefix = isError
           ? '❌ [$timestamp] [TPHIMX-$type]'
           : 'ℹ️ [$timestamp] [TPHIMX-$type]';
       debugPrint('$consolePrefix $tagStr$message');
-
-      // Auto-submit error logs to server
-      if (isError) {
-        submitErrorLog(type: type, message: message, tag: tag);
-      }
     } catch (e) {
       if (kDebugMode) debugPrint('CRITICAL: Failed to write to log file: $e');
     }
@@ -221,7 +262,7 @@ class TxaLogger {
     };
   }
 
-  // Submit error log to server
+  // Submit error log directly to Supabase logs table
   static Future<void> submitErrorLog({
     required String type,
     required String message,
@@ -233,32 +274,37 @@ class TxaLogger {
       final locationInfo = await getIpLocation();
 
       final dio = Dio();
+      final detailsMap = {
+        'type': type,
+        'tag': tag,
+        'extra': extra,
+        'device_info': deviceInfo,
+        'location_info': locationInfo,
+        'app_version': 'TPhimX-App-V4.5.0',
+        'timestamp': DateTime.now().toIso8601String(),
+      };
+
       await dio.post(
-        'https://dongmephim.online/api/app/client-error',
+        'https://jjmzipyewddbepnelawf.supabase.co/rest/v1/logs',
         data: {
-          'type': type,
+          'action': 'client_error',
+          'level': 'error',
           'message': message,
-          'tag': tag,
-          'extra': {
-            ...?extra,
-            'device_info': deviceInfo,
-            'location_info': locationInfo,
-          },
-          'device_info': 'TPhimX-App-V4.4.0',
-          'timestamp': DateTime.now().toIso8601String(),
+          'details': jsonEncode(detailsMap),
         },
         options: Options(
           headers: {
-            'X-TXA-API-KEY': 'tphimx-mobile-2026-secure',
-            'X-TXC-Client': 'TPhimX-App',
-            'X-TXC-Platform': Platform.isIOS ? 'iOS' : 'Android',
-            'X-TXA-UDID': TxaSettings.udid,
+            'apikey': 'sb_publishable_p45xwwJNPMFAzp9K8YQlkA_2oc87I1u',
+            'Authorization':
+                'Bearer sb_publishable_p45xwwJNPMFAzp9K8YQlkA_2oc87I1u',
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
           },
           connectTimeout: const Duration(seconds: 10),
         ),
       );
     } catch (e) {
-      debugPrint('Failed to submit error log: $e');
+      debugPrint('Failed to submit error log to Supabase: $e');
     }
   }
 }

@@ -450,9 +450,13 @@ class _TxaPlayerState extends State<TxaPlayer>
       _isRefreshing = false;
     });
 
-    // Force landscapeLeft for consistent rotation on both iOS and Android
-    // landscapeLeft = 90° counter-clockwise (top on left side)
-    SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft]);
+    // Force landscape orientation based on platform
+    // iOS uses landscapeRight for correct rotation (clockwise 90°)
+    // Android uses landscapeLeft for consistent rotation
+    final orientations = Platform.isIOS
+        ? [DeviceOrientation.landscapeRight]
+        : [DeviceOrientation.landscapeLeft];
+    SystemChrome.setPreferredOrientations(orientations);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     _startSpeedTracking();
 
@@ -1647,6 +1651,7 @@ class _TxaPlayerState extends State<TxaPlayer>
       child: Scaffold(
         backgroundColor: Colors.black,
         body: GestureDetector(
+          behavior: HitTestBehavior.translucent,
           onTapUp: (d) => _handleTap(d, width),
           onVerticalDragUpdate: (d) => _handleVerticalDrag(d, width),
           onDoubleTapDown: (d) => _onDoubleTap(d, width),
@@ -1662,8 +1667,10 @@ class _TxaPlayerState extends State<TxaPlayer>
                           children: [
                             _isEmbed
                                 ? WebViewWidget(controller: _webViewController!)
-                                : BetterPlayer(
-                                    controller: _betterPlayerController!,
+                                : IgnorePointer(
+                                    child: BetterPlayer(
+                                      controller: _betterPlayerController!,
+                                    ),
                                   ),
                             if (_isBuffering && !_isEmbed)
                               Container(
@@ -2639,6 +2646,12 @@ class _TxaPlayerState extends State<TxaPlayer>
               value: TxaSettings.autoNextEpisode,
               onChanged: (v) => setState(() => TxaSettings.autoNextEpisode = v),
             ),
+            const Divider(color: Colors.white10, height: 32),
+            // _SwitchRow(
+            //   label: TxaLanguage.t('player_gesture_hint'),
+            //   value: TxaSettings.showGestureHint,
+            //   onChanged: (v) => setState(() => TxaSettings.showGestureHint = v),
+            // ),
           ],
         ),
       ),

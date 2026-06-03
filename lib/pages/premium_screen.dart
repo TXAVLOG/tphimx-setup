@@ -425,7 +425,7 @@ class _PremiumScreenState extends State<PremiumScreen> {
               // Install button
               ElevatedButton.icon(
                 onPressed: () =>
-                    _launchUrl(context, 'https://asset.nrotxa.online/install'),
+                    _launchUrl(context, 'https://dongmephim.online/install'),
                 icon: const Icon(Icons.auto_awesome_rounded, size: 20),
                 label: Text(TxaLanguage.t('udid_install_btn')),
                 style: ElevatedButton.styleFrom(
