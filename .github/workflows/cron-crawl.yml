@@ -1,0 +1,23 @@
+name: Auto Crawl Movies D1
+
+on:
+  schedule:
+    - cron: '*/30 * * * *' # Run every 30 minutes
+  workflow_dispatch:      # Enable manually running this from the Actions tab on GitHub
+
+jobs:
+  crawl:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Cloudflare D1 Cron Crawl
+        run: |
+          curl -f -X POST "${{ secrets.CRAWL_API_URL }}" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "table": "movies",
+              "action": "cronCrawl",
+              "params": {
+                "limit": 10,
+                "secret": "${{ secrets.CRON_SECRET }}"
+              }
+            }'
