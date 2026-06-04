@@ -470,7 +470,8 @@ class _LogViewerScreenState extends State<LogViewerScreen>
     try {
       String type = 'app';
       if (_tabController.index == 1) type = 'api';
-      if (_tabController.index == 2) type = 'downloads';
+      if (_tabController.index == 2) type = 'search';
+      if (_tabController.index == 3) type = 'downloads';
       final path = await TxaLogger.getActiveLogPath();
       final date = TxaFormat.formatDate(DateTime.now(), pattern: 'yyyy-MM-dd');
       final filePath = '$path/${type}_$date.log';
@@ -598,6 +599,8 @@ class _LogViewerScreenState extends State<LogViewerScreen>
         centerTitle: true,
         bottom: TabBar(
           controller: _tabController,
+          isScrollable: true,
+          tabAlignment: TabAlignment.start,
           indicatorColor: TxaTheme.accent,
           indicatorWeight: 3,
           labelStyle: const TextStyle(
