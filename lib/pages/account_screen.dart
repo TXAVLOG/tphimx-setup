@@ -1080,10 +1080,10 @@ class _PremiumProfileCard extends StatelessWidget {
               );
             }
 
-            final name = user['name'] ?? 'TPhimX User';
+            final name = user['name'] ?? user['username'] ?? 'TPhimX User';
             final email = user['email'] ?? '...';
-            final isVerified = user['email_verified_at'] != null;
-            final avatar = user['avatar'];
+            final isVerified = user['email_verified_at'] != null || user['email_verified'] == true || user['is_verified'] == true;
+            final avatar = user['avatar'] ?? user['avatar_url'];
 
             // Check for session expiration quietly
             bool isExpired = false;

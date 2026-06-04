@@ -17,7 +17,7 @@ class TxaWatermark extends StatelessWidget {
     try {
       if (TxaSettings.userData.isNotEmpty) {
         final userData = jsonDecode(TxaSettings.userData);
-        userIdentifier = userData['email'] ?? userData['name'];
+        userIdentifier = userData['email'] ?? userData['name'] ?? userData['username'];
       }
     } catch (_) {}
 
