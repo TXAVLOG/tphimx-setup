@@ -344,6 +344,7 @@ class _AccountScreenState extends State<AccountScreen> {
                   'favorites',
                   'my_list',
                   'downloads',
+                  'earn_money',
                   'history',
                 ], menuItems),
                 const SizedBox(height: 24),
