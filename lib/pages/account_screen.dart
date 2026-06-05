@@ -345,7 +345,6 @@ class _AccountScreenState extends State<AccountScreen> {
                   'my_list',
                   'downloads',
                   'earn_money',
-                  'history',
                 ], menuItems),
                 const SizedBox(height: 24),
                 _buildMenuSection(TxaLanguage.t('app_settings'), [

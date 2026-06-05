@@ -1,4 +1,4 @@
-﻿import 'dart:async';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:better_player_plus/better_player_plus.dart';
@@ -208,9 +208,9 @@ class _TxaPlayerState extends State<TxaPlayer>
     final ep = serverData[_currentEpisodeIndex];
 
     final mId = int.tryParse(widget.movie['id'].toString()) ?? 0;
-    final eId = int.tryParse(ep['id'].toString()) ?? 0;
+    final eId = ep['id']?.toString() ?? '';
 
-    if (mId == 0 || eId == 0) return;
+    if (mId == 0 || eId.isEmpty) return;
 
     // ALWAYS save locally first for instant offline resume
     TxaSettings.saveLocalHistory(eId, pos.inSeconds.toDouble());
@@ -629,8 +629,8 @@ class _TxaPlayerState extends State<TxaPlayer>
 
       // If no initial time provided (e.g. from Download Manager), check local cache
       if (resumeTime == null || resumeTime == 0) {
-        final eId = int.tryParse(episode?['id']?.toString() ?? '0') ?? 0;
-        if (eId > 0) {
+        final eId = episode?['id']?.toString() ?? '';
+        if (eId.isNotEmpty) {
           resumeTime = TxaSettings.getLocalHistory(eId);
           if (resumeTime > 0) {
             TxaLogger.log("Resuming from local history: $resumeTime s");

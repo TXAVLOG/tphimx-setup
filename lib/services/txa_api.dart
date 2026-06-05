@@ -363,7 +363,7 @@ class TxaApi {
 
   Future<Map<String, dynamic>> updateWatchHistory({
     required int movieId,
-    required int episodeId,
+    required dynamic episodeId,
     required double currentTime,
     required double duration,
   }) async {

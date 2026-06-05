@@ -263,11 +263,11 @@ class TxaSettings extends ChangeNotifier {
       _prefs?.setString('last_notified_update_version', v);
 
   // --- Watch History ---
-  static void saveLocalHistory(int episodeId, double position) {
+  static void saveLocalHistory(dynamic episodeId, double position) {
     _prefs?.setDouble('hist_$episodeId', position);
   }
 
-  static double getLocalHistory(int episodeId) {
+  static double getLocalHistory(dynamic episodeId) {
     return _prefs?.getDouble('hist_$episodeId') ?? 0.0;
   }
 
