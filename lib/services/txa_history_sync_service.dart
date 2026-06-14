@@ -53,6 +53,9 @@ class TxaHistorySyncService {
           episodeId: item['episode_id'],
           currentTime: item['current_time'].toDouble(),
           duration: item['duration'].toDouble(),
+          serverIndex: item['server_index'] != null
+              ? (item['server_index'] as num).toInt()
+              : null,
         );
         successCount++;
       } catch (e) {

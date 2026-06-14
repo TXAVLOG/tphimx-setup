@@ -280,7 +280,7 @@ class TxaLogger {
         'extra': extra,
         'device_info': deviceInfo,
         'location_info': locationInfo,
-        'app_version': 'TPhimX-App-V4.5.0',
+        'app_version': 'TPhimX-App-V4.6.0',
         'timestamp': DateTime.now().toIso8601String(),
       };
 

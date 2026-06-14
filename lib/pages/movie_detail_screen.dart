@@ -107,10 +107,16 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
         final history = _data!['history'];
         String epId = s[0]['server_data'][0]['id'].toString();
         double initialTime = 0;
+        int initialServer = 0;
 
         if (history != null) {
           epId = history['episode_id'].toString();
           initialTime = (history['current_time'] as num).toDouble();
+          if (history['server_index'] != null) {
+            initialServer = (history['server_index'] as num).toInt();
+          } else if (history['serverIndex'] != null) {
+            initialServer = (history['serverIndex'] as num).toInt();
+          }
         }
 
         Navigator.push(
@@ -119,7 +125,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
             builder: (ctx) => TxaPlayer(
               movie: m,
               servers: s,
-              initialServerIndex: 0,
+              initialServerIndex: initialServer,
               initialEpisodeId: epId,
               initialTime: initialTime,
             ),
@@ -395,11 +401,17 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                             String epId = s[0]['server_data'][0]['id']
                                 .toString();
                             double initialTime = 0;
+                            int initialServer = 0;
 
                             if (history != null) {
                               epId = history['episode_id'].toString();
                               initialTime = (history['current_time'] as num)
                                   .toDouble();
+                              if (history['server_index'] != null) {
+                                initialServer = (history['server_index'] as num).toInt();
+                              } else if (history['serverIndex'] != null) {
+                                initialServer = (history['serverIndex'] as num).toInt();
+                              }
                             }
 
                             Navigator.push(
@@ -408,7 +420,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                 builder: (ctx) => TxaPlayer(
                                   movie: m,
                                   servers: s,
-                                  initialServerIndex: 0,
+                                  initialServerIndex: initialServer,
                                   initialEpisodeId: epId,
                                   initialTime: initialTime,
                                 ),

@@ -152,13 +152,32 @@ class _TxaPlayerState extends State<TxaPlayer>
     _volume = TxaSettings.volume;
 
     if (widget.initialEpisodeId != null && widget.servers.isNotEmpty) {
+      bool found = false;
       final episodes =
           widget.servers[_currentServerIndex]['server_data'] as List;
       for (int i = 0; i < episodes.length; i++) {
         if (episodes[i]['id'].toString() ==
             widget.initialEpisodeId.toString()) {
           _currentEpisodeIndex = i;
+          found = true;
           break;
+        }
+      }
+
+      if (!found) {
+        // Fallback: Search all servers to find the matching episode ID
+        for (int s = 0; s < widget.servers.length; s++) {
+          if (s == _currentServerIndex) continue;
+          final eps = widget.servers[s]['server_data'] as List;
+          for (int i = 0; i < eps.length; i++) {
+            if (eps[i]['id'].toString() == widget.initialEpisodeId.toString()) {
+              _currentServerIndex = s;
+              _currentEpisodeIndex = i;
+              found = true;
+              break;
+            }
+          }
+          if (found) break;
         }
       }
     }
@@ -222,6 +241,7 @@ class _TxaPlayerState extends State<TxaPlayer>
         episodeId: eId,
         currentTime: pos.inSeconds.toDouble(),
         duration: dur.inSeconds.toDouble(),
+        serverIndex: _currentServerIndex,
       );
     } catch (e) {
       // If offline or error, save to pending queue for later sync
@@ -233,6 +253,7 @@ class _TxaPlayerState extends State<TxaPlayer>
         'episode_id': eId,
         'current_time': pos.inSeconds.toDouble(),
         'duration': dur.inSeconds.toDouble(),
+        'server_index': _currentServerIndex,
       });
     }
   }

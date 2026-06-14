@@ -15,8 +15,8 @@ class TxaApi {
   static const String baseUrl = 'https://dongmephim.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '4.5.0';
-  static const String buildNumber = '450';
+  static const String apiVersion = '4.6.0';
+  static const String buildNumber = '460';
 
   // Community Links
   static const String facebookFanpage =
@@ -366,6 +366,7 @@ class TxaApi {
     required dynamic episodeId,
     required double currentTime,
     required double duration,
+    int? serverIndex,
   }) async {
     final response = await post(
       updateWatchHistoryUrl,
@@ -374,6 +375,7 @@ class TxaApi {
         'episode_id': episodeId,
         'current_time': currentTime,
         'duration': duration,
+        'server_index':? serverIndex,
       },
     );
     return _safeMap(response.data);
@@ -392,7 +394,7 @@ class TxaApi {
           'type': type,
           'message': message,
           'extra': extra,
-          'device_info': 'TPhimX-App-V4.5.0',
+          'device_info': 'TPhimX-App-V4.6.0',
           'timestamp': DateTime.now().toIso8601String(),
         },
       );
