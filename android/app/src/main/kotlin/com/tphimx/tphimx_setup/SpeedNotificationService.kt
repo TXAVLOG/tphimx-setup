@@ -53,6 +53,7 @@ class SpeedNotificationService : Service() {
     
     // Config
     private var speedUnit: String = "Auto"
+    private var fontFamily: String = "Outfit"
     
     // Translations
     private var txtTitle = "Tốc độ mạng"
@@ -89,8 +90,21 @@ class SpeedNotificationService : Service() {
             return START_STICKY
         }
 
-        // Read config
-        speedUnit = intent?.getStringExtra("speedUnit") ?: "Auto"
+        // Read config and persist to prevent loss on background restarts
+        val prefs = getSharedPreferences("speed_service_prefs", Context.MODE_PRIVATE)
+        if (intent?.hasExtra("speedUnit") == true) {
+            speedUnit = intent.getStringExtra("speedUnit") ?: "Auto"
+            prefs.edit().putString("speedUnit", speedUnit).apply()
+        } else {
+            speedUnit = prefs.getString("speedUnit", "Auto") ?: "Auto"
+        }
+
+        if (intent?.hasExtra("fontFamily") == true) {
+            fontFamily = intent.getStringExtra("fontFamily") ?: "Outfit"
+            prefs.edit().putString("fontFamily", fontFamily).apply()
+        } else {
+            fontFamily = prefs.getString("fontFamily", "Outfit") ?: "Outfit"
+        }
         
         // Read translations
         intent?.let {
@@ -156,17 +170,21 @@ class SpeedNotificationService : Service() {
 
     override fun onTaskRemoved(rootIntent: Intent?) {
         // When app is swiped away from recents, ensure service stays or restarts
-        val restartServiceIntent = Intent(applicationContext, SpeedNotificationService::class.java)
-        val restartServicePendingIntent = PendingIntent.getService(
+        val restartServiceIntent = Intent(applicationContext, SpeedServiceRestarter::class.java)
+        val restartServicePendingIntent = PendingIntent.getBroadcast(
             applicationContext, 1, restartServiceIntent, 
             PendingIntent.FLAG_ONE_SHOT or PendingIntent.FLAG_IMMUTABLE
         )
         val alarmService = applicationContext.getSystemService(Context.ALARM_SERVICE) as AlarmManager
-        alarmService.set(
-            AlarmManager.RTC_WAKEUP,
-            System.currentTimeMillis() + 1000,
-            restartServicePendingIntent
-        )
+        try {
+            alarmService.set(
+                AlarmManager.RTC_WAKEUP,
+                System.currentTimeMillis() + 1000,
+                restartServicePendingIntent
+            )
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
         super.onTaskRemoved(rootIntent)
     }
 
@@ -252,6 +270,9 @@ class SpeedNotificationService : Service() {
     }
 
     private fun getSignalStrength(): String {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+            return "━━━━"
+        }
         val connectivityManager = getSystemService(Context.CONNECTIVITY_SERVICE) as ConnectivityManager
         val network = connectivityManager.activeNetwork ?: return "━━━━"
         val capabilities = connectivityManager.getNetworkCapabilities(network) ?: return "━━━━"
@@ -332,14 +353,36 @@ class SpeedNotificationService : Service() {
     }
 
     private fun getSpeedIcon(speedText: String): IconCompat {
-        val key = speedText.trim()
+        val cleanText = speedText.trim()
+        val cacheKey = "$cleanText|$fontFamily"
         val currentIcon = cachedIcon
-        if (key == cachedIconKey && currentIcon != null) return currentIcon
+        if (cacheKey == cachedIconKey && currentIcon != null) return currentIcon
 
-        val icon = createSpeedIcon(key)
-        cachedIconKey = key
+        val icon = createSpeedIcon(cleanText)
+        cachedIconKey = cacheKey
         cachedIcon = icon
         return icon
+    }
+
+    private fun resolveTypeface(family: String): Typeface {
+        return try {
+            val systemName = when (family.lowercase(Locale.US)) {
+                "roboto" -> "sans-serif-black"
+                "inter" -> "sans-serif-black"
+                "outfit" -> "sans-serif-black"
+                "poppins" -> "sans-serif-black"
+                "montserrat" -> "sans-serif-black"
+                "lato" -> "sans-serif-medium"
+                "open sans" -> "sans-serif-medium"
+                "manrope" -> "sans-serif-black"
+                "rubik" -> "sans-serif-black"
+                "bebas neue" -> "sans-serif-condensed"
+                else -> "sans-serif-black"
+            }
+            Typeface.create(systemName, Typeface.BOLD)
+        } catch (e: Exception) {
+            Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+        }
     }
 
     private fun createSpeedIcon(speedText: String): IconCompat {
@@ -368,15 +411,15 @@ class SpeedNotificationService : Service() {
         // Android status bar icons use the ALPHA channel to colorize
         val paintValue = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = if (displayValue.length > 3) 46f else 58f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textSize = if (displayValue.length > 3) 54f else 72f
+            typeface = resolveTypeface(fontFamily)
             textAlign = Paint.Align.CENTER
         }
 
         val paintUnit = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
-            textSize = if (unitStr.length > 3) 26f else 30f
-            typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
+            textSize = if (unitStr.length > 3) 28f else 34f
+            typeface = resolveTypeface(fontFamily)
             textAlign = Paint.Align.CENTER
         }
 
@@ -413,10 +456,14 @@ class SpeedNotificationService : Service() {
 class SpeedServiceRestarter : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
         val serviceIntent = Intent(context, SpeedNotificationService::class.java)
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            context.startForegroundService(serviceIntent)
-        } else {
-            context.startService(serviceIntent)
+        try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                context.startForegroundService(serviceIntent)
+            } else {
+                context.startService(serviceIntent)
+            }
+        } catch (e: Exception) {
+            android.util.Log.e("SpeedService", "Failed to start SpeedNotificationService from background: ${e.message}")
         }
     }
 }

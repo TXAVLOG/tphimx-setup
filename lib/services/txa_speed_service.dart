@@ -254,6 +254,7 @@ class TxaSpeedService {
         'txtUsage': TxaLanguage.t('network_usage'),
         'txtTotal': TxaLanguage.t('total'),
         'fontWeight': 900,
+        'fontFamily': TxaSettings.fontFamily,
       };
 
       final bool? result = await _channel.invokeMethod(

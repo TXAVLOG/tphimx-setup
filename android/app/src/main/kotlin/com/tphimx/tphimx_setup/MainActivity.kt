@@ -49,6 +49,7 @@ class MainActivity : FlutterFragmentActivity() {
                     val speedUnit = call.argument<String>("speedUnit") ?: "Auto"
                     val intent = Intent(this, SpeedNotificationService::class.java).apply {
                         putExtra("speedUnit", speedUnit)
+                        putExtra("fontFamily", call.argument<String>("fontFamily"))
                         putExtra("txtTitle", call.argument<String>("txtTitle"))
                         putExtra("txtInit", call.argument<String>("txtInit"))
                         putExtra("txtNetwork", call.argument<String>("txtNetwork"))
@@ -60,19 +61,27 @@ class MainActivity : FlutterFragmentActivity() {
                         putExtra("txtUsage", call.argument<String>("txtUsage"))
                         putExtra("txtTotal", call.argument<String>("txtTotal"))
                     }
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                        startForegroundService(intent)
-                    } else {
-                        startService(intent)
+                    try {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+                            startForegroundService(intent)
+                        } else {
+                            startService(intent)
+                        }
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("START_FAILED", "Failed to start speed service: ${e.message}", null)
                     }
-                    result.success(true)
                 }
 
 
                 "stopSpeedService" -> {
-                    val intent = Intent(this, SpeedNotificationService::class.java)
-                    stopService(intent)
-                    result.success(true)
+                    try {
+                        val intent = Intent(this, SpeedNotificationService::class.java)
+                        stopService(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("STOP_FAILED", "Failed to stop speed service: ${e.message}", null)
+                    }
                 }
                 "updateSpeed" -> {
                     val downSpeed = call.argument<String>("downSpeed") ?: "0 KB/s"
@@ -82,8 +91,12 @@ class MainActivity : FlutterFragmentActivity() {
                         putExtra("downSpeed", downSpeed)
                         putExtra("upSpeed", upSpeed)
                     }
-                    startService(intent)
-                    result.success(true)
+                    try {
+                        startService(intent)
+                        result.success(true)
+                    } catch (e: Exception) {
+                        result.error("UPDATE_FAILED", "Failed to update speed data: ${e.message}", null)
+                    }
                 }
                 else -> result.notImplemented()
             }
