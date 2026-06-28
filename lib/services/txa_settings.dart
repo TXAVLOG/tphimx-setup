@@ -209,7 +209,40 @@ class TxaSettings extends ChangeNotifier {
     return false;
   }
 
-  static bool get isBypassAds => isVip;
+  static bool get isBypassAds {
+    if (isVip) return true;
+    final p = userPermissions;
+    return p['bypass_ads'] ?? false;
+  }
+
+  static Map<String, dynamic> get userPermissions {
+    if (authToken.isEmpty) return {};
+    final dataStr = userData;
+    if (dataStr.isEmpty) return {};
+    try {
+      final map = jsonDecode(dataStr);
+      if (map is Map<String, dynamic>) {
+        if (map['permissions'] is Map<String, dynamic>) {
+          return map['permissions'] as Map<String, dynamic>;
+        }
+      }
+    } catch (_) {}
+    return {};
+  }
+
+  static String get maxResolution {
+    if (isVip) {
+      final p = userPermissions;
+      return (p['max_resolution'] ?? '4K').toString();
+    }
+    return '1080p';
+  }
+
+  static bool get hasVipBadge {
+    if (!isVip) return false;
+    final p = userPermissions;
+    return p['vip_badge'] ?? true;
+  }
 
   // Scheduled Movies
   static bool isMovieScheduled(String movieId) {

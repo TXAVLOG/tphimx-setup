@@ -92,6 +92,30 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
     _calculatedPrice = _calculatedPrice.roundToDouble();
   }
 
+  List<String> _extractPackageFeatures(dynamic p) {
+    if (p == null) return [];
+    List<String> list = [];
+    if (p['features'] is List) {
+      list.addAll((p['features'] as List).map((e) => e.toString()).where((e) => e.isNotEmpty));
+    }
+    if (p['permissions'] is Map) {
+      final perm = p['permissions'] as Map;
+      if (perm['bypass_ads'] == true && !list.any((e) => e.toLowerCase().contains('quảng cáo'))) {
+        list.add('Xem phim không quảng cáo');
+      }
+      if (perm['max_resolution'] != null && !list.any((e) => e.contains('4K') || e.contains('1080p') || e.contains('HD'))) {
+        list.add('Độ phân giải tối đa ${perm['max_resolution']}');
+      }
+      if (perm['watch_together'] == true && !list.any((e) => e.toLowerCase().contains('xem chung'))) {
+        list.add('Hỗ trợ tính năng Xem Chung cùng bạn bè');
+      }
+      if (perm['vip_badge'] == true && !list.any((e) => e.toLowerCase().contains('huy hiệu'))) {
+        list.add('Huy hiệu VIP độc quyền trên tài khoản');
+      }
+    }
+    return list;
+  }
+
   String _formatCurrency(double val) {
     return '${val.toStringAsFixed(0).replaceAllMapped(RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'), (Match m) => '${m[1]}.')}đ';
   }
@@ -540,24 +564,33 @@ class _SubscriptionScreenState extends State<SubscriptionScreen> {
                                 '${_formatCurrency((p['price'] as num).toDouble())} / tháng',
                                 style: const TextStyle(color: Colors.amber, fontWeight: FontWeight.bold, fontSize: 13),
                               ),
-                              if (p['features'] != null) ...[
-                                const SizedBox(height: 12),
-                                ...((p['features'] as List).map((f) => Padding(
-                                  padding: const EdgeInsets.symmetric(vertical: 2),
-                                  child: Row(
+                               Builder(
+                                builder: (_) {
+                                  final feats = _extractPackageFeatures(p);
+                                  if (feats.isEmpty) return const SizedBox.shrink();
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      const Icon(Icons.check_rounded, color: Colors.green, size: 14),
-                                      const SizedBox(width: 6),
-                                      Expanded(
-                                        child: Text(
-                                          f.toString(),
-                                          style: const TextStyle(color: TxaTheme.textSecondary, fontSize: 11),
+                                      const SizedBox(height: 12),
+                                      ...feats.map((f) => Padding(
+                                        padding: const EdgeInsets.symmetric(vertical: 2),
+                                        child: Row(
+                                          children: [
+                                            const Icon(Icons.check_rounded, color: Colors.green, size: 14),
+                                            const SizedBox(width: 6),
+                                            Expanded(
+                                              child: Text(
+                                                f,
+                                                style: const TextStyle(color: TxaTheme.textSecondary, fontSize: 11),
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ),
+                                      )),
                                     ],
-                                  ),
-                                ))),
-                              ],
+                                  );
+                                },
+                              ),
                             ],
                           ),
                         ),
