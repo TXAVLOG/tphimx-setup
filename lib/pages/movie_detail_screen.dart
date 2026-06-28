@@ -128,6 +128,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
               initialServerIndex: initialServer,
               initialEpisodeId: epId,
               initialTime: initialTime,
+              ads: _data!['ads'],
             ),
           ),
         ).then((_) {
@@ -423,6 +424,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                                   initialServerIndex: initialServer,
                                   initialEpisodeId: epId,
                                   initialTime: initialTime,
+                                  ads: _data!['ads'],
                                 ),
                               ),
                             ).then((_) {
@@ -882,6 +884,7 @@ class _MovieDetailScreenState extends State<MovieDetailScreen>
                             initialTime: isActive
                                 ? (history['current_time'] as num).toDouble()
                                 : 0,
+                            ads: _data!['ads'],
                           ),
                         ),
                       ).then((_) {

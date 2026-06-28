@@ -36,6 +36,7 @@ class TxaPlayer extends StatefulWidget {
   final BetterPlayerController? existingController;
   final String? localPath;
   final String? localTitle;
+  final Map<String, dynamic>? ads;
 
   const TxaPlayer({
     super.key,
@@ -47,6 +48,7 @@ class TxaPlayer extends StatefulWidget {
     this.existingController,
     this.localPath,
     this.localTitle,
+    this.ads,
   });
 
   final double? initialTime;
@@ -58,6 +60,12 @@ class TxaPlayer extends StatefulWidget {
 class _TxaPlayerState extends State<TxaPlayer>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   BetterPlayerController? _betterPlayerController;
+
+  // Pre-Roll Ad State
+  bool _hasShownPreRoll = false;
+  bool _isPlayingPreRoll = false;
+  int _preRollCountdown = 5;
+  Timer? _preRollTimer;
 
   bool _error = false;
   bool _isInitialized = false;
@@ -462,7 +470,51 @@ class _TxaPlayerState extends State<TxaPlayer>
   bool _showEpisodeDrawer = false;
   bool _showServerDrawer = false;
 
+  void _startPreRollAd(Map<String, dynamic> ads) {
+    final String url = ads['pre_roll_url'] ?? '';
+    final String type = ads['pre_roll_type'] ?? 'video';
+    final int skipSecs = (ads['pre_roll_skip_seconds'] as num?)?.toInt() ?? 5;
+
+    setState(() {
+      _isPlayingPreRoll = true;
+      _preRollCountdown = skipSecs;
+    });
+
+    _preRollTimer?.cancel();
+    _preRollTimer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (!mounted) return;
+      if (_preRollCountdown > 0) {
+        setState(() {
+          _preRollCountdown--;
+        });
+      }
+    });
+
+    if (type == 'embed') {
+      _initializeEmbed(url);
+    } else {
+      _trySource([{'type': 'stream', 'url': url, 'name': 'Quảng cáo Pre-Roll'}], 0, {'id': 'preroll', 'name': 'Ad'});
+    }
+  }
+
+  void _finishPreRollAndStartMovie() {
+    _preRollTimer?.cancel();
+    setState(() {
+      _isPlayingPreRoll = false;
+      _hasShownPreRoll = true;
+    });
+    _initializePlayer();
+  }
+
   Future<void> _initializePlayer() async {
+    if (!_hasShownPreRoll && !TxaSettings.isBypassAds && widget.ads != null) {
+      final ads = widget.ads!;
+      if (ads['pre_roll_enable'] == true && ads['pre_roll_url']?.toString().isNotEmpty == true) {
+        _startPreRollAd(ads);
+        return;
+      }
+    }
+
     setState(() {
       _isInitialized = false;
       _error = false;
@@ -775,6 +827,9 @@ class _TxaPlayerState extends State<TxaPlayer>
         if (_showAutoNextCountdownOverlay && ct < (dur - 20)) {
           _cancelAutoNextCountdown(resetTrigger: true);
         }
+    } else if (event.betterPlayerEventType == BetterPlayerEventType.finished) {
+      if (_isPlayingPreRoll) {
+        _finishPreRollAndStartMovie();
       }
     } else if (event.betterPlayerEventType ==
         BetterPlayerEventType.bufferingStart) {
@@ -783,7 +838,11 @@ class _TxaPlayerState extends State<TxaPlayer>
         BetterPlayerEventType.bufferingEnd) {
       if (mounted) setState(() => _isBuffering = false);
     } else if (event.betterPlayerEventType == BetterPlayerEventType.exception) {
-      _handlePlayerError();
+      if (_isPlayingPreRoll) {
+        _finishPreRollAndStartMovie();
+      } else {
+        _handlePlayerError();
+      }
     }
   }
 
@@ -1704,6 +1763,57 @@ class _TxaPlayerState extends State<TxaPlayer>
                       ? _buildErrorUI()
                       : _buildLoadingUI(),
                 ),
+
+                // PRE-ROLL AD OVERLAY
+                if (_isPlayingPreRoll)
+                  Positioned(
+                    bottom: 40,
+                    right: 20,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: Colors.black80,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.amber.withValues(alpha: 0.5)),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: Colors.amber,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              'AD',
+                              style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 10),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          if (_preRollCountdown > 0)
+                            Text(
+                              'Bỏ qua sau ${_preRollCountdown}s',
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                            )
+                          else
+                            InkWell(
+                              onTap: _finishPreRollAndStartMovie,
+                              child: const Row(
+                                children: [
+                                  Text(
+                                    'Bỏ qua quảng cáo',
+                                    style: TextStyle(color: Colors.amber, fontSize: 12, fontWeight: FontWeight.bold),
+                                  ),
+                                  SizedBox(width: 4),
+                                  Icon(Icons.skip_next_rounded, color: Colors.amber, size: 16),
+                                ],
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
 
                 // 2.5 CLOCK (Top-Left)
                 if (TxaSettings.showClock)
