@@ -15,8 +15,8 @@ class TxaApi {
   static const String baseUrl = 'https://dongmephim.online';
   static const String apiPrefix = '/api/app';
   static const String apiKey = 'tphimx-mobile-2026-secure';
-  static const String apiVersion = '4.6.0';
-  static const String buildNumber = '460';
+  static const String apiVersion = '4.7.0';
+  static const String buildNumber = '470';
 
   // Community Links
   static const String facebookFanpage =
@@ -76,6 +76,8 @@ class TxaApi {
       '$apiPrefix/notifications/read-all';
   static const String clearWatchHistoryUrl = '$apiPrefix/watch-history/clear';
   static const String updateWatchHistoryUrl = '$apiPrefix/watch-history/update';
+  static const String packages = '$apiPrefix/packages';
+  static const String sepayInit = '/api/payment/sepay-init';
 
   // Auth
   static const String authLogin = '/api/auth/login';
@@ -375,10 +377,81 @@ class TxaApi {
         'episode_id': episodeId,
         'current_time': currentTime,
         'duration': duration,
-        'server_index':? serverIndex,
+        'server_index': serverIndex,
       },
     );
     return _safeMap(response.data);
+  }
+
+  Future<Map<String, dynamic>> getPackages() async {
+    try {
+      final response = await get(packages);
+      if (response.data != null && response.data['data'] != null) {
+        final data = response.data['data'];
+        if (data is Map<String, dynamic>) {
+          return data;
+        } else if (data is List) {
+          return {'packages': data, 'payment': {}};
+        }
+      }
+      return {'packages': [], 'payment': {}};
+    } catch (e) {
+      TxaLogger.log('getPackages error: $e', isError: true);
+      return {'packages': [], 'payment': {}};
+    }
+  }
+
+  Future<Map<String, dynamic>?> createPaymentLog(Map<String, dynamic> paymentData) async {
+    try {
+      final response = await post('/api/user/payments', data: paymentData);
+      return _safeMap(response.data);
+    } catch (e) {
+      debugPrint('createPaymentLog error: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> initSepayPayment(String txid, double amount, String packageTitle) async {
+    try {
+      final response = await post(sepayInit, data: {
+        'txid': txid,
+        'totalAmount': amount,
+        'packageTitle': packageTitle,
+      });
+      return _safeMap(response.data);
+    } catch (e) {
+      debugPrint('initSepayPayment error: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> getRating(String slug) async {
+    try {
+      final response = await get('/api/app/rating', queryParameters: {'slug': slug});
+      if (response.data != null && response.data['data'] != null) {
+        return _safeMap(response.data['data']);
+      }
+      return _safeMap(response.data);
+    } catch (e) {
+      debugPrint('getRating error: $e');
+      return null;
+    }
+  }
+
+  Future<Map<String, dynamic>?> submitRating(String slug, int rating) async {
+    try {
+      final response = await post('/api/app/rating', data: {
+        'slug': slug,
+        'rating': rating,
+      });
+      if (response.data != null && response.data['data'] != null) {
+        return _safeMap(response.data['data']);
+      }
+      return _safeMap(response.data);
+    } catch (e) {
+      debugPrint('submitRating error: $e');
+      return null;
+    }
   }
 
   /// Ghi log lỗi từ client về server
@@ -394,7 +467,7 @@ class TxaApi {
           'type': type,
           'message': message,
           'extra': extra,
-          'device_info': 'TPhimX-App-V4.6.0',
+          'device_info': 'TPhimX-App-V4.7.0',
           'timestamp': DateTime.now().toIso8601String(),
         },
       );

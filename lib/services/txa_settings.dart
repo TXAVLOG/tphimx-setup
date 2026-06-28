@@ -193,6 +193,24 @@ class TxaSettings extends ChangeNotifier {
     _notify();
   }
 
+  static bool get isVip {
+    if (authToken.isEmpty) return false;
+    final dataStr = userData;
+    if (dataStr.isEmpty) return false;
+    try {
+      final map = jsonDecode(dataStr);
+      if (map is Map<String, dynamic>) {
+        final role = (map['role'] ?? '').toString().toLowerCase();
+        if (role == 'vip' || role == 'admin') return true;
+        final isVipFlag = map['is_vip'] ?? map['isVip'];
+        if (isVipFlag == true || isVipFlag == 1 || isVipFlag == '1') return true;
+      }
+    } catch (_) {}
+    return false;
+  }
+
+  static bool get isBypassAds => isVip;
+
   // Scheduled Movies
   static bool isMovieScheduled(String movieId) {
     return _prefs?.getBool('sch_$movieId') ?? false;

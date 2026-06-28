@@ -21,6 +21,7 @@ import '../utils/txa_format.dart';
 import 'download_manager_screen.dart';
 import 'update_history_screen.dart';
 import '../widgets/txa_modal.dart';
+import 'subscription_screen.dart';
 
 class AccountScreen extends StatefulWidget {
   const AccountScreen({super.key});
@@ -420,8 +421,8 @@ class _AccountScreenState extends State<AccountScreen> {
               child: FutureBuilder<PackageInfo>(
                 future: PackageInfo.fromPlatform(),
                 builder: (context, snapshot) {
-                  final version = snapshot.data?.version ?? '4.6.0';
-                  final buildNumber = snapshot.data?.buildNumber ?? '460';
+                  final version = snapshot.data?.version ?? '4.7.0';
+                  final buildNumber = snapshot.data?.buildNumber ?? '470';
                   return InkWell(
                     onTap: () => Navigator.push(
                       context,
@@ -1079,6 +1080,20 @@ class _PremiumProfileCard extends StatelessWidget {
               );
             }
 
+            final package = user['package']?.toString() ?? 'free';
+            final expiryDate = user['expiryDate']?.toString() ?? '';
+            final isVIP = package != 'free' && package.isNotEmpty;
+
+            String formattedExpiry = '';
+            if (expiryDate.isNotEmpty) {
+              try {
+                final dt = DateTime.parse(expiryDate);
+                formattedExpiry = '${dt.day}/${dt.month}/${dt.year}';
+              } catch (_) {
+                formattedExpiry = expiryDate;
+              }
+            }
+
             final name = user['name'] ?? user['username'] ?? 'TPhimX User';
             final email = user['email'] ?? '...';
             final isVerified = user['email_verified_at'] != null || user['email_verified'] == true || user['is_verified'] == true;
@@ -1109,140 +1124,181 @@ class _PremiumProfileCard extends StatelessWidget {
                   ),
                 ],
               ),
-              child: Row(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  Stack(
+                  Row(
                     children: [
-                      Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          border: Border.all(color: TxaTheme.accent, width: 2),
-                        ),
-                        child: CircleAvatar(
-                          radius: 35,
-                          backgroundColor: TxaTheme.accent.withValues(
-                            alpha: 0.2,
+                      Stack(
+                        children: [
+                          Container(
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: isVIP ? Colors.amber : TxaTheme.accent, width: 2),
+                            ),
+                            child: CircleAvatar(
+                              radius: 35,
+                              backgroundColor: (isVIP ? Colors.amber : TxaTheme.accent).withValues(
+                                alpha: 0.2,
+                              ),
+                              backgroundImage:
+                                  (avatar != null && avatar.toString().isNotEmpty)
+                                  ? CachedNetworkImageProvider(avatar)
+                                  : null,
+                              child: (avatar == null || avatar.toString().isEmpty)
+                                  ? Text(
+                                      name.isNotEmpty ? name[0].toUpperCase() : 'U',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    )
+                                  : null,
+                            ),
                           ),
-                          backgroundImage:
-                              (avatar != null && avatar.toString().isNotEmpty)
-                              ? CachedNetworkImageProvider(avatar)
-                              : null,
-                          child: (avatar == null || avatar.toString().isEmpty)
-                              ? Text(
-                                  name.isNotEmpty ? name[0].toUpperCase() : 'U',
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 24,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                )
-                              : null,
-                        ),
+                          Positioned(
+                            bottom: 0,
+                            right: 0,
+                            child: Container(
+                              padding: const EdgeInsets.all(4),
+                              decoration: BoxDecoration(
+                                color: isVIP ? Colors.amber : Colors.green,
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                isVIP ? Icons.star_rounded : Icons.check,
+                                color: Colors.black,
+                                size: 10,
+                              ),
+                            ),
+                          ),
+                        ],
                       ),
-                      Positioned(
-                        bottom: 0,
-                        right: 0,
-                        child: Container(
-                          padding: const EdgeInsets.all(4),
-                          decoration: const BoxDecoration(
-                            color: Colors.green,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.check,
-                            color: Colors.white,
-                            size: 10,
-                          ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    name,
+                                    style: const TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 18,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ),
+                                if (isExpired)
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                      horizontal: 6,
+                                      vertical: 2,
+                                    ),
+                                    decoration: BoxDecoration(
+                                      color: Colors.red.withValues(alpha: 0.1),
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: Colors.red.withValues(alpha: 0.3),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      '!',
+                                      style: TextStyle(
+                                        color: Colors.redAccent,
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              email,
+                              style: const TextStyle(
+                                color: TxaTheme.textMuted,
+                                fontSize: 13,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 3,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: isVIP
+                                        ? Colors.amber.withValues(alpha: 0.1)
+                                        : Colors.white.withValues(alpha: 0.05),
+                                    borderRadius: BorderRadius.circular(6),
+                                    border: Border.all(
+                                      color: isVIP
+                                          ? Colors.amber.withValues(alpha: 0.3)
+                                          : Colors.white.withValues(alpha: 0.1),
+                                    ),
+                                  ),
+                                  child: Text(
+                                    isVIP ? 'VIP Premium' : 'Free Account',
+                                    style: TextStyle(
+                                      color: isVIP ? Colors.amberAccent : Colors.white60,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                if (isVIP && formattedExpiry.isNotEmpty) ...[
+                                  const SizedBox(width: 8),
+                                  Expanded(
+                                    child: Text(
+                                      'Hạn: $formattedExpiry',
+                                      style: const TextStyle(
+                                        color: TxaTheme.textMuted,
+                                        fontSize: 10,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ],
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                name,
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            ),
-                            if (isExpired)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 6,
-                                  vertical: 2,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.red.withValues(alpha: 0.1),
-                                  borderRadius: BorderRadius.circular(4),
-                                  border: Border.all(
-                                    color: Colors.red.withValues(alpha: 0.3),
-                                  ),
-                                ),
-                                child: const Text(
-                                  '!',
-                                  style: TextStyle(
-                                    color: Colors.redAccent,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                          ],
+                  const SizedBox(height: 16),
+                  ElevatedButton.icon(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (ctx) => const SubscriptionScreen(),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          email,
-                          style: const TextStyle(
-                            color: TxaTheme.textMuted,
-                            fontSize: 13,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        if (isVerified)
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.green.withValues(alpha: 0.1),
-                              borderRadius: BorderRadius.circular(6),
-                              border: Border.all(
-                                color: Colors.green.withValues(alpha: 0.3),
-                              ),
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(
-                                  Icons.verified_rounded,
-                                  color: Colors.greenAccent,
-                                  size: 12,
-                                ),
-                                const SizedBox(width: 4),
-                                Text(
-                                  TxaLanguage.t('email_verified'),
-                                  style: const TextStyle(
-                                    color: Colors.greenAccent,
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                      ],
+                      );
+                    },
+                    icon: const Icon(Icons.workspace_premium_rounded, size: 16),
+                    label: Text(
+                      isVIP ? 'Gia hạn / Đổi gói cước' : 'Nâng cấp lên VIP Premium',
+                      style: const TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.amber,
+                      foregroundColor: Colors.black,
+                      minimumSize: const Size(double.infinity, 40),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
                     ),
                   ),
                 ],
